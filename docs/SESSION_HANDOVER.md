@@ -12,7 +12,7 @@ Phases 1–7 have a first playable implementation; Phase 10 (CI/release) is done
 - The 30-shot gauntlet in `screenshots/auto/` has been visually inspected.
 
 ## Released
-- v0.1.2 (latest; CIA loader fix): https://github.com/JustGoodinc/zombie-settlement-3ds/releases/tag/v0.1.2. v0.1.1 = Try 2 visual pass (its CIA crashes the loader, do not use), v0.1.0 = first slice. Each has zip, 3dsx, cia, SHA256SUMS, FBI QR. CI is a single workflow `.github/workflows/ci.yml`; pushing a `v*` tag publishes a release.
+- v0.1.3 (latest; readable controls, tutorial, camera zoom): https://github.com/JustGoodinc/zombie-settlement-3ds/releases/tag/v0.1.3. v0.1.2 = CIA loader fix. v0.1.1 = Try 2 visual pass (its CIA crashes the loader, do not use), v0.1.0 = first slice. Each has zip, 3dsx, cia, SHA256SUMS, FBI QR. CI is a single workflow `.github/workflows/ci.yml`; pushing a `v*` tag publishes a release.
 
 ## Not verified
 - 3DS on real hardware and its performance.
