@@ -7,7 +7,7 @@ Legend: **NS** not started · **IP** in progress · **I** implemented · **AT** 
 | Shared core, fixed-step sim, software renderer | I, AT, MT |
 | Windows dual-screen window, input, audio, saves | I, MT (screenshot gauntlet; hand-played session pending) |
 | 3DS `.3dsx` build | I, emulator boot verified (Azahar log), not HW |
-| 3DS `.cia` packaging | I (CI), awaiting first CI run |
+| 3DS `.cia` packaging | I, CI-built and header-checked, published in v0.1.0 |
 | Movement, 8-way facing, sprint/dodge, stamina | I, AT (partial), MT |
 | Hit probabilities, aim assist, headshots | I, AT |
 | Firearms, ammo, reload, durability, no jams | I, AT |
@@ -31,15 +31,15 @@ Legend: **NS** not started · **IP** in progress · **I** implemented · **AT** 
 | Save/load, corruption recovery | I, AT |
 | Animation system + test room | I, AT, MT |
 | Audio (29 sfx, ambience, music) | I (not listened to by a human yet) |
-| GitHub repo + CI | IP |
+| GitHub repo + CI + release v0.1.0 | I (CI green: Windows tests + smoke launch, 3DS build, CIA package) |
 | Hospital, Grocery, Train Yard, Scrapyard, Woods, Residential maps | NS |
 | Expanded weapon catalog beyond 9 | NS |
 | Original 3DS performance measurement | NS (needs hardware) |
-| FBI QR install | NS (needs release + hardware) |
+| FBI QR install | I (QR points at verified public CIA URL), not HW-tested |
 
 ## Next milestones
-1. Get CI green on both platforms and publish v0.1.0 with .zip, .3dsx and .cia.
-2. Generate the FBI QR for the released CIA and have a 3DS owner test it.
+1. ~~CI green + v0.1.0 release~~ done.
+2. Have a 3DS owner test the CIA via the FBI QR.
 3. Inspect the 3DS build visually in the emulator and measure it on hardware.
 4. Build the remaining six locations (Phase 8), starting with the Grocery Store (low threat, food).
 5. Polish: smoother night lighting, more character detail, more weapons.

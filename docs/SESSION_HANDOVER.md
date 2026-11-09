@@ -11,10 +11,12 @@ Phases 1–7 have a first playable implementation; Phase 10 (CI/release) is in p
 - 214/214 automated test checks pass (`build\zs_tests.exe`).
 - The 30-shot gauntlet in `screenshots/auto/` has been visually inspected.
 
+## Released
+- v0.1.0: https://github.com/JustGoodinc/zombie-settlement-3ds/releases/tag/v0.1.0 (zip, 3dsx, cia, SHA256SUMS, FBI QR). CI is a single workflow `.github/workflows/ci.yml`; pushing a `v*` tag publishes a release.
+
 ## Not verified
 - 3DS on real hardware and its performance.
-- CIA packaging, which runs only in CI and has not run yet.
-- FBI QR install.
+- FBI QR install on real hardware.
 - A hand-played PC session with keyboard and mouse. The scripted input path is tested; real input devices are not.
 
 ## Build commands
@@ -37,7 +39,7 @@ Azahar emulator: `C:\Users\admin\Tools\Azahar\azahar-windows-msvc-2126.2\azahar.
 - The loot refresh timer starts on departure (see WORLD_MAP_SPECIFICATION).
 
 ## Immediate next actions
-1. Push, watch both workflows, and fix whatever fails (most likely `cia.rsf` or the bannertool paths).
-2. Tag `v0.1.0`, create the release with zip/3dsx/cia plus SHA-256 sums, then generate `ZombieSettlement-FBI-QR.png` pointing at the CIA asset URL (the release step needs a QR generator: build one into zs_tool or use the `qrencode` apt package in CI).
+1. Hand the CIA/QR to the owner for a hardware test; record results in TEST_RESULTS and PERFORMANCE_RESULTS.
+2. Inspect the 3DS build visually in Azahar (the owner declined screen control once; ask first).
 3. Ask the owner to test the CIA and QR on hardware, and to report Old 3DS FPS ("Show FPS" in Settings).
 4. Phase 8: Grocery Store map (ASCII in `src/world/maps.cpp`, add a `MAP_*` id, set `LOCATIONS[2].map`).
