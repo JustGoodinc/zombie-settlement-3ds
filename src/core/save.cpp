@@ -201,3 +201,25 @@ bool save_info(int slot, char* out, int len) {
     free(d);
     return ok;
 }
+
+// Settings live next to the saves (plain text, tolerant of missing/garbled files).
+void settings_load() {
+    char p[256]; snprintf(p, sizeof p, "%ssettings.ini", g_dir);
+    FILE* f = fopen(p, "r"); if (!f) return;
+    int a, b, c, d, e, s, fps, fs, slot;
+    if (fscanf(f, "%d %d %d %d %d %d %d %d %d", &a, &b, &c, &d, &e, &s, &fps, &fs, &slot) == 9) {
+        Settings& st = G.set;
+        auto cl = [](int v, int lo, int hi) { return (uint8_t)(v < lo ? lo : (v > hi ? hi : v)); };
+        st.master = cl(a, 0, 10); st.sfx = cl(b, 0, 10); st.music = cl(c, 0, 10);
+        st.dayMinutes = (d == 15 || d == 30 || d == 60) ? (uint8_t)d : 30; st.winScale = cl(e, 1, 3);
+        st.shake = s != 0; st.showFps = fps != 0; st.fullscreen = fs != 0; G.saveSlot = slot >= 0 && slot < 3 ? slot : 0;
+    }
+    fclose(f);
+}
+void settings_save() {
+    char p[256]; snprintf(p, sizeof p, "%ssettings.ini", g_dir);
+    FILE* f = fopen(p, "w"); if (!f) return;
+    const Settings& s = G.set;
+    fprintf(f, "%d %d %d %d %d %d %d %d %d\n", s.master, s.sfx, s.music, s.dayMinutes, s.winScale, s.shake, s.showFps, s.fullscreen, G.saveSlot);
+    fclose(f);
+}

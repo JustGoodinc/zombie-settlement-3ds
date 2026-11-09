@@ -64,7 +64,9 @@ int main(int, char**) {
         "Circle Pad: move and face\nY: fire   X: reload   A: interact/search\nB: hold sprint, tap dodge\nL: lock facing   R: flashlight\n"
         "D-Pad Left/Right: weapons  Up: heal  Down: squad orders\nSELECT: inventory   START: pause\nTouchscreen: menus, drag items with the stylus";
     game_init();
+    settings_load();
     audioInit();
+    Settings lastSet = G.set; int lastSlot = G.saveSlot;
     u64 last = osGetTime();
     float fpsAcc = 0; int fpsN = 0;
     while (aptMainLoop()) {
@@ -98,6 +100,7 @@ int main(int, char**) {
         blitRotated(GFX_TOP, topBuf, TOP_W, TOP_H);
         blitRotated(GFX_BOTTOM, botBuf, BOT_W, BOT_H);
         G.frameMs = (svcGetSystemTick() - t0) / (float)CPU_TICKS_PER_MSEC;   // CPU work per frame (excludes vsync wait)
+        if (memcmp(&lastSet, &G.set, sizeof lastSet) || lastSlot != G.saveSlot) { lastSet = G.set; lastSlot = G.saveSlot; settings_save(); }
         audioPump();
         gfxFlushBuffers();
         gfxSwapBuffers();

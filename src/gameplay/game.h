@@ -243,6 +243,8 @@ bool save_exists(int slot);
 bool save_delete(int slot);
 const char* save_dir();
 void save_setDir(const char* d);
+void settings_load();
+void settings_save();
 // serialisation for tests
 int  save_serialize(uint8_t* buf, int cap);
 bool save_deserialize(const uint8_t* buf, int len, char* err, int errLen);

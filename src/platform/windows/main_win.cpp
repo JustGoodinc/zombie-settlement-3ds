@@ -76,27 +76,6 @@ struct XSTATE { DWORD packet; XPAD pad; };
 typedef DWORD(WINAPI* XGetState)(DWORD, XSTATE*);
 static XGetState xget;
 
-// ---- settings persistence ----
-static void settingsPath(char* p, int n) { snprintf(p, n, "%ssettings.ini", baseDir); }
-static void loadSettings() {
-    char p[MAX_PATH]; settingsPath(p, sizeof p);
-    FILE* f = fopen(p, "r"); if (!f) return;
-    int a, b, c, d, e, s, fps, fs, slot;
-    if (fscanf(f, "%d %d %d %d %d %d %d %d %d", &a, &b, &c, &d, &e, &s, &fps, &fs, &slot) == 9) {
-        Settings& st = G.set;
-        st.master = (uint8_t)a; st.sfx = (uint8_t)b; st.music = (uint8_t)c; st.dayMinutes = (uint8_t)d; st.winScale = (uint8_t)(e < 1 ? 1 : (e > 3 ? 3 : e));
-        st.shake = s != 0; st.showFps = fps != 0; st.fullscreen = fs != 0; G.saveSlot = slot >= 0 && slot < 3 ? slot : 0;
-    }
-    fclose(f);
-}
-static void saveSettings() {
-    char p[MAX_PATH]; settingsPath(p, sizeof p);
-    FILE* f = fopen(p, "w"); if (!f) return;
-    const Settings& s = G.set;
-    fprintf(f, "%d %d %d %d %d %d %d %d %d\n", s.master, s.sfx, s.music, s.dayMinutes, s.winScale, s.shake, s.showFps, s.fullscreen, G.saveSlot);
-    fclose(f);
-}
-
 // ---- display ----
 static void layout() {
     RECT r; GetClientRect(hwnd, &r);
@@ -225,7 +204,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int) {
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW); wc.hIcon = LoadIcon(inst, MAKEINTRESOURCE(1));
     RegisterClassA(&wc);
     game_init();
-    loadSettings();
+    settings_load();
     RECT r = {0, 0, FB_W * G.set.winScale, FB_H * G.set.winScale};
     AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, FALSE);
     hwnd = CreateWindowA("ZombieSettlement", "Zombie Settlement", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, nullptr, nullptr, inst, nullptr);
@@ -284,14 +263,14 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int) {
         audioPump();
         HDC dc = GetDC(hwnd); present(dc); ReleaseDC(hwnd, dc);
 
-        if (G.set.winScale != lastScale) { lastScale = G.set.winScale; sizeWindow(); saveSettings(); }
-        if (G.set.fullscreen != lastFs) { lastFs = G.set.fullscreen; setFullscreen(lastFs); saveSettings(); }
+        if (G.set.winScale != lastScale) { lastScale = G.set.winScale; sizeWindow(); settings_save(); }
+        if (G.set.fullscreen != lastFs) { lastFs = G.set.fullscreen; setFullscreen(lastFs); settings_save(); }
         // ~60 FPS render cap; simulation is fixed-step and independent of this
         QueryPerformanceCounter(&now);
         float spent = (float)(now.QuadPart - last.QuadPart) / freq.QuadPart;
         if (spent < 1.0f / 60) Sleep((DWORD)((1.0f / 60 - spent) * 1000));
     }
-    saveSettings();
+    settings_save();
     if (wo) { waveOutReset(wo); for (int i = 0; i < 4; i++) waveOutUnprepareHeader(wo, &hdr[i], sizeof(WAVEHDR)); waveOutClose(wo); }
     timeEndPeriod(1);
     return 0;
