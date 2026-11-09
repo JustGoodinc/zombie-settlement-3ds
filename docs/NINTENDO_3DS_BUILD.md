@@ -12,7 +12,7 @@ sh scripts/package_3ds.sh <tools dir>  # ZombieSettlement-3DS.cia (needs makerom
   - Unique ID 0xF7A31, product code CTR-H-ZSET, homebrew logo.
   - SD-only, 64 MB (Old 3DS) system mode, 268 MHz baseline.
   - The game calls `osSetSpeedupEnable` so New 3DS units get 804 MHz. This is optional, not required.
-- CI (`.github/workflows/3ds.yml`) runs in the `devkitpro/devkitarm` container. It downloads makerom v0.19.0 (3DSGuy/Project_CTR) and bannertool v1.2.2 (Epicpkmn11), packages the files, and checks the 3DSX magic and the CIA header.
+- CI (`.github/workflows/ci.yml`) runs in the `devkitpro/devkitarm` container. It downloads makerom v0.19.0 (3DSGuy/Project_CTR) and bannertool v1.2.2 (Epicpkmn11), packages the files, and checks the 3DSX magic and the CIA header.
 
 ## Verification status
 - Local build: ✅ `.3dsx` compiles and links, 0 errors (devkitARM GCC 16.1).

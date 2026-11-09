@@ -11,4 +11,4 @@ CMake alternative: `cmake -S . -B build -A x64 && cmake --build build --config R
 
 The executable links the static CRT (`/MT`), so players need no runtime installer. Saves, `settings.ini` and `controls.ini` live in `%APPDATA%\ZombieSettlement\`.
 
-CI (`.github/workflows/windows.yml`) builds, runs the tests and the benchmark, zips the game, and launches the zipped exe from outside the build directory as a smoke test.
+CI (`.github/workflows/ci.yml`) builds, runs the tests and the benchmark, zips the game, and launches the zipped exe from outside the build directory as a smoke test.
