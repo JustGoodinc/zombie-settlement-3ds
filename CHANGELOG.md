@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Try 2 visual pass
+## v0.1.1 — Try 2 visual pass
 - Characters rebuilt at 16×24 (faces, shading, backpacks; zombies hunched with torn clothes and red eyes).
 - Warm colour grade, vignette, drop shadows, wall ambient occlusion, scattered ground detail.
 - Settlement rebuilt: grass and paths, tents, campfire circle, torches, barrels, sandbags, log piles; you start by the fire.
