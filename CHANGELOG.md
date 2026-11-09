@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — readability, tutorial, zoom
+## v0.1.3 — readability, tutorial, zoom
 - Button prompts redrawn: coloured 3DS buttons (A red, B yellow, X blue, Y green), shoulder/START/SELECT pills, D-pad and Circle Pad icons. On PC they show your actual keys from controls.ini (keycaps) and switch to Xbox labels when a gamepad is used.
 - Controls screen is now a glyph + action table; bigger footer prompts; HUD hints use glyphs.
 - Skippable tutorial (10 steps: move, backpack, plan, deploy, search, loot, fire, reload, sprint/dodge, extract). Offered on New Game; each step completes from the real action; the button to press pulses; skip from the HUD or Pause; replay from Settings.
