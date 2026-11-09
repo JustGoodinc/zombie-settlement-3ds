@@ -2,10 +2,8 @@ name: Nintendo 3DS
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
-permissions:
-  contents: write
+  workflow_call:
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,9 +12,25 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build .3dsx
         run: make -j4
+      - name: Check 3DSX magic
+        run: head -c 4 ZombieSettlement.3dsx | grep -q 3DSX
+      - uses: actions/upload-artifact@v4
+        with:
+          name: n3ds-elf
+          path: |
+            ZombieSettlement.elf
+            ZombieSettlement.3dsx
+  package:
+    # makerom needs glibc >= 2.38, newer than the devkitPro container: package on the host runner
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: n3ds-elf
       - name: Packaging tools (makerom, bannertool)
         run: |
-          apt-get update -qq && apt-get install -y -qq unzip curl > /dev/null
           curl -fsSL -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.19.0/makerom-v0.19.0-ubuntu_x86_64.zip
           curl -fsSL -o bannertool.zip https://github.com/Epicpkmn11/bannertool/releases/download/v1.2.2/bannertool.zip
           unzip -o -q makerom.zip -d tools-bin && unzip -o -q bannertool.zip -d bannertool
@@ -26,12 +40,9 @@ jobs:
       - name: Verify outputs
         run: |
           set -e
-          for f in dist/ZombieSettlement-3DS.3dsx dist/ZombieSettlement-3DS.cia; do
-            test -s "$f" || { echo "missing $f"; exit 1; }
-          done
+          for f in dist/ZombieSettlement-3DS.3dsx dist/ZombieSettlement-3DS.cia; do test -s "$f" || { echo "missing $f"; exit 1; }; done
           head -c 4 dist/ZombieSettlement-3DS.3dsx | grep -q 3DSX
-          # CIA header: header size 0x2020 at offset 0
-          test "$(od -An -tx1 -N4 dist/ZombieSettlement-3DS.cia | tr -d ' ')" = "20200000"
+          test "$(od -An -tx1 -N4 dist/ZombieSettlement-3DS.cia | tr -d ' \n')" = "20200000"
           ls -la dist
       - uses: actions/upload-artifact@v4
         with:

@@ -2,8 +2,8 @@ name: Windows
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
+  workflow_call:
 permissions:
   contents: write
 jobs:
