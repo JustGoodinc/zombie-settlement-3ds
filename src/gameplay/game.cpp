@@ -120,6 +120,7 @@ static void do_reload(Unit& u, Survivor& s) {
     if (w->mag >= ws.mag || u.reloadT > 0) return;
     if (s.pack.countOf(ws.ammo) <= 0) { if (u.sv == G.u[G.ctrl].sv) game_toast("No %s.", idef(ws.ammo).name); return; }
     u.reloadT = ws.reloadMs / 1000.0f;
+    if (u.sv == G.u[G.ctrl].sv) G.statReloads++;
     u.anim.play(AnimState::Reload, true);
     audio_playAt(SFX_RELOAD, u.x, u.y);
 }
@@ -236,6 +237,7 @@ static void fire(int ui) {
         u.cd = w ? idef(w->id).wpn.cooldownMs / 1000.0f : 0.45f;
         u.meleePending = true;
         u.anim.play(AnimState::Melee, true);
+        if (isPlayer) G.statShots++;
         return;
     }
     const ItemDef& d = idef(w->id); const WeaponStats& ws = d.wpn;
@@ -248,6 +250,7 @@ static void fire(int ui) {
     }
     w->mag--; w->dur--;
     u.cd = ws.cooldownMs / 1000.0f;
+    if (isPlayer) G.statShots++;
     u.muzzleT = 0.07f;
     bool moving = len2(u.x - u.px, u.y - u.py) > 0.3f;
     if (!moving) u.anim.play(AnimState::Shoot, true);
@@ -402,7 +405,7 @@ void level_enter(int mapId, int loc) {
             n.wait = (hash32(i * 9) % 30) / 10.0f; n.dir = 2; n.anim = Animator(); n.anim.speed = 0.9f + (hash32(i) % 20) / 100.0f;
         }
     }
-    G.camX = G.u[0].x - TOP_W / 2; G.camY = G.u[0].y - TOP_H / 2;
+    G.camX = G.u[0].x - view_w() / 2; G.camY = G.u[0].y - view_h() / 2;
 
 }
 
@@ -613,7 +616,7 @@ static void update_player(Unit& u, float dt) {
         u.dodgeT = 0.24f; u.dvx = dx * 190; u.dvy = dy * 190; u.stam -= 20;
         u.reloadT = 0;   // dodging interrupts a reload (no ammo lost: rounds load at the end)
         u.searchT = 0; u.searchProp = -1;
-        u.anim.play(AnimState::Dodge, true);
+        u.anim.play(AnimState::Dodge, true); G.statDodges++;
         audio_playAt(SFX_STEP, u.x, u.y, 1, 0.7f);
     }
     u.sprinting = moving && (g_in.held & BTN_B) && u.bHeld >= 0.2f && u.stam > 1 && u.dodgeT <= 0;
@@ -626,7 +629,7 @@ static void update_player(Unit& u, float dt) {
         map_move(G.map, u.x, u.y, ax / mag * speed * m * dt, ay / mag * speed * m * dt, 5);
         if (u.searchT > 0) { u.searchT = 0; u.searchProp = -1; float_text(u.x, u.y - 18, "Stopped", pal::dim); }
     }
-    if (u.sprinting) u.stam -= 22 * dt;
+    if (u.sprinting) { u.stam -= 22 * dt; G.statSprint += dt; }
     // fire
     Item* w = equipped(s);
     bool automatic = w && idef(w->id).cat == IC_FIREARM && idef(w->id).wpn.automatic;
@@ -1002,7 +1005,7 @@ static void update_level(float dt) {
     }
     if (G.scene == SC_SETTLEMENT) update_settlers(dt);
     // ambient environment particles near the camera
-    if (G.rng.chance(0.02f) && daylight() > 0.3f) spawn_particles(PK_LEAF, G.camX + G.rng.range(TOP_W), G.camY + G.rng.range(TOP_H / 2), 1, rgb(120, 110, 50));
+    if (G.rng.chance(0.02f) && daylight() > 0.3f) spawn_particles(PK_LEAF, G.camX + G.rng.range(view_w()), G.camY + G.rng.range(view_h() / 2), 1, rgb(120, 110, 50));
     for (int i = 0; i < G.map.nprop; i++) if (G.map.prop[i].type == PR_FIRE && G.rng.chance(0.25f)) {
         const Prop& f = G.map.prop[i];
         spawn_particles(G.rng.chance(0.5f) ? PK_EMBER : PK_SMOKE, f.tx * 16 + 8.0f, f.ty * 16 + 6.0f, 1, G.rng.chance(0.5f) ? rgb(250, 170, 60) : rgb(90, 90, 96));
@@ -1019,10 +1022,10 @@ static void update_level(float dt) {
         }
     }
     // camera: follow with a small look-ahead in the facing direction
-    float tx = p.x + p.fx * 24 - TOP_W / 2, ty = p.y + p.fy * 18 - TOP_H / 2;
+    float tx = p.x + p.fx * 24 - view_w() / 2, ty = p.y + p.fy * 18 - view_h() / 2;
     G.camX += (tx - G.camX) * fminf(1, dt * 6); G.camY += (ty - G.camY) * fminf(1, dt * 6);
-    G.camX = clampf(G.camX, 0, (float)(G.map.w * 16 - TOP_W)); G.camY = clampf(G.camY, 0, (float)(G.map.h * 16 - TOP_H));
-    if (G.map.w * 16 < TOP_W) G.camX = (G.map.w * 16 - TOP_W) / 2.0f;
+    G.camX = clampf(G.camX, 0, (float)(G.map.w * 16 - view_w())); G.camY = clampf(G.camY, 0, (float)(G.map.h * 16 - view_h()));
+    if (G.map.w * 16 < view_w()) G.camX = (G.map.w * 16 - view_w()) / 2.0f;
     if (G.shake > 0) G.shake -= dt * 12;
     if (G.toastT > 0) G.toastT -= dt;
     float fa = G.flashlight ? 1.0f : 0.0f; G.flashAnim += (fa - G.flashAnim) * fminf(1, dt * 8);
@@ -1093,6 +1096,7 @@ void game_frame(const Input& in, float realDt) {
         g_down = 0; g_up = 0;
     }
     g_renderAlpha = acc / DT;
+    tut_update();
     if (G.panel != before) ui_dropInput();
     G.frameMs = realDt * 1000;
     bool indoor = false;

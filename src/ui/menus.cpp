@@ -24,7 +24,10 @@ static void ask(int action, int arg, const char* fmt, ...) {
     ui_resetFocus();
 }
 static void say(const char* s) { snprintf(msg, sizeof msg, "%s", s); msgT = 3; }
-enum { CA_NEWGAME = 1, CA_LOAD, CA_SAVE, CA_DELETE, CA_MAINMENU, CA_REJECT, CA_QUIT };
+enum { CA_NEWGAME = 1, CA_LOAD, CA_SAVE, CA_DELETE, CA_MAINMENU, CA_REJECT, CA_QUIT, CA_TUTORIAL };
+// tutorial nudges: pulse the button the current step wants (gold on/off)
+static int hl(int which) { return (tut_highlight() == which && (((int)(G.uiTime * 3)) & 1)) ? UB_SELECTED : 0; }
+static void offerTutorial() { if (!G.set.tutorialDone) ask(CA_TUTORIAL, 0, "Play the tutorial? Recommended if you are new. You can skip it at any time."); }
 
 void ui_update(const Input& in) { g_input = in; }
 // The simulation changed panels this frame (e.g. extraction): the button press that caused it
@@ -71,13 +74,18 @@ static void blitHalf(Canvas& c, const Sprite& s, int x, int y) {
     for (int j = 0; j < s.h / 2; j++) for (int i = 0; i < s.w / 2; i++) { px v = s.d[(j * 2) * s.w + i * 2]; if (v != KEYC) gfx_pset(c, x + i, y + j, v); }
 }
 static void footer(Canvas& c, const char* a, const char* b2, const char* x = nullptr, const char* y = nullptr) {
-    gfx_fill(c, 0, 226, BOT_W, 14, pal::ink);
-    gfx_fill(c, 0, 226, BOT_W, 1, pal::border);
-    int px_ = 6;
-    if (a) { ui_prompt(c, px_, 229, 'A', a); px_ += gfx_textW(a) + 26; }
-    if (y) { ui_prompt(c, px_, 229, 'Y', y); px_ += gfx_textW(y) + 26; }
-    if (x) { ui_prompt(c, px_, 229, 'X', x); px_ += gfx_textW(x) + 26; }
-    if (b2) ui_prompt(c, BOT_W - gfx_textW(b2) - 20, 229, 'B', b2);
+    // footer strip: glyphs match the active device (3DS buttons / keyboard keys / Xbox pad)
+    gfx_fill(c, 0, 224, BOT_W, 16, rgb(16, 16, 18));
+    gfx_fill(c, 0, 224, BOT_W, 1, rgb(84, 82, 88));
+    int px_ = 5, bw = b2 ? ui_promptW('B', b2) : 0;
+    const char* items[3] = {a, y, x}; const char keys[3] = {'A', 'Y', 'X'};
+    for (int i = 0; i < 3; i++) {
+        if (!items[i]) continue;
+        int w = ui_promptW(keys[i], items[i]);
+        if (px_ + w > BOT_W - bw - 12) break;   // never overlap the Back prompt
+        ui_prompt(c, px_, 226, keys[i], items[i]); px_ += w + 10;
+    }
+    if (b2) ui_prompt(c, BOT_W - bw - 5, 226, 'B', b2);
 }
 static void resRow(Canvas& c, int x, int y, bool compact) {
     static const int IC[RES_COUNT] = {S_ICON_FOOD, S_ICON_MED, S_ICON_AMMO, S_ICON_MAT, S_ICON_FUEL};
@@ -433,7 +441,7 @@ static void panelContainer(Canvas& c) {
         if (s.equip < 0) survivor_equipBest(s);
         return true;
     };
-    if (ui_button(c, ax + 6, ay + 62, 82, 18, "Take All", UB_GOLD, ct->n > 0)) {
+    if (ui_button(c, ax + 6, ay + 62, 82, 18, "Take All", UB_GOLD | hl(TH_TAKEALL), ct->n > 0)) {
         int moved = 0, start = ct->n;
         for (int i = ct->n - 1; i >= 0; i--) if (takeOne(i)) moved++;
         audio_play(moved ? SFX_PICKUP : SFX_EMPTY);
@@ -530,6 +538,7 @@ static void panelHud(Canvas& c) {
     gfx_blit(c, g_spr[S_ICON_SHIELD], ox, oy);
     gfx_text(c, ox + 11, oy, "Objective", pal::gold);
     gfx_wrap(c, ox, oy + 12, 140, objective(), pal::cream);
+    if (tut_active() && ui_button(c, ox, 150, 140, 18, "Skip Tutorial")) tut_skip();
     if (G.scene == SC_EXPEDITION) {
         Survivor* s = invSurv();
         if (s) {
@@ -543,7 +552,7 @@ static void panelHud(Canvas& c) {
     if (G.scene == SC_SETTLEMENT) {
         if (ui_button(c, 4, by, 76, 20, "Base")) ui_open(PN_BASE);
         if (ui_button(c, 82, by, 76, 20, "Survivors")) ui_open(PN_SURVIVORS);
-        if (ui_button(c, 160, by, 76, 20, "Expedition")) ui_open(PN_WORLDMAP);
+        if (ui_button(c, 160, by, 76, 20, "Expedition", hl(TH_EXPEDITION))) ui_open(PN_WORLDMAP);
         char jb[24]; snprintf(jb, sizeof jb, G.st.unread ? "Journal(%d)" : "Journal", G.st.unread);
         if (ui_button(c, 238, by, 78, 20, jb, G.st.unread ? UB_GOLD : 0)) ui_open(PN_JOURNAL);
         if (ui_button(c, 4, by + 24, 154, 20, "Inventory")) { g_invSurvivor = -1; ui_open(PN_INVENTORY); }
@@ -552,7 +561,8 @@ static void panelHud(Canvas& c) {
         if (ui_button(c, 4, by, 102, 20, "Inventory")) { g_invSurvivor = -1; ui_open(PN_INVENTORY); }
         if (ui_button(c, 109, by, 102, 20, "Squad")) ui_open(PN_SQUAD);
         if (ui_button(c, 214, by, 102, 20, "Pause")) ui_open(PN_PAUSE);
-        gfx_text(c, 6, by + 28, "SELECT Inventory  START Pause  R Light", pal::dim);
+        { int hx = 6; const uint32_t B[3] = {BTN_SELECT, BTN_START, BTN_R}; const char* L[3] = {"Backpack", "Pause", "Flashlight"};
+          for (int i = 0; i < 3; i++) { hx += ui_btn(c, hx, by + 26, B[i]) + 4; gfx_text(c, hx, by + 28, L[i], pal::cream); hx += gfx_textW(L[i]) + 12; } }
     }
     footer(c, "Interact", "Sprint/Dodge", "Reload", "Fire");
     if (g_ui.in.down & BTN_SELECT) { g_invSurvivor = -1; ui_open(PN_INVENTORY); }
@@ -591,6 +601,7 @@ static void panelPause(Canvas& c) {
     bool canSave = G.scene == SC_SETTLEMENT;
     if (ui_button(c, 76, y, 168, 20, canSave ? "Save Game" : "Save (settlement only)", 0, canSave)) { saveMode = 1; ui_push(PN_SAVELOAD); } y += 24;
     if (ui_button(c, 76, y, 168, 20, "Controls")) ui_push(PN_CONTROLS); y += 24;
+    if (tut_active() && ui_button(c, 76, y + 24, 168, 20, "Skip Tutorial")) { tut_skip(); ui_open(PN_HUD); return; }
     if (ui_button(c, 76, y, 168, 20, "Main Menu")) ask(CA_MAINMENU, 0, G.scene == SC_EXPEDITION ? "Quit to menu? Expedition progress since the last save is lost." : "Return to the main menu? Unsaved progress is lost.");
     if (ui_pressedB()) ui_open(PN_HUD);
 }
@@ -646,7 +657,7 @@ static void panelSaveLoad(Canvas& c) {
         if (ui_button(c, 200, y + 6, 46, 18, lbl, 0, en)) {
             if (saveMode == 0) ask(CA_LOAD, s, "Load slot %d? Unsaved progress is lost.", s + 1);
             else if (saveMode == 1) { if (exists) ask(CA_SAVE, s, "Overwrite slot %d?", s + 1); else { G.saveSlot = s; say(save_write(s) ? "Game saved." : "Save FAILED. Previous save kept."); } }
-            else { if (exists) ask(CA_NEWGAME, s, "Start a new game in slot %d? Its save will be replaced.", s + 1); else { G.saveSlot = s; game_newGame(); save_write(s); } }
+            else { if (exists) ask(CA_NEWGAME, s, "Start a new game in slot %d? Its save will be replaced.", s + 1); else { G.saveSlot = s; game_newGame(); save_write(s); offerTutorial(); } }
         }
         if (ui_button(c, 250, y + 6, 48, 18, "Delete", 0, exists && saveMode != 2)) ask(CA_DELETE, s, "Delete slot %d permanently?", s + 1);
     }
@@ -1057,7 +1068,7 @@ static void panelWorldMap(Canvas& c) {
     else if (S.cooldown >= 0) snprintf(b, sizeof b, "Restock in %d:%02d", (int)S.cooldown / 60, (int)S.cooldown % 60);
     else snprintf(b, sizeof b, S.visited ? "Cooldown: Ready" : "Unexplored");
     gfx_text(c, 146, 166, b, S.cooldown >= 0 ? pal::gold : pal::green);
-    if (ui_button(c, 146, 196, 80, 20, "Deploy", UB_GOLD, L.map >= 0 && G.scene == SC_SETTLEMENT)) {
+    if (ui_button(c, 146, 196, 80, 20, "Deploy", UB_GOLD | (L.map >= 0 ? hl(TH_DEPLOY) : 0), L.map >= 0 && G.scene == SC_SETTLEMENT)) {
         G.squad[0] = (int8_t)G.st.leader; G.squad[1] = G.squad[2] = -1; g_mapSel = sel;
         ui_push(PN_PREP);
     }
@@ -1106,7 +1117,7 @@ static void panelPrep(Canvas& c) {
     snprintf(b, sizeof b, "Security while away: %d (%s)", sec, security_rating(sec));
     gfx_text(c, 12, 172, b, sec < 25 ? pal::red : pal::cream);
     if (sec < 25) gfx_text(c, 12, 184, "Warning: the settlement will be vulnerable!", pal::red);
-    if (ui_button(c, 12, 198, 120, 20, "Deploy", UB_GOLD)) {
+    if (ui_button(c, 12, 198, 120, 20, "Deploy", UB_GOLD | hl(TH_DEPLOY))) {
         int dest = g_mapSel;
         for (int k = 0; k < 3; k++) if (G.squad[k] >= 0) G.st.surv[G.squad[k]].onExpedition = true;
         G.expLoc = (int8_t)dest;
@@ -1169,20 +1180,44 @@ static void panelSettings(Canvas& c) {
     if (ui_button(c, 14, 90, 140, 18, b)) s.dayMinutes = s.dayMinutes == 15 ? 30 : (s.dayMinutes == 30 ? 60 : 15);
     if (ui_button(c, 160, 90, 146, 18, s.shake ? "Screen shake: On" : "Screen shake: Off")) s.shake = !s.shake;
     if (ui_button(c, 14, 112, 140, 18, s.showFps ? "Show FPS: On" : "Show FPS: Off")) s.showFps = !s.showFps;
+    snprintf(b, sizeof b, "Camera zoom: %d%%", s.zoom);
+    if (ui_button(c, 160, 112, 146, 18, b)) { s.zoom = s.zoom >= 200 ? 100 : (s.zoom >= 150 ? 200 : (s.zoom >= 125 ? 150 : 125)); settings_save(); }
+    int ry = 134;
     if (g_canQuit) {
         snprintf(b, sizeof b, "Window scale: %dx", s.winScale);
-        if (ui_button(c, 160, 112, 146, 18, b)) s.winScale = s.winScale >= 3 ? 1 : s.winScale + 1;
-        if (ui_button(c, 14, 134, 140, 18, s.fullscreen ? "Fullscreen: On" : "Fullscreen: Off")) s.fullscreen = !s.fullscreen;
+        if (ui_button(c, 160, ry, 146, 18, b)) s.winScale = s.winScale >= 3 ? 1 : s.winScale + 1;
+        if (ui_button(c, 14, ry, 140, 18, s.fullscreen ? "Fullscreen: On" : "Fullscreen: Off")) s.fullscreen = !s.fullscreen;
+        ry += 22;
     }
-    if (ui_button(c, 160, 134, 146, 18, "Controls")) ui_push(PN_CONTROLS);
-    if (ui_button(c, 14, 156, 140, 18, "Animation Test Room")) { ui_push(PN_ANIMTEST); }
-    gfx_wrap(c, 14, 178, 290, "Accessibility: text has drop shadows; shake can be disabled; all actions work without touch.", pal::dim);
+    if (ui_button(c, 14, ry, 140, 18, "Controls")) ui_push(PN_CONTROLS);
+    bool canTut = G.scene == SC_SETTLEMENT && G.inLevel;
+    if (ui_button(c, 160, ry, 146, 18, tut_active() ? "Tutorial running" : "Replay Tutorial", 0, canTut && !tut_active())) { tut_start(); ui_open(PN_HUD); return; }
+    ry += 22;
+    if (ui_button(c, 14, ry, 140, 18, "Animation Test Room")) { ui_push(PN_ANIMTEST); }
+    if (!canTut) gfx_wrap(c, 160, ry + 2, 146, "Tutorial: start from the settlement", pal::dim);
     if (ui_button(c, 210, 200, 100, 18, "Back") || ui_pressedB()) ui_back();
 }
 static void panelControls(Canvas& c) {
     ui_panel(c, 4, 3, 312, 218, "Controls");
-    gfx_wrap(c, 12, 22, 296, g_controlsText, pal::cream);
-    if (ui_button(c, 210, 200, 100, 18, "Back") || ui_pressedB()) ui_back();
+    // one row per action: the glyph shown is exactly what to press on this device
+    struct Row { uint32_t b; const char* action; };
+    static const Row rows[] = {
+        {BTN_STICK, "Move / aim (facing follows)"}, {BTN_Y, "Fire weapon / swing"}, {BTN_A, "Interact, search, open doors"},
+        {BTN_B, "Hold: sprint   Tap: dodge"}, {BTN_X, "Reload"}, {BTN_L, "Hold: lock facing direction"},
+        {BTN_R, "Flashlight on / off"}, {BTN_DPAD_LR, "Switch weapon"}, {BTN_UP, "Quick heal"},
+        {BTN_DOWN, "Squad order: follow/hold/retreat"}, {BTN_SELECT, "Backpack (pauses the game)"}, {BTN_START, "Pause menu"},
+        {BTN_TOUCH, "Menus, drag items in the backpack"},
+    };
+    int y = 23;
+    for (const Row& r : rows) {
+        int w = ui_btnW(r.b);
+        ui_btn(c, 74 - w, y, r.b);                  // glyphs right-aligned in a column
+        gfx_text(c, 82, y + 2, r.action, pal::cream);
+        y += 13;
+    }
+    if (g_canQuit) gfx_text(c, 12, 196, "F11 fullscreen  F12 screenshot", pal::dim), gfx_text(c, 12, 206, "Rebind: controls.ini", pal::dim);
+    else gfx_text(c, 12, 200, "Menus also accept the D-Pad + A", pal::dim);
+    if (ui_button(c, 210, 198, 100, 20, "Back") || ui_pressedB()) ui_back();
 }
 static void panelCredits(Canvas& c) {
     ui_panel(c, 4, 3, 312, 218, "Credits");
@@ -1231,12 +1266,16 @@ static void confirmDialog(Canvas& c) {
     gfx_wrap(c, 40, 82, 240, confirmBox.text, pal::cream);
     bool yes = ui_button(c, 46, 140, 104, 22, "Yes", UB_GOLD);
     bool no = ui_button(c, 170, 140, 104, 22, "No") || ui_pressedB();
-    if (no) { confirmBox.active = false; ui_resetFocus(); return; }
+    if (no) {
+        if (confirmBox.action == CA_TUTORIAL) { G.set.tutorialDone = true; settings_save(); game_toast("Tutorial skipped. Replay it from Settings."); }
+        confirmBox.active = false; ui_resetFocus(); return;
+    }
     if (!yes) return;
     confirmBox.active = false; ui_resetFocus();
     int a = confirmBox.arg;
     switch (confirmBox.action) {
-    case CA_NEWGAME: G.saveSlot = a; save_delete(a); game_newGame(); save_write(a); break;
+    case CA_NEWGAME: G.saveSlot = a; save_delete(a); game_newGame(); save_write(a); offerTutorial(); break;
+    case CA_TUTORIAL: tut_start(); break;
     case CA_LOAD: doLoad(a); break;
     case CA_SAVE: G.saveSlot = a; say(save_write(a) ? "Game saved." : "Save FAILED. Previous save kept."); break;
     case CA_DELETE: save_delete(a); say("Slot deleted."); break;

@@ -21,9 +21,11 @@ All screens live in `src/ui/menus.cpp`. Every screen works with touch and with D
 | Prep | World Map→Deploy | leader, companions, equipment, security warning, Deploy |
 | Summary | extraction or wipe | results, rescued survivor, Return |
 | Journal | HUD, Resources, after summary | paged history |
-| Settings | Main, Pause | volumes, day length, shake, FPS, window scale/fullscreen (PC), Controls, Animation Test Room |
+| Settings | Main, Pause | volumes, day length, shake, FPS, camera zoom, window scale/fullscreen (PC), Controls, Replay Tutorial, Animation Test Room |
 | Save/Load | Main, Pause | 3 slots, confirmations, damage reporting |
-| Controls, Credits, Death, Animation Test | as named | |
+| Controls | Settings, Pause, Main | glyph + action table for the active device (3DS buttons, keyboard keys, Xbox pad) |
+| Tutorial banner | New Game prompt, Settings → Replay | top-screen step banner; Skip Tutorial on the HUD and in Pause |
+| Credits, Death, Animation Test | as named | |
 
 Unscouted locations are listed but visibly disabled ("UNSCOUTED – Route not yet found") and Deploy is greyed out for them.
 

@@ -117,15 +117,99 @@ void ui_panel(Canvas& c, int x, int y, int w, int h, const char* title) {
     }
 }
 
-void ui_glyph(Canvas& c, int x, int y, char b, bool hi) {
-    gfx_circle(c, x + 4, y + 4, 4, hi ? pal::gold : pal::cream, true);
-    gfx_circle(c, x + 4, y + 4, 4, pal::ink, false);
-    char s[2] = {b, 0};
-    gfx_text(c, x + 2, y + 1, s, pal::ink, 1, false);
+// ---- button glyphs: 3DS buttons, keyboard keycaps (with the player's own bindings) or Xbox pad
+int g_inputStyle = 0;                 // 0 = 3DS, 1 = keyboard, 2 = Xbox pad (set by the platform layer)
+const char* g_keyName[12] = {"A", "B", "X", "Y", "L", "R", "START", "SELECT", "^", "v", "<", ">"};
+const char* g_stickName = "WASD";
+
+static int bitIndex(uint32_t b) { for (int i = 0; i < 12; i++) if (b == (1u << i)) return i; return -1; }
+static const char* xboxName(uint32_t b) {
+    switch (b) { case BTN_A: return "A"; case BTN_B: return "B"; case BTN_Y: return "X"; case BTN_X: return "Y";
+                 case BTN_L: return "LB"; case BTN_R: return "RB"; case BTN_START: return "Menu"; case BTN_SELECT: return "View"; }
+    return "?";
 }
+static void dpadIcon(Canvas& c, int x, int y, uint32_t dir) {
+    gfx_fill(c, x + 3, y, 5, 11, pal::ink); gfx_fill(c, x, y + 3, 11, 5, pal::ink);
+    gfx_fill(c, x + 4, y + 1, 3, 9, rgb(150, 148, 152)); gfx_fill(c, x + 1, y + 4, 9, 3, rgb(150, 148, 152));
+    px h = pal::gold;
+    if (dir == BTN_UP) gfx_fill(c, x + 4, y + 1, 3, 3, h);
+    if (dir == BTN_DOWN) gfx_fill(c, x + 4, y + 7, 3, 3, h);
+    if (dir == BTN_LEFT) gfx_fill(c, x + 1, y + 4, 3, 3, h);
+    if (dir == BTN_RIGHT) gfx_fill(c, x + 7, y + 4, 3, 3, h);
+    if (dir == (BTN_LEFT | BTN_RIGHT)) { gfx_fill(c, x + 1, y + 4, 3, 3, h); gfx_fill(c, x + 7, y + 4, 3, 3, h); }
+}
+static int keycap(Canvas& c, int x, int y, const char* label, bool draw) {
+    int w = gfx_textW(label) + 7; if (w < 11) w = 11;
+    if (!draw) return w;
+    gfx_fill(c, x, y, w, 12, pal::ink);
+    gfx_fill(c, x + 1, y, w - 2, 10, rgb(226, 220, 206)); gfx_fill(c, x + 1, y + 10, w - 2, 1, rgb(150, 144, 132));
+    gfx_text(c, x + (w - gfx_textW(label)) / 2, y + 1, label, pal::ink, 1, false);
+    return w;
+}
+static int pill(Canvas& c, int x, int y, const char* label, px fill, bool draw) {
+    int w = gfx_textW(label) + 8;
+    if (!draw) return w;
+    gfx_fill(c, x + 1, y, w - 2, 11, pal::ink); gfx_fill(c, x, y + 1, w, 9, pal::ink);
+    gfx_fill(c, x + 1, y + 1, w - 2, 9, fill);
+    gfx_text(c, x + 4, y + 2, label, rgb(240, 236, 226), 1, false);
+    return w;
+}
+static int face(Canvas& c, int x, int y, const char* letter, px col, bool draw) {
+    if (!draw) return 11;
+    gfx_circle(c, x + 5, y + 5, 5, col, true);
+    gfx_circle(c, x + 5, y + 5, 5, pal::ink, false);
+    gfx_pset(c, x + 3, y + 2, gfx_mix(col, rgb(255, 255, 255), 140));
+    gfx_text(c, x + 3, y + 2, letter, rgb(250, 248, 240), 1, false);
+    return 11;
+}
+
+static int btnGlyph(Canvas& c, int x, int y, uint32_t b, bool draw) {
+    if (b == BTN_STICK) {
+        if (g_inputStyle == 1) return keycap(c, x, y, g_stickName, draw);
+        if (draw) { gfx_circle(c, x + 5, y + 5, 5, pal::ink, true); gfx_circle(c, x + 5, y + 5, 4, rgb(90, 90, 96), true); gfx_circle(c, x + 5, y + 5, 2, rgb(180, 178, 182), true); }
+        return 11;
+    }
+    if (b == BTN_TOUCH) return g_inputStyle == 1 ? keycap(c, x, y, "Mouse", draw) : pill(c, x, y, "Touch", rgb(70, 110, 150), draw);
+    if (b == BTN_DPAD_LR || b == BTN_UP || b == BTN_DOWN || b == BTN_LEFT || b == BTN_RIGHT) {
+        if (g_inputStyle == 1 && b != BTN_DPAD_LR) return keycap(c, x, y, g_keyName[bitIndex(b)], draw);
+        if (g_inputStyle == 1) { int w = keycap(c, x, y, g_keyName[10], draw); return w + 2 + keycap(c, x + w + 2, y, g_keyName[11], draw); }
+        if (draw) dpadIcon(c, x, y, b == BTN_DPAD_LR ? (BTN_LEFT | BTN_RIGHT) : b);
+        return 11;
+    }
+    if (g_inputStyle == 1) { int i = bitIndex(b); return keycap(c, x, y, i >= 0 ? g_keyName[i] : "?", draw); }
+    if (g_inputStyle == 2) {
+        const char* n = xboxName(b);
+        if (b == BTN_A) return face(c, x, y, n, rgb(70, 160, 60), draw);
+        if (b == BTN_B) return face(c, x, y, n, rgb(190, 50, 46), draw);
+        if (b == BTN_Y) return face(c, x, y, n, rgb(50, 100, 200), draw);
+        if (b == BTN_X) return face(c, x, y, n, rgb(210, 170, 30), draw);
+        return pill(c, x, y, n, rgb(70, 70, 76), draw);
+    }
+    // Nintendo 3DS colours: A red, B yellow, X blue, Y green
+    switch (b) {
+    case BTN_A: return face(c, x, y, "A", rgb(196, 56, 48), draw);
+    case BTN_B: return face(c, x, y, "B", rgb(206, 166, 36), draw);
+    case BTN_X: return face(c, x, y, "X", rgb(52, 100, 196), draw);
+    case BTN_Y: return face(c, x, y, "Y", rgb(56, 150, 70), draw);
+    case BTN_L: return pill(c, x, y, "L", rgb(80, 80, 88), draw);
+    case BTN_R: return pill(c, x, y, "R", rgb(80, 80, 88), draw);
+    case BTN_START: return pill(c, x, y, "START", rgb(80, 80, 88), draw);
+    case BTN_SELECT: return pill(c, x, y, "SELECT", rgb(80, 80, 88), draw);
+    }
+    return 0;
+}
+int ui_btn(Canvas& c, int x, int y, uint32_t b) { return btnGlyph(c, x, y, b, true); }
+int ui_btnW(uint32_t b) { Canvas dummy; return btnGlyph(dummy, 0, 0, b, false); }
+
+static uint32_t charBtn(char b) {
+    switch (b) { case 'A': return BTN_A; case 'B': return BTN_B; case 'X': return BTN_X; case 'Y': return BTN_Y; case 'L': return BTN_L; case 'R': return BTN_R; }
+    return BTN_A;
+}
+void ui_glyph(Canvas& c, int x, int y, char b, bool) { ui_btn(c, x, y, charBtn(b)); }
+int ui_promptW(char b, const char* label) { return ui_btnW(charBtn(b)) + 4 + gfx_textW(label); }
 void ui_prompt(Canvas& c, int x, int y, char b, const char* label) {
-    ui_glyph(c, x, y, b);
-    gfx_text(c, x + 12, y + 1, label, pal::cream);
+    int w = ui_btn(c, x, y, charBtn(b));
+    gfx_text(c, x + w + 4, y + 2, label, pal::cream);
 }
 void ui_bar(Canvas& c, int x, int y, int w, int h, float v, px col) {
     if (v < 0) v = 0; if (v > 1) v = 1;

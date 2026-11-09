@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — readability, tutorial, zoom
+- Button prompts redrawn: coloured 3DS buttons (A red, B yellow, X blue, Y green), shoulder/START/SELECT pills, D-pad and Circle Pad icons. On PC they show your actual keys from controls.ini (keycaps) and switch to Xbox labels when a gamepad is used.
+- Controls screen is now a glyph + action table; bigger footer prompts; HUD hints use glyphs.
+- Skippable tutorial (10 steps: move, backpack, plan, deploy, search, loot, fire, reload, sprint/dodge, extract). Offered on New Game; each step completes from the real action; the button to press pulses; skip from the HUD or Pause; replay from Settings.
+- Camera zoom setting (100/125/150/200%, default 125%). Text and prompts are drawn after scaling so they stay sharp.
+- settings.ini gains zoom + tutorial flag (older files still load).
+
 ## v0.1.2 — CIA fix
 - Fix: the v0.1.1 CIA crashed the 3DS system loader on real hardware. The makerom spec is now based on the hardware-proven ftpd template (valid CpuSpeed, MemoryType and memory permissions).
 

@@ -24,7 +24,7 @@ void render_compute_light() {
     flashDX += (p.fx - flashDX) * fk; flashDY += (p.fy - flashDY) * fk;
     float fl = sqrtf(flashDX * flashDX + flashDY * flashDY) + 1e-4f;
     float fdx = flashDX / fl, fdy = flashDY / fl;
-    int tx0 = camX / 16 - 1, ty0 = camY / 16 - 1, tx1 = (camX + TOP_W) / 16 + 1, ty1 = (camY + TOP_H) / 16 + 1;
+    int tx0 = camX / 16 - 1, ty0 = camY / 16 - 1, tx1 = (camX + view_w()) / 16 + 1, ty1 = (camY + view_h()) / 16 + 1;
     float t = G.uiTime;
     for (int ty = ty0; ty <= ty1; ty++) for (int tx = tx0; tx <= tx1; tx++) {
         if (!m.in(tx, ty)) continue;
@@ -139,7 +139,7 @@ void render_world(Canvas& c, float alpha) {
     camY = (int)G.camY + (sh > 0 ? (int)((hash32(G.tick * 13) % 3) - 1) * (int)ceilf(sh) : 0);
     render_compute_light();
     gfx_clear(c, pal::black);
-    int tx0 = camX / 16, ty0 = camY / 16, tx1 = (camX + TOP_W) / 16 + 1, ty1 = (camY + TOP_H) / 16 + 1;
+    int tx0 = camX / 16, ty0 = camY / 16, tx1 = (camX + view_w()) / 16 + 1, ty1 = (camY + view_h()) / 16 + 1;
     for (int ty = ty0; ty <= ty1; ty++) for (int tx = tx0; tx <= tx1; tx++) {
         if (!m.in(tx, ty)) continue;
         int bx = tx * 16 - camX, by = ty * 16 - camY;
@@ -355,7 +355,7 @@ void render_world(Canvas& c, float alpha) {
             int v = (L * 2 + Lx + Ly) / 4;
             int x0 = tx * 16 + ox * 8 - camX, y0 = ty * 16 + oy * 8 - camY;
             // vignette: darken toward the screen edges (folded into the same pass)
-            float vx = (x0 + 4 - TOP_W / 2) / (float)(TOP_W / 2), vy = (y0 + 4 - TOP_H / 2) / (float)(TOP_H / 2);
+            int VW = view_w(), VH = view_h(); float vx = (x0 + 4 - VW / 2) / (float)(VW / 2), vy = (y0 + 4 - VH / 2) / (float)(VH / 2);
             v = v * (256 - (int)(70 * (vx * vx + vy * vy))) >> 8;
             if (v >= 250) continue;
             for (int y = y0; y < y0 + 8; y++) {
@@ -378,21 +378,24 @@ void render_world(Canvas& c, float alpha) {
         gfx_outline(c, *s, p.tx * 16 - camX, p.ty * 16 - camY + oy, col);
         if (!searched && !searching) gfx_outline(c, *s, p.tx * 16 - camX, p.ty * 16 - camY + oy - 0, (G.tick / 8) & 1 ? pal::lime : rgb(110, 170, 40));
     }
+}
+
+// Text and prompts are drawn after the zoom scale-up, at native resolution, so they stay crisp.
+static void render_overlay(Canvas& c, float z) {
+    auto SX = [&](float wx) { return (int)((wx - camX) * z); };
+    auto SY = [&](float wy) { return (int)((wy - camY) * z); };
     const Unit& pl = G.u[G.ctrl];
-    if (pl.searchT > 0) {
-        int x = (int)pl.x - camX - 12, y = (int)pl.y - camY - 34;
-        ui_bar(c, x, y, 24, 4, 1 - pl.searchT / 1.4f, pal::gold);
-    }
-    if (pl.reloadT > 0) gfx_textC(c, (int)pl.x - camX, (int)pl.y - camY - 38, "RELOADING", pal::cream);
-    for (auto& f : G.ft) if (f.life > 0) gfx_textC(c, (int)f.x - camX, (int)f.y - camY, f.txt, f.col);
+    if (pl.searchT > 0) ui_bar(c, SX(pl.x) - 14, SY(pl.y - 34), 28, 5, 1 - pl.searchT / 1.4f, pal::gold);
+    if (pl.reloadT > 0) gfx_textC(c, SX(pl.x), SY(pl.y - 38), "RELOADING", pal::cream);
+    for (auto& f : G.ft) if (f.life > 0) gfx_textC(c, SX(f.x), SY(f.y), f.txt, f.col);
     if (g_prompt && !game_paused()) {
-        int x = (int)g_promptX - camX, y = (int)g_promptY - camY + 12;
-        int w = gfx_textW(g_prompt) + 18;
+        int w = ui_promptW('A', g_prompt) + 8;
+        int x = SX(g_promptX), y = SY(g_promptY + 12);
         if (x - w / 2 < 2) x = w / 2 + 2; if (x + w / 2 > TOP_W - 2) x = TOP_W - 2 - w / 2;
         if (y > TOP_H - 40) y = TOP_H - 40;
-        gfx_fillA(c, x - w / 2, y, w, 13, pal::ink, 200);
-        gfx_rect(c, x - w / 2, y, w, 13, pal::border);
-        ui_prompt(c, x - w / 2 + 3, y + 2, 'A', g_prompt);
+        gfx_fillA(c, x - w / 2, y, w, 16, pal::ink, 210);
+        gfx_rect(c, x - w / 2, y, w, 16, pal::gold);
+        ui_prompt(c, x - w / 2 + 4, y + 2, 'A', g_prompt);
     }
 }
 
@@ -449,8 +452,9 @@ static void hud(Canvas& c) {
     if (G.toastT > 0) {
         int tw = gfx_textW(G.toast) + 12; if (tw > 396) tw = 396;
         int a = G.toastT < 0.4f ? (int)(G.toastT / 0.4f * 200) : 200;
-        gfx_fillA(c, 200 - tw / 2, 216, tw, 14, pal::ink, a); gfx_rect(c, 200 - tw / 2, 216, tw, 14, pal::goldDk);
-        gfx_textC(c, 200, 219, G.toast, pal::cream);
+        int ty = tut_active() ? 174 : 216;   // keep clear of the tutorial banner
+        gfx_fillA(c, 200 - tw / 2, ty, tw, 14, pal::ink, a); gfx_rect(c, 200 - tw / 2, ty, tw, 14, pal::goldDk);
+        gfx_textC(c, 200, ty + 3, G.toast, pal::cream);
     }
     if (G.set.showFps) { char f[24]; snprintf(f, sizeof f, "%.0ffps %.1fms", G.fps, G.frameMs); gfx_text(c, 4, 228, f, pal::lime); }
 }
@@ -517,7 +521,20 @@ void game_render(Canvas& top, Canvas& bot, float alpha) {
     if (G.panel == PN_ANIMTEST) render_animtest(top);
     else if (G.scene == SC_TITLE || !G.inLevel) { camX = camY = 0; render_title(top); }
     else {
-        render_world(top, alpha);
+        int z = G.set.zoom ? G.set.zoom : 100;
+        if (z == 100) render_world(top, alpha);
+        else {
+            // render the smaller world view, then nearest-neighbour scale it to the full top screen
+            static px vbuf[TOP_W * TOP_H]; Canvas v; v.init(vbuf, view_w(), view_h());
+            render_world(v, alpha);
+            static int xs[TOP_W]; for (int x = 0; x < TOP_W; x++) xs[x] = x * 100 / z;
+            for (int y = 0; y < TOP_H; y++) {
+                const px* src = vbuf + (y * 100 / z) * v.w; px* dst = top.p + y * TOP_W;
+                for (int x = 0; x < TOP_W; x++) dst[x] = src[xs[x]];
+            }
+        }
+        render_overlay(top, z / 100.0f);
+        tut_render(top);
         hud(top);
         if (game_paused()) {
             gfx_fillA(top, 0, 0, TOP_W, TOP_H, pal::ink, 110);

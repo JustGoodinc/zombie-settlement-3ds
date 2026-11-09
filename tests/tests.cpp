@@ -408,6 +408,65 @@ static void testMenus() {
     CHECK(settle_population() == pop + 1 && !G.st.visitorPresent);
 }
 
+
+static void testTutorialZoom() {
+    SECTION("tutorial: every step completes from real player actions");
+    save_setDir("test_saves/");
+    game_newGame();
+    G.set.tutorialDone = false;
+    tut_start();
+    CHECK(tut_active() && G.tut == 0);
+    Input mv; mv.ax = 1; mv.held = 0;
+    frames(40, mv);                                   // walk
+    CHECK(G.tut == 1);
+    ui_open(PN_INVENTORY); frames(2); ui_open(PN_HUD); frames(2);   // backpack open + close
+    CHECK(G.tut == 2);
+    CHECK(tut_highlight() == TH_EXPEDITION);
+    ui_open(PN_WORLDMAP); frames(2);
+    CHECK(G.tut == 3 && tut_highlight() == TH_DEPLOY);
+    G.squad[0] = 0; G.squad[1] = -1; G.squad[2] = -1; G.st.surv[0].onExpedition = true;
+    level_leave(); level_enter(MAP_POLICE, 0); ui_open(PN_HUD); frames(2);
+    CHECK(G.tut == 4);
+    int prop = -1; for (int i = 0; i < G.map.nprop; i++) if (G.map.prop[i].container >= 0) { prop = i; break; }
+    ui_container(prop, -1); frames(2);
+    CHECK(G.tut == 5 && tut_highlight() == TH_TAKEALL);
+    ui_open(PN_HUD); frames(2);
+    CHECK(G.tut == 6);
+    Survivor& s = G.st.surv[0]; s.pack.it[s.equip].mag = 5; s.pack.it[s.equip].dur = 100;
+    G.u[0].cd = 0; dbg_fire(0); frames(2);
+    CHECK(G.tut == 7);
+    Input rl; rl.down = BTN_X; rl.held = BTN_X; frames(1, rl); frames(2);
+    CHECK(G.tut == 8);
+    Input b1; b1.held = BTN_B; b1.down = BTN_B; frames(1, b1); Input b2; b2.up = BTN_B; frames(1, b2); frames(10);
+    CHECK(G.tut == 9);
+    expedition_finish(false); frames(2);
+    CHECK(G.tut == 10);
+    G.frameMs = 1000.0f / 30; frames(200);
+    CHECK(!tut_active() && G.set.tutorialDone);
+
+    SECTION("tutorial: skip, and dying/extracting early never strands it");
+    game_newGame(); G.set.tutorialDone = false; tut_start();
+    tut_skip();
+    CHECK(!tut_active() && G.set.tutorialDone);
+    game_newGame(); tut_start(); G.tut = 4; ui_open(PN_SUMMARY); frames(2);
+    CHECK(G.tut == 10);
+
+    SECTION("zoom: every level renders, view covers the screen, settings persist");
+    startExpedition();
+    const uint8_t Z[4] = {100, 125, 150, 200};
+    for (uint8_t z : Z) {
+        G.set.zoom = z; frames(3);
+        CHECK(view_w() * z / 100 >= TOP_W && view_h() * z / 100 >= TOP_H);
+        CHECK(G.camX >= 0 && G.camX <= G.map.w * 16 - view_w() + 1);
+    }
+    G.set.zoom = 150; G.set.tutorialDone = true; settings_save();
+    G.set.zoom = 100; G.set.tutorialDone = false; settings_load();
+    CHECK(G.set.zoom == 150 && G.set.tutorialDone);
+    FILE* f = fopen("test_saves/settings.ini", "w"); fputs("8 8 6 30 2 1 0 0 0\n", f); fclose(f);   // old 9-field file
+    settings_load();
+    CHECK(G.set.zoom == 125 && !G.set.tutorialDone);
+    G.set.zoom = 125;
+}
 int main() {
     game_init();
     testCombat();
@@ -418,6 +477,7 @@ int main() {
     testSave();
     testAnimation();
     testMenus();
+    testTutorialZoom();
     printf("\n%d passed, %d failed\n", passes, fails);
     return fails;
 }

@@ -9,6 +9,7 @@
 #include <string.h>
 #include "../../gameplay/game.h"
 #include "../../core/audio.h"
+#include "../../ui/ui.h"
 
 extern bool g_canQuit;
 extern const char* g_controlsText;
@@ -68,6 +69,23 @@ static void loadBindings() {
         else for (auto& b : binds) if (!_stricmp(line, b.name)) memcpy(b.vk, vks, sizeof vks);
     }
     fclose(f);
+}
+
+// keycap labels for on-screen prompts, taken from the active bindings
+static const char* vkName(int vk) {
+    static char buf[16][8]; static int n = 0;
+    switch (vk) {
+    case VK_SPACE: return "Space"; case VK_SHIFT: return "Shift"; case VK_CONTROL: return "Ctrl"; case VK_RETURN: return "Enter";
+    case VK_ESCAPE: return "Esc"; case VK_TAB: return "Tab"; case VK_BACK: return "Bksp"; case VK_MENU: return "Alt";
+    case VK_UP: return "^"; case VK_DOWN: return "v"; case VK_LEFT: return "<"; case VK_RIGHT: return ">";
+    }
+    char* b = buf[n++ & 15]; b[0] = (char)vk; b[1] = 0; return b;
+}
+static void buildKeyNames() {
+    for (auto& b : binds) for (int i = 0; i < 12; i++) if (b.btn == (1u << i)) g_keyName[i] = vkName(b.vk[0]);
+    static char stick[8];
+    bool letters = true; for (int i = 0; i < 4; i++) letters &= stickVk[i] >= 'A' && stickVk[i] <= 'Z';
+    if (letters) { stick[0] = (char)stickVk[0]; stick[1] = (char)stickVk[2]; stick[2] = (char)stickVk[1]; stick[3] = (char)stickVk[3]; stick[4] = 0; g_stickName = stick; }
 }
 
 // ---- XInput (loaded dynamically so the game runs without it) ----
@@ -194,6 +212,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int) {
     } else { snprintf(baseDir, sizeof baseDir, "saves\\"); CreateDirectoryA(baseDir, nullptr); }
     save_setDir(baseDir);
     loadBindings();
+    buildKeyNames();
+    g_inputStyle = 1;   // keyboard keycaps until a gamepad is used
     g_canQuit = true;
     g_controlsText =
         "Move/aim: WASD (facing follows movement)\nFire (Y): Space or J   Reload (X): R\nInteract/Search (A): E or K\n"
@@ -230,17 +250,20 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int) {
         uint32_t held = 0;
         bool focus = GetForegroundWindow() == hwnd;
         for (auto& b : binds) for (int k = 0; k < 3; k++) if (b.vk[k] && focus && (GetAsyncKeyState(b.vk[k]) & 0x8000)) held |= b.btn;
+        if (held) g_inputStyle = 1;
         float ax = 0, ay = 0;
         if (focus) {
             if (GetAsyncKeyState(stickVk[0]) & 0x8000) ay -= 1; if (GetAsyncKeyState(stickVk[1]) & 0x8000) ay += 1;
             if (GetAsyncKeyState(stickVk[2]) & 0x8000) ax -= 1; if (GetAsyncKeyState(stickVk[3]) & 0x8000) ax += 1;
+            if (ax || ay) g_inputStyle = 1;
         }
         if (ax && ay) { ax *= 0.7071f; ay *= 0.7071f; }
         XSTATE xs;
         if (xget && xget(0, &xs) == 0) {
             const XPAD& p = xs.pad;
             float lx = p.lx / 32767.0f, ly = -p.ly / 32767.0f;
-            if (lx * lx + ly * ly > 0.06f) { ax = lx; ay = ly; }
+            if (lx * lx + ly * ly > 0.06f) { ax = lx; ay = ly; g_inputStyle = 2; }
+            if (p.buttons || p.rt > 100) g_inputStyle = 2;
             if (p.buttons & 0x1000) held |= BTN_A; if (p.buttons & 0x2000) held |= BTN_B; if (p.buttons & 0x4000) held |= BTN_Y; if (p.buttons & 0x8000) held |= BTN_X;
             if (p.rt > 100) held |= BTN_Y;
             if (p.buttons & 0x0100) held |= BTN_L; if (p.buttons & 0x0200) held |= BTN_R;

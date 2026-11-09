@@ -122,6 +122,8 @@ struct Settings {
     bool shake = true, showFps = false;
     uint8_t winScale = 2;                     // Windows window scale
     bool fullscreen = false;
+    uint8_t zoom = 125;                       // camera zoom percent: 100 / 125 / 150 / 200
+    bool tutorialDone = false;
 };
 
 enum Scene : uint8_t { SC_TITLE, SC_SETTLEMENT, SC_EXPEDITION };
@@ -176,6 +178,9 @@ struct Game {
     bool inLevel = false;
     int8_t squad[3] = {-1, -1, -1};   // survivors chosen for the next expedition (0 = controlled)
     int8_t expLoc = -1;              // location of an in-progress expedition (persisted)
+    // tutorial (-1 = inactive) and the player-action counters it watches
+    int8_t tut = -1; float tutT = 0, tutDist = 0, tutLX = 0, tutLY = 0; bool tutFlag = false;
+    uint32_t statShots = 0, statReloads = 0, statDodges = 0; float statSprint = 0;
     struct Decal { float x, y; uint8_t kind; } decal[64]; int ndecal = 0;
 };
 
@@ -186,6 +191,9 @@ struct Settler {           // lightweight settlement NPC (one per survivor)
 };
 extern Settler g_npc[MAX_SURV];
 extern Game G;
+// world viewport in world pixels (the top screen shows this area scaled by the zoom setting)
+inline int view_w() { int z = G.set.zoom ? G.set.zoom : 100; return (TOP_W * 100 + z - 1) / z; }   // rounded up so scaling never reads past the edge
+inline int view_h() { int z = G.set.zoom ? G.set.zoom : 100; return (TOP_H * 100 + z - 1) / z; }
 
 // ---- game.cpp
 void game_init();
@@ -252,6 +260,15 @@ bool save_deserialize(const uint8_t* buf, int len, char* err, int errLen);
 // ---- menus.cpp
 void ui_update(const Input& in);
 void ui_dropInput();
+
+// ---- tutorial.cpp (skippable guided first run)
+void tut_start();
+void tut_skip();
+void tut_update();
+void tut_render(Canvas& top);
+bool tut_active();
+int  tut_highlight();   // which on-screen button the current step wants pressed (TH_*)
+enum { TH_NONE, TH_EXPEDITION, TH_DEPLOY, TH_TAKEALL };
 void ui_render(Canvas& bot);
 void ui_open(Panel p);
 void ui_push(Panel p);

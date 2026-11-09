@@ -24,6 +24,14 @@ void ui_resetFocus();
 // drawing primitives
 void ui_panel(Canvas& c, int x, int y, int w, int h, const char* title = nullptr);
 void ui_bg(Canvas& c);
+// button glyphs (style follows the active input device)
+constexpr uint32_t BTN_STICK = 1u << 20, BTN_TOUCH = 1u << 21, BTN_DPAD_LR = BTN_LEFT | BTN_RIGHT;
+extern int g_inputStyle;          // 0 = 3DS buttons, 1 = keyboard keycaps, 2 = Xbox pad
+extern const char* g_keyName[12];  // keyboard labels per BTN bit (Windows fills from controls.ini)
+extern const char* g_stickName;
+int  ui_btn(Canvas& c, int x, int y, uint32_t btn);   // draws, returns width
+int  ui_btnW(uint32_t btn);
+int  ui_promptW(char b, const char* label);
 void ui_glyph(Canvas& c, int x, int y, char b, bool hi = false);
 void ui_prompt(Canvas& c, int x, int y, char b, const char* label);
 void ui_bar(Canvas& c, int x, int y, int w, int h, float v, px col);

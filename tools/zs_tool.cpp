@@ -94,6 +94,9 @@ static void shots(const char* dir) {
     step(20); shot(dir, "01_title");
     game_newGame(); step(40);
     shot(dir, "02_settlement_day");
+    tut_start(); step(12); shot(dir, "02b_tutorial_banner"); tut_skip(); G.toastT = 0;
+    ui_open(PN_CONTROLS); step(8); shot(dir, "02c_controls_3ds");
+    { extern int g_inputStyle; extern const char* g_keyName[12]; static const char* PC[12] = {"E", "Shift", "R", "Space", "Q", "F", "Esc", "Tab", "^", "v", "<", ">"}; for (int i = 0; i < 12; i++) g_keyName[i] = PC[i]; g_inputStyle = 1; step(2); shot(dir, "02d_controls_keyboard"); ui_open(PN_HUD); step(4); shot(dir, "02e_hud_keyboard_prompts"); g_inputStyle = 0; }
     ui_open(PN_BASE); step(10); shot(dir, "03_settlement_base");
     g_buildingSel = B_INFIRMARY; ui_open(PN_BUILDING); step(10); shot(dir, "04_build_menu");
     ui_open(PN_SURVIVORS); step(10); shot(dir, "05_survivors");
@@ -134,6 +137,9 @@ static void shots(const char* dir) {
     press(BTN_Y); step(2); shot(dir, "15_combat_muzzle");
     for (int i = 0; i < 4; i++) { press(BTN_Y); step(9); }
     shot(dir, "16_combat_hits");
+    G.set.zoom = 100; step(3); shot(dir, "16b_zoom_100");
+    G.set.zoom = 200; step(3); shot(dir, "16c_zoom_200");
+    G.set.zoom = 125;
     // night with flashlight
     G.clock = 23 * 60; step(10); shot(dir, "17_night_flashlight");
     G.flashlight = false; step(10); shot(dir, "18_night_no_light");

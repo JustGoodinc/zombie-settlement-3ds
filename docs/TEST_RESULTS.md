@@ -16,6 +16,8 @@ Run: `build\zs_tests.exe` (MSVC Release, 2026-11-09). **214 passed, 0 failed.**
 | Save | round trip of rotations, deaths, building levels, timers, clock and container contents; truncated payload rejected without side effects; corrupted file restored from backup; stray tmp ignored; delete |
 | Animation | every definition valid; frame-rate independent (30 vs 120 Hz); non-interruptible melee; death is final; reload returns to idle; walk is not reset by re-play; dir8 mapping; all 8 directions × 14 poses for survivors and zombies; pivot stability |
 | UI | every panel opens and B backs out; the recruit Accept flow |
+| Tutorial | all 10 steps advance only from the real actions (walk, open+close backpack, world map, deploy, search, back to HUD, fire, reload, dodge, extract); finishing or skipping saves the flag; extracting early jumps to the end |
+| Zoom | every zoom level renders and the view always covers the screen; zoom and tutorial flag survive settings save/load; old 9-field settings files still load |
 
 ## Screenshot gauntlet
 `zs_tool --shots screenshots/auto` plays a scripted session and captures 30 native-resolution composites (title → settlement → menus → deploy → police → search → loot → inventory → combat → night → pause → squad → extraction → settlement night → infirmary → workshop → recruit → journal → settings → animation room → save/load → main menu). These were inspected visually. One bug was found and fixed: the A press that triggered extraction also activated the summary's button.

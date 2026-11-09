@@ -23,6 +23,8 @@ World: olive grass, dusty asphalt, lino checker, wood, carpet and concrete, all 
 - Inventory art uses 8 px per grid cell: drawn at 3× (24 px cells) for the 6×4 starter pack, 2× (16 px) for larger packs, and 1× in the compact container view (12 px cells).
 - Portraits 24×24 (1× in the HUD, 2× in menus).
 - Font: 5×8 bitmap, 6 px advance, 10 px line, 1 px drop shadow. Bold variant (7 px advance) for titles, tabs and buttons.
+- Button glyphs (`ui_btn`): 3DS colours A red, B yellow, X blue, Y green; pills for L/R/START/SELECT; D-pad and Circle Pad icons. PC shows keycaps with the bound key names, Xbox labels when a pad is active.
+- Camera zoom: the world renders a smaller view (400/zoom × 240/zoom) scaled up nearest-neighbour; HUD, floating text and prompts are drawn afterwards at native resolution.
 - Panels: bevelled metal (light top-left, dark bottom-right), rivets, gradient title bar. Buttons and tabs: vertical gradient + bevel, gold border when focused or selected. Bars are segmented. The bottom screen has a worn metal frame.
 - Atmosphere: warm dusty grade by day, amber dusk, blue night, screen-edge vignette, prop and building drop shadows, wall ambient occlusion, deterministic ground detail (tufts, flowers, rocks, litter, oil, cracks, blood smears indoors).
 - Nearest-neighbour scaling only.
