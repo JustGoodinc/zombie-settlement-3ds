@@ -380,12 +380,12 @@ static void testAnimation() {
     CHECK(dir8(1, 0) == 0 && dir8(0, 1) == 2 && dir8(-1, 0) == 4 && dir8(0, -1) == 6 && dir8(1, 1) == 1 && dir8(-1, -1) == 5 && dir8(1, -1) == 7 && dir8(-1, 1) == 3);
     // every survivor/zombie pose exists for all 8 directions
     bool allPoses = true;
-    for (int z = 0; z < 2; z++) for (int d = 0; d < 8; d++) for (int p = 0; p < P_COUNT; p++) { bool f; const Sprite& s = art_char(z != 0, 0, d, (Pose)p, f); if (!s.d || s.w != 16 || s.h != 16) allPoses = false; }
+    for (int z = 0; z < 2; z++) for (int d = 0; d < 8; d++) for (int p = 0; p < P_COUNT; p++) { bool f; const Sprite& s = art_char(z != 0, 0, d, (Pose)p, f); if (!s.d || s.w * s.h != 16 * 24) allPoses = false; }
     CHECK(allPoses);
     // pivot stability: feet row stays put between stand and walk frames
     bool f;
     const Sprite& st = art_char(false, 0, 2, P_STAND, f); const Sprite& wa = art_char(false, 0, 2, P_WALK_A, f);
-    int lowS = 0, lowW = 0; for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) { if (st.d[y * 16 + x] != KEYC) lowS = y; if (wa.d[y * 16 + x] != KEYC) lowW = y; }
+    int lowS = 0, lowW = 0; for (int y = 0; y < st.h; y++) for (int x = 0; x < st.w; x++) { if (st.d[y * st.w + x] != KEYC) lowS = y; if (wa.d[y * wa.w + x] != KEYC) lowW = y; }
     CHECK(lowS == lowW);
 }
 

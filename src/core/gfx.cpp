@@ -194,7 +194,9 @@ Sprite spr_rot90(const Sprite& a) {
 
 px pal_char(char ch) {
     switch (ch) {
-    case 'k': return rgb(22, 20, 24);    case 'e': return rgb(22, 20, 24);
+    case 'k': return rgb(22, 20, 24);    case 'e': return rgb(34, 26, 30);
+    case 'j': return rgb(40, 30, 20);    case 'm': return rgb(96, 70, 44);
+    case 'p': return rgb(28, 40, 64);
     case 'd': return rgb(42, 42, 48);    case 'g': return rgb(74, 74, 82);
     case 'l': return rgb(138, 138, 144); case 'w': return rgb(216, 208, 192);
     case 't': return rgb(180, 154, 122); case 's': return rgb(216, 168, 128);
@@ -260,3 +262,16 @@ bool gfx_writePNG(const char* path, const px* d, int w, int h) {
     free(r); free(z); fclose(f);
     return true;
 }
+
+// Bold variant (glyph drawn twice, 7 px advance) for titles, tabs and buttons, like the Try 2 UI.
+int gfx_textWB(const char* s) { int n = 0; for (; *s && *s != '\n'; s++) n++; return n ? n * 7 - 1 : 0; }
+int gfx_textB(Canvas& c, int x, int y, const char* s, px col) {
+    int cx = x;
+    for (; *s; s++) {
+        glyph(c, cx + 1, y + 1, *s, pal::ink, 1); glyph(c, cx + 2, y + 1, *s, pal::ink, 1);
+        glyph(c, cx, y, *s, col, 1); glyph(c, cx + 1, y, *s, col, 1);
+        cx += 7;
+    }
+    return cx - x;
+}
+void gfx_textCB(Canvas& c, int cx, int y, const char* s, px col) { gfx_textB(c, cx - gfx_textWB(s) / 2, y, s, col); }

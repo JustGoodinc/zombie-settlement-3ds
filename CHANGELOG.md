@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Try 2 visual pass
+- Characters rebuilt at 16×24 (faces, shading, backpacks; zombies hunched with torn clothes and red eyes).
+- Warm colour grade, vignette, drop shadows, wall ambient occlusion, scattered ground detail.
+- Settlement rebuilt: grass and paths, tents, campfire circle, torches, barrels, sandbags, log piles; you start by the fire.
+- Police Station: lit POLICE sign with strobes, traffic cones, barrels.
+- UI: bevelled metal panels, gradient title bars, bold labels, segmented bars, icons in building, location, survivor and patient lists, 3× inventory cells for small packs, settlement minimap shows buildings.
+
 ## v0.1.0 — first playable vertical slice
 - Shared C++17 core with a software RGB565 renderer (pixel-identical on PC and 3DS).
 - Windows: Win32 dual-screen window, mouse touchscreen, keyboard plus rebinding, XInput, waveOut audio, fullscreen and scaling.

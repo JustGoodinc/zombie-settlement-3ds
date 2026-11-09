@@ -20,7 +20,8 @@ void render_compute_light() {
     const Unit& p = G.u[G.ctrl];
     float day = daylight();
     // smooth flashlight rotation toward the facing direction
-    flashDX += (p.fx - flashDX) * 0.35f; flashDY += (p.fy - flashDY) * 0.35f;
+    float fk = 1 - expf(-fmaxf(G.frameMs, 1.0f) / 1000.0f * 14);   // time-based smoothing (same feel at any FPS)
+    flashDX += (p.fx - flashDX) * fk; flashDY += (p.fy - flashDY) * fk;
     float fl = sqrtf(flashDX * flashDX + flashDY * flashDY) + 1e-4f;
     float fdx = flashDX / fl, fdy = flashDY / fl;
     int tx0 = camX / 16 - 1, ty0 = camY / 16 - 1, tx1 = (camX + TOP_W) / 16 + 1, ty1 = (camY + TOP_H) / 16 + 1;
@@ -29,7 +30,7 @@ void render_compute_light() {
         if (!m.in(tx, ty)) continue;
         int i = m.idx(tx, ty);
         bool indoor = (m.flags[i] & F_INDOOR) != 0;
-        float L = indoor ? 70 + day * 110 : 28 + day * 227;
+        float L = indoor ? 70 + day * 104 : 28 + day * 210;
         float cx = tx * 16 + 8.0f, cy = ty * 16 + 8.0f, dx = cx - p.x, dy = cy - (p.y - 4), d = sqrtf(dx * dx + dy * dy);
         bool los = d < 12 || map_los(m, p.x, p.y - 4, cx, cy);
         if (los) {
@@ -42,11 +43,11 @@ void render_compute_light() {
         // light sources: lamps, campfire (flicker), generator lamp
         for (int k = 0; k < m.nprop; k++) {
             const Prop& pr = m.prop[k];
-            if (pr.type != PR_LAMP && pr.type != PR_FIRE) continue;
+            if (pr.type != PR_LAMP && pr.type != PR_FIRE && pr.type != PR_TORCH) continue;
             float lx = pr.tx * 16 + 8.0f, ly = pr.ty * 16 + 8.0f, ld = sqrtf((cx - lx) * (cx - lx) + (cy - ly) * (cy - ly));
-            float r = pr.type == PR_FIRE ? 88.0f : 72.0f;
+            float r = pr.type == PR_FIRE ? 88.0f : (pr.type == PR_TORCH ? 56.0f : 72.0f);
             if (ld > r) continue;
-            float flick = pr.type == PR_FIRE ? 0.85f + 0.15f * sinf(t * 13 + k) * sinf(t * 7.3f) : ((int)(t * 6 + k * 3) % 23 == 0 ? 0.4f : 1.0f);
+            float flick = pr.type != PR_LAMP ? 0.85f + 0.15f * sinf(t * 13 + k) * sinf(t * 7.3f) : ((int)(t * 6 + k * 3) % 23 == 0 ? 0.4f : 1.0f);
             if (map_los(m, lx, ly, cx, cy)) L = fmaxf(L, 200 * (1 - ld / r) * flick + 30);
         }
         if (!los) L = fminf(L * 0.3f, 48);
@@ -98,13 +99,13 @@ static void drawChar(Canvas& c, bool zombie, int variant, float x, float y, uint
     const AnimFrame& f = a.cur();
     bool flip;
     const Sprite& s = art_char(zombie, variant, dir, (Pose)f.pose, flip);
-    int sx = (int)(x + fx * f.kick) - camX - 8, sy = (int)(y + fy * f.kick * 0.5f + f.bob) - camY - 14;
-    if (shadow && f.pose != P_DEAD) gfx_fillA(c, sx + 3, sy + 14, 10, 3, rgb(0, 0, 0), 110);
+    int sx = (int)(x + fx * f.kick) - camX - s.w / 2, sy = (int)(y + fy * f.kick * 0.5f + f.bob) - camY - s.h + 2;
+    if (shadow && f.pose != P_DEAD) { gfx_fillA(c, (int)x - camX - 6, (int)y - camY - 1, 12, 3, rgb(0, 0, 0), 120); gfx_fillA(c, (int)x - camX - 4, (int)y - camY - 2, 8, 5, rgb(0, 0, 0), 60); }
     // weapon: drawn behind the body when facing away from the camera
     auto weapon = [&]() {
         if (weaponId <= 0 || f.pose == P_DEAD || f.pose == P_FALL) return;
         const ItemDef& d = idef(weaponId);
-        int hx = sx + 8 + (int)(fx * 3), hy = sy + 9 + (int)(fy * 2);
+        int hx = sx + 8 + (int)(fx * 3), hy = sy + 15 + (int)(fy * 2);
         float len = d.cat == IC_FIREARM ? (d.w >= 4 ? 10.0f : (d.w == 3 ? 8.0f : 6.0f)) : (d.w >= 3 ? 9.0f : 6.0f);
         float ax = fx, ay = fy;
         if (a.state == AnimState::Melee) {   // swing arc: anticipation -> strike
@@ -151,6 +152,34 @@ void render_world(Canvas& c, float alpha) {
             if (b.state != BS_BROKEN && b.state != BS_OPEN && hp < 0.66f) gfx_blit(c, g_tile[hp < 0.33f ? TA_CRACK2 : TA_CRACK1][0], bx + jx, by);
         } else gfx_blit(c, tileSprite(tx, ty), bx, by);
         if (m.t[i] == T_EXTRACT && ((int)(G.uiTime * 2) & 1)) gfx_rect(c, bx + 2, by + 2, 12, 12, rgb(154, 228, 64));
+        uint8_t t = m.t[i];
+        if (t == T_WALL || t == T_PALISADE || t == T_DOOR || t == T_BARS || t == T_FENCE) continue;
+        // ground detail scattered deterministically (no storage, identical every frame)
+        uint32_t h = hash32((uint32_t)(tx * 92837 + ty * 689287 + m.id * 7919));
+        int r = h % 100, dx = (h >> 8) % 9, dy = (h >> 12) % 9;
+        int dec = -1;
+        if (m.propAt[i] < 0) {
+            if (t == T_GRASS) dec = r < 9 ? S_DEC_TUFT : (r < 13 ? S_DEC_FLOWER : (r < 16 ? S_DEC_ROCK : (r < 18 ? S_DEC_LEAVES : -1)));
+            else if (t == T_DIRT) dec = r < 6 ? S_DEC_ROCK : (r < 11 ? S_DEC_TUFT : (r < 13 ? S_DEC_LEAVES : -1));
+            else if (t == T_ASPHALT || t == T_LINE) dec = r < 2 ? S_DEC_OIL : (r < 6 ? S_DEC_CRACK : (r < 12 ? S_DEC_PAPER : (r < 14 ? S_DEC_DEBRIS : -1)));
+            else if (t == T_TILE || t == T_WOOD || t == T_CARPET || t == T_CONCRETE) dec = r < 6 ? S_DEC_PAPER : (r < 10 ? S_DEC_DEBRIS : (r < 12 ? S_DEC_CRACK : ((r < 14 && m.id == MAP_POLICE) ? S_DEC_SMEAR : -1)));
+        }
+        if (dec >= 0) gfx_blit(c, g_spr[dec], bx + dx, by + dy);
+        // ambient occlusion: floors darken where they meet a wall (north) or wall side (west/east)
+        auto solidWall = [&](int x, int y) { if (!m.in(x, y)) return false; uint8_t w = m.t[m.idx(x, y)]; return w == T_WALL || w == T_PALISADE || (w == T_DOOR && m.bar[m.barAt[m.idx(x, y)]].kind == BK_WINDOW); };
+        if (solidWall(tx, ty - 1)) { static const int AO[5] = {130, 160, 190, 215, 238}; for (int k = 0; k < 5; k++) gfx_shade(c, bx, by + k, 16, 1, AO[k]); }
+        if (solidWall(tx - 1, ty)) { gfx_shade(c, bx, by, 2, 16, 170); gfx_shade(c, bx + 2, by, 2, 16, 215); }
+        if (solidWall(tx + 1, ty)) gfx_shade(c, bx + 14, by, 2, 16, 200);
+    }
+    // police station signage above the front doors (Try 2 look)
+    if (m.id == MAP_POLICE) {
+        int sx = 19 * 16 + 14 - camX, sy = 32 * 16 + 3 - camY;   // facade wall left of the double doors
+        gfx_fill(c, sx - 1, sy - 1, 74, 13, pal::ink);
+        gfx_fill(c, sx, sy, 72, 11, rgb(34, 46, 84)); gfx_fill(c, sx, sy, 72, 1, rgb(70, 90, 140));
+        gfx_text(c, sx + 9, sy + 2, "POLICE", pal::cream, 1, true); gfx_text(c, sx + 10, sy + 2, "POLICE", pal::cream, 1, false);
+        bool on = ((int)(G.uiTime * 3)) & 1;   // emergency strobes either side
+        gfx_fill(c, sx - 8, sy + 2, 4, 4, on ? rgb(240, 60, 50) : rgb(90, 30, 30));
+        gfx_fill(c, sx + 76, sy + 2, 4, 4, on ? rgb(60, 90, 240) : rgb(30, 40, 90));
     }
     // decals (blood) and corpses lie under everything
     for (int k = 0; k < G.ndecal; k++) gfx_blit(c, g_spr[S_BLOOD0 + G.decal[k].kind % 3], (int)G.decal[k].x - camX, (int)G.decal[k].y - camY);
@@ -159,6 +188,34 @@ void render_world(Canvas& c, float alpha) {
         if (z.state != ZS_DEAD || z.anim.state != AnimState::Dead) continue;
         if (!visibleAt(z.x, z.y)) continue;
         drawChar(c, true, z.variant, z.x, z.y, z.dir, z.anim, z.hx, z.hy, 0, 0, 0, false);
+    }
+    // soft drop shadows (light from the north-west), drawn before anything stands on the floor
+    auto shadow = [&](const Sprite& s, int x, int y, int ox, int oy, int lvl) {
+        for (int j = 0; j < s.h; j++) {
+            int py = y + j + oy; if (py < 0 || py >= c.h) continue;
+            for (int i = 0; i < s.w; i++) {
+                int pxx = x + i + ox; if (pxx < 0 || pxx >= c.w || s.d[j * s.w + i] == KEYC) continue;
+                c.p[py * c.w + pxx] = gfx_scale(c.p[py * c.w + pxx], lvl);
+            }
+        }
+    };
+    for (int k = 0; k < m.nprop; k++) {
+        const Prop& p = m.prop[k];
+        if (p.tx + p.tw < tx0 - 3 || p.tx > tx1 + 1 || p.ty + p.th < ty0 - 3 || p.ty > ty1 + 1) continue;
+        int x = p.tx * 16 - camX, y = p.ty * 16 - camY;
+        switch (p.type) {
+        case PR_TREE: gfx_fillA(c, x - 6, y + 6, 32, 12, rgb(0, 0, 0), 90); gfx_fillA(c, x - 2, y + 4, 24, 16, rgb(0, 0, 0), 50); break;
+        case PR_PLOT: if (G.st.bLevel[p.special]) shadow(g_building[p.special][G.st.bLevel[p.special] > 3 ? 3 : G.st.bLevel[p.special]], x, y, 4, 3, 150); break;
+        case PR_CAR: shadow(g_spr[S_CAR], x, y, 2, 3, 140); break;
+        case PR_WRECK: shadow(g_spr[S_WRECK], x, y, 2, 3, 140); break;
+        case PR_TENT: shadow(g_spr[S_TENT], x, y - 8, 3, 3, 150); break;
+        case PR_CHAIR: case PR_CONE: case PR_GENERATOR: break;
+        default: if (p.type <= PR_LOGS && p.type != PR_PLOT) {
+            static const int SPR[PR_COUNT] = {S_DESK, S_FILING, S_LOCKER, S_CRATE, S_MEDCAB, S_SHELF, S_CAR, S_WRECK, S_TREE, S_BENCH, S_COT, S_CHAIR, S_PLANT, S_COOLER,
+                                              S_FIRE0, S_RADIO, S_GENPROP0, S_WORKBENCH, S_LAMP, S_CRATE, S_TENT, S_BARREL, S_SANDBAG, S_LOGS, S_TORCH0, S_CONE, S_CRATE};
+            shadow(g_spr[SPR[p.type]], x, y, 2, 2, 160);
+        }
+        }
     }
     // y-sorted scene
     static DrawItem items[Map::MAXPROP + MAX_ZOMB + MAX_UNITS + MAX_SURV + MAX_BAGS];
@@ -205,6 +262,12 @@ void render_world(Canvas& c, float alpha) {
                 break;
             }
             case PR_BENCH: gfx_blit(c, g_spr[S_BENCH], x, y); break;
+            case PR_TENT: gfx_blit(c, g_spr[S_TENT], x, y - 8); break;
+            case PR_BARREL: gfx_blit(c, g_spr[S_BARREL], x, y); break;
+            case PR_SANDBAG: gfx_blit(c, g_spr[S_SANDBAG], x, y); break;
+            case PR_LOGS: gfx_blit(c, g_spr[S_LOGS], x, y); break;
+            case PR_TORCH: gfx_blit(c, g_spr[S_TORCH0 + (((int)(G.uiTime * 7) + p.tx) & 1)], x, y - 4); break;
+            case PR_CONE: gfx_blit(c, g_spr[S_CONE], x, y); break;
             case PR_COT: gfx_blit(c, g_spr[S_COT], x, y); break;
             case PR_CHAIR: gfx_blit(c, g_spr[S_CHAIR], x, y); break;
             case PR_PLANT: gfx_blit(c, g_spr[S_PLANT], x, y); break;
@@ -243,7 +306,7 @@ void render_world(Canvas& c, float alpha) {
             int wid = 0;
             if (u.sv >= 0) { const Survivor& s = G.st.surv[u.sv]; if (s.equip >= 0 && s.equip < s.pack.n) wid = s.pack.it[s.equip].id; }
             drawChar(c, false, variant, x, y, u.dir, u.anim, u.fx, u.fy, u.hurtT > 0.15f ? 1 : 0, wid, u.muzzleT);
-            if (u.escort && u.order == ORD_HOLD && ((int)(G.uiTime * 2) & 1)) gfx_textC(c, (int)x - camX, (int)y - camY - 26, "HELP!", pal::cream);
+            if (u.escort && u.order == ORD_HOLD && ((int)(G.uiTime * 2) & 1)) gfx_textC(c, (int)x - camX, (int)y - camY - 34, "HELP!", pal::cream);
         } else if (d.kind == DK_NPC) {
             Settler& s = g_npc[d.idx];
             if (s.asleep) gfx_blit(c, g_spr[S_BEDROLL], (int)s.x - camX - 8, (int)s.y - camY - 8);
@@ -280,7 +343,8 @@ void render_world(Canvas& c, float alpha) {
 
     // ---- lighting: 8x8 cells, each blended toward its neighbours to soften tile edges
     float day = daylight();
-    px tint = day > 0.6f ? rgb(0, 0, 0) : (day > 0.15f ? rgb(40, 20, 16) : rgb(6, 10, 26));
+    // warm dusty grade by day, amber at dusk, deep blue at night
+    px tint = day > 0.6f ? rgb(30, 22, 14) : (day > 0.15f ? rgb(44, 22, 14) : rgb(6, 10, 26));
     for (int ty = ty0; ty <= ty1; ty++) for (int tx = tx0; tx <= tx1; tx++) {
         if (!m.in(tx, ty)) continue;
         int L = G.light[m.idx(tx, ty)];
@@ -289,8 +353,11 @@ void render_world(Canvas& c, float alpha) {
             int nx = tx + (ox ? 1 : -1), ny = ty + (oy ? 1 : -1);
             int Lx = m.in(nx, ty) ? G.light[m.idx(nx, ty)] : L, Ly = m.in(tx, ny) ? G.light[m.idx(tx, ny)] : L;
             int v = (L * 2 + Lx + Ly) / 4;
-            if (v >= 250) continue;
             int x0 = tx * 16 + ox * 8 - camX, y0 = ty * 16 + oy * 8 - camY;
+            // vignette: darken toward the screen edges (folded into the same pass)
+            float vx = (x0 + 4 - TOP_W / 2) / (float)(TOP_W / 2), vy = (y0 + 4 - TOP_H / 2) / (float)(TOP_H / 2);
+            v = v * (256 - (int)(70 * (vx * vx + vy * vy))) >> 8;
+            if (v >= 250) continue;
             for (int y = y0; y < y0 + 8; y++) {
                 if (y < 0 || y >= c.h) continue;
                 px* row = c.p + y * c.w;
@@ -313,10 +380,10 @@ void render_world(Canvas& c, float alpha) {
     }
     const Unit& pl = G.u[G.ctrl];
     if (pl.searchT > 0) {
-        int x = (int)pl.x - camX - 12, y = (int)pl.y - camY - 26;
+        int x = (int)pl.x - camX - 12, y = (int)pl.y - camY - 34;
         ui_bar(c, x, y, 24, 4, 1 - pl.searchT / 1.4f, pal::gold);
     }
-    if (pl.reloadT > 0) gfx_textC(c, (int)pl.x - camX, (int)pl.y - camY - 28, "RELOADING", pal::cream);
+    if (pl.reloadT > 0) gfx_textC(c, (int)pl.x - camX, (int)pl.y - camY - 38, "RELOADING", pal::cream);
     for (auto& f : G.ft) if (f.life > 0) gfx_textC(c, (int)f.x - camX, (int)f.y - camY, f.txt, f.col);
     if (g_prompt && !game_paused()) {
         int x = (int)g_promptX - camX, y = (int)g_promptY - camY + 12;
@@ -433,12 +500,12 @@ static void render_animtest(Canvas& c) {
         gfx_textC(c, (int)x, 70, DN[d], pal::dim);
     }
     // 3x zoom of the south-facing variant
-    static px zoomBuf[16 * 16]; Canvas z; z.init(zoomBuf, 16, 16);
+    static px zoomBuf[24 * 24]; Canvas z; z.init(zoomBuf, 24, 24);
     for (auto& p : zoomBuf) p = rgb(40, 40, 44);
     int keepX = camX, keepY = camY; camX = 0; camY = 0;
-    drawChar(z, g_animTestZombie, g_animTestVariant, 8, 14, 2, a[8], 0, 1, 0, 0, 0, false);
+    drawChar(z, g_animTestZombie, g_animTestVariant, 12, 22, 2, a[8], 0, 1, 0, 0, 0, false);
     camX = keepX; camY = keepY;
-    for (int j = 0; j < 16; j++) for (int i = 0; i < 16; i++) gfx_fill(c, 152 + i * 6, 96 + j * 6, 6, 6, zoomBuf[j * 16 + i]);
+    for (int j = 0; j < 24; j++) for (int i = 0; i < 24; i++) gfx_fill(c, 152 + i * 4, 96 + j * 4, 4, 4, zoomBuf[j * 24 + i]);
     gfx_rect(c, 151, 95, 98, 98, pal::border);
     char b[48]; snprintf(b, sizeof b, "%s  frame %d/%d", anim_name(a[8].state), a[8].frame + 1, anim_def(a[8].state).n);
     gfx_textC(c, 200, 200, b, pal::cream);

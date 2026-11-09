@@ -90,6 +90,12 @@ void map_load(Map& m, int which) {
         case 'p': addProp(m, PR_PLANT, x, y, 1, 1, false, true); break;
         case 'w': addProp(m, PR_COOLER, x, y, 1, 1, false, true); break;
         case 'y': addProp(m, PR_DECOR_CRATE, x, y, 1, 1, false, true); break;
+        case 'A': addProp(m, PR_TENT, x, y, 2, 1, false, true); break;
+        case 'o': addProp(m, PR_BARREL, x, y, 1, 1, false, true); break;
+        case 'S': addProp(m, PR_SANDBAG, x, y, 1, 1, false, true); break;
+        case 'Y': addProp(m, PR_LOGS, x, y, 1, 1, false, true); break;
+        case '!': addProp(m, PR_TORCH, x, y, 1, 1, false, true); break;
+        case 'i': addProp(m, PR_CONE, x, y, 1, 1, false, false); break;
         case 'L': addProp(m, PR_LAMP, x, y, 1, 1, false, true); break;
         case '*': addProp(m, PR_FIRE, x, y, 1, 1, false, true); break;
         case 'r': addProp(m, PR_RADIO, x, y, 1, 1, false, true); break;

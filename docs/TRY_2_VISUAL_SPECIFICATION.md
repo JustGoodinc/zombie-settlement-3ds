@@ -19,11 +19,12 @@ Try 2 is the approved look. The 3DS shell in the mockup is not rendered: the gam
 World: olive grass, dusty asphalt, lino checker, wood, carpet and concrete, all desaturated. Night tint 6,10,26; dusk tint 40,20,16.
 
 ## Grid and metrics
-- Tiles 16×16. Characters 16×16 with the pivot at the feet (drawn at x−8, y−14).
+- Tiles 16×16. Characters 16×24 chibi (big head with eyes and mouth, shaded hair/clothes, backpack from behind), pivot at the feet (drawn at x−w/2, y−h+2).
 - Inventory art uses 8 px per grid cell: drawn at 2× (16 px cells) in the backpack view and 1× in the compact container view (12 px cells).
 - Portraits 24×24 (1× in the HUD, 2× in menus).
-- Font: 5×8 bitmap, 6 px advance, 10 px line, 1 px drop shadow.
-- Buttons 18–22 px tall; gold border plus an inner dark-gold line when focused.
+- Font: 5×8 bitmap, 6 px advance, 10 px line, 1 px drop shadow. Bold variant (7 px advance) for titles, tabs and buttons.
+- Panels: bevelled metal (light top-left, dark bottom-right), rivets, gradient title bar. Buttons and tabs: vertical gradient + bevel, gold border when focused or selected. Bars are segmented. The bottom screen has a worn metal frame.
+- Atmosphere: warm dusty grade by day, amber dusk, blue night, screen-edge vignette, prop and building drop shadows, wall ambient occlusion, deterministic ground detail (tufts, flowers, rocks, litter, oil, cracks, blood smears indoors).
 - Nearest-neighbour scaling only.
 
 ## Comparison with the mockup
@@ -38,4 +39,4 @@ World: olive grass, dusty asphalt, lino checker, wood, carpet and concrete, all 
 | Build / upgrade | Build/Upgrade/Repair tabs, facility cards, costs | `04_build_menu.png` |
 | Infirmary | patient, infection bar, Treat / Quarantine / Examine / Back | `23_infirmary.png` |
 
-Known difference: mockup characters are larger and more detailed than 16 px allows. The sprites are deliberately simpler so they stay readable at native resolution.
+Known differences: the mockup is an illustration at higher detail than the 3DS can show at 1:1; characters are 16×24 rather than the mockup's larger figures, and the police facade is a single 16 px wall row with a sign rather than a full building front.

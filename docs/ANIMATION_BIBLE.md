@@ -9,7 +9,7 @@
 - Melee hits and zombie bites apply on their IMPACT frame. A dead zombie's death animation plays on while it is already flagged dead and harmless.
 
 ## Sprites and directions
-16×16 characters with a stable pivot at the feet (tested: lowest opaque row identical between stand and walk). 5 directions are stored (S, SE, E, NE, N); W, SW and NW are mirrored, giving 8 visual directions. 14 generated poses per direction per variant: STAND, BREATHE, WALK_A/B, RUN_A/B, CROUCH, REACH, LEAN_BACK, LEAN_FWD, HURT, FALL, DEAD, LOOK. The held weapon is drawn as a line along the exact facing vector (continuous aim), with a swing arc for melee and a lowered angle for reloads.
+16×24 characters (lying poses 24×16) with a stable pivot at the feet (tested: lowest opaque row identical between stand and walk). 5 directions are stored (S, SE, E, NE, N); W, SW and NW are mirrored, giving 8 visual directions. 14 generated poses per direction per variant: STAND, BREATHE, WALK_A/B, RUN_A/B, CROUCH, REACH, LEAN_BACK, LEAN_FWD, HURT, FALL, DEAD, LOOK. The held weapon is drawn as a line along the exact facing vector (continuous aim), with a swing arc for melee and a lowered angle for reloads.
 
 ## Animation list
 | State | Frames | Cycle (ms) | Loop | Events |

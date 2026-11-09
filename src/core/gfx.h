@@ -49,6 +49,9 @@ int  gfx_text(Canvas&, int x, int y, const char* s, px c, int scale = 1, bool sh
 int  gfx_textW(const char* s, int scale = 1);
 void gfx_textC(Canvas&, int cx, int y, const char* s, px c, int scale = 1);  // centred
 int  gfx_wrap(Canvas&, int x, int y, int maxW, const char* s, px c);       // returns lines
+int  gfx_textB(Canvas&, int x, int y, const char* s, px c);   // bold
+int  gfx_textWB(const char* s);
+void gfx_textCB(Canvas&, int cx, int y, const char* s, px c);
 
 // sprite construction helpers (used by art.cpp and tools)
 Sprite spr_new(int w, int h);

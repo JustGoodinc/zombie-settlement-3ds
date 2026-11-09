@@ -110,6 +110,15 @@ static const char* survStatus(const Survivor& s, px& col) {
     return "Healthy";
 }
 static int survLevel(const Survivor& s) { int t = 0; for (int k = 0; k < SK_COUNT; k++) t += s.skill[k]; return t / SK_COUNT; }
+// small list icons
+static void iconThird(Canvas& c, const Sprite& s, int x, int y) {
+    for (int j = 0; j < s.h / 3; j++) for (int i = 0; i < s.w / 3; i++) { px v = s.d[(j * 3 + 1) * s.w + i * 3 + 1]; if (v != KEYC) gfx_pset(c, x + i, y + j, v); }
+}
+static void headCrop(Canvas& c, const Survivor& s, int x, int y) {
+    const Sprite& p = g_portrait[s.variant % PORTRAITS];
+    for (int j = 0; j < 18; j++) for (int i = 0; i < 18; i++) gfx_pset(c, x + i, y + j, p.d[(j + 2) * 24 + i + 3]);
+    gfx_rect(c, x, y, 18, 18, pal::ink);
+}
 
 // ---------------------------------------------------------------- inventory grid
 struct InvState {
@@ -168,7 +177,7 @@ static void drawGrid(Canvas& c, Survivor& s, int gx, int gy, int cell, bool inte
         gfx_rect(c, gx + x * cell, gy + y * cell, cell + 1, cell + 1, rgb(54, 54, 60));
     }
     gfx_rect(c, gx - 2, gy - 2, g.w * cell + 5, g.h * cell + 5, pal::border);
-    int sc = cell >= 16 ? 2 : 1, pad = cell >= 16 ? 0 : (cell - 8) / 2;
+    int sc = cell / 8, pad = (cell - sc * 8) / 2;
     for (int i = 0; i < g.n; i++) {
         if (interactive && i == inv.held && inv.dragging) continue;
         const Item& it = g.it[i];
@@ -188,7 +197,7 @@ static void drawGrid(Canvas& c, Survivor& s, int gx, int gy, int cell, bool inte
     }
 }
 
-static int gridCell(const Survivor& s) { return s.pack.w <= 10 ? 16 : 12; }
+static int gridCell(const Survivor& s) { return s.pack.w <= 6 ? 24 : (s.pack.w <= 10 ? 16 : 12); }   // big chunky cells when they fit
 
 static void invInfo(Canvas& c, Survivor& s, int x, int y, int w, int idx, bool canUse, bool showDrop) {
     ui_panel(c, x, y, w, 196);
@@ -296,7 +305,7 @@ static void gridInteract(Canvas& c, Survivor& s, int gx, int gy, int cell) {
             int tx = inv.curX - inv.grabDX, ty = inv.curY - inv.grabDY;
             bool ok = g.fits(it.id, inv.heldRot, tx, ty, inv.held);
             gfx_fillA(c, gx + tx * cell, gy + ty * cell, w * cell, h * cell, ok ? pal::green : pal::red, 90);
-            gfx_blit(c, iconFor(it.id, inv.heldRot), gx + tx * cell, gy + ty * cell, cell >= 16 ? 2 : 1);
+            gfx_blit(c, iconFor(it.id, inv.heldRot), gx + tx * cell, gy + ty * cell, cell / 8);
         }
         gfx_rect(c, gx + inv.curX * cell, gy + inv.curY * cell, cell + 1, cell + 1, ((int)(G.uiTime * 4) & 1) ? pal::gold : pal::cream);
     }
@@ -307,7 +316,7 @@ static void gridInteract(Canvas& c, Survivor& s, int gx, int gy, int cell) {
         int tx = (in.tx - gx) / cell - inv.grabDX, ty = (in.ty - gy) / cell - inv.grabDY;
         bool ok = in.tx >= gx && in.ty >= gy && g.fits(it.id, inv.heldRot, tx, ty, inv.held);
         if (in.tx >= gx && in.ty >= gy) gfx_fillA(c, gx + tx * cell, gy + ty * cell, w * cell, h * cell, ok ? pal::green : pal::red, 80);
-        gfx_blit(c, iconFor(it.id, inv.heldRot), in.tx - inv.grabDX * cell - cell / 2, in.ty - inv.grabDY * cell - cell / 2, cell >= 16 ? 2 : 1);
+        gfx_blit(c, iconFor(it.id, inv.heldRot), in.tx - inv.grabDX * cell - cell / 2, in.ty - inv.grabDY * cell - cell / 2, cell / 8);
     }
 }
 
@@ -477,6 +486,10 @@ static void minimap(Canvas& c, int x, int y, int w, int h) {
         else if (m.flags[i] & F_INDOOR) col = rgb(60, 58, 54);
         else col = rgb(38, 44, 32);
         if (m.propAt[i] >= 0 && m.prop[m.propAt[i]].container >= 0) col = G.curLoc >= 0 && G.loc[G.curLoc].generated[m.prop[m.propAt[i]].container] ? rgb(90, 90, 90) : rgb(110, 160, 60);
+        if (m.propAt[i] >= 0 && m.prop[m.propAt[i]].type == PR_PLOT) col = G.st.bLevel[m.prop[m.propAt[i]].special] ? rgb(170, 130, 80) : rgb(90, 74, 56);
+        else if (m.propAt[i] >= 0 && m.prop[m.propAt[i]].solid && G.scene == SC_SETTLEMENT) col = rgb(110, 100, 80);
+        if (t == T_GARDEN) col = rgb(70, 110, 50);
+        if (t == T_DIRT && G.scene == SC_SETTLEMENT) col = rgb(80, 66, 48);
         gfx_fill(c, ox + tx * scale, oy + ty * scale, scale, scale, col);
     }
     for (int i = 0; i < G.nu; i++) if (G.u[i].alive) {
@@ -658,9 +671,10 @@ static void panelBase(Canvas& c) {
         ui_panel(c, 4, 22, 180, 200);
         for (int b = 0; b < B_COUNT; b++) {
             char t[40]; int lv = G.st.bLevel[b];
-            snprintf(t, sizeof t, "%-15s%s", BUILDINGS[b].name, lv ? "" : "");
-            int y = 28 + b * 26;
-            if (ui_button(c, 10, y, 168, 22, t, UB_LEFT | (sel == b ? UB_SELECTED : 0))) { if (sel == b) { g_buildingSel = b; ui_push(PN_BUILDING); } sel = b; }
+            snprintf(t, sizeof t, "    %s", BUILDINGS[b].name);
+            int y = 26 + b * 26;
+            if (ui_button(c, 10, y, 168, 23, t, UB_LEFT | (sel == b ? UB_SELECTED : 0))) { if (sel == b) { g_buildingSel = b; ui_push(PN_BUILDING); } sel = b; }
+            iconThird(c, g_building[b][lv > 3 ? 3 : (lv ? lv : 0)], 13, y + 3);
             char l[12]; snprintf(l, sizeof l, lv ? "Lv %d" : "Empty", lv);
             gfx_text(c, 172 - gfx_textW(l), y + 7, l, lv ? pal::cream : pal::dim);
             if (G.st.bDamage[b]) gfx_text(c, 120, y + 7, "!", pal::red);
@@ -680,7 +694,8 @@ static void panelBase(Canvas& c) {
         for (int i = 0; i < G.st.nsurv; i++) if (G.st.surv[i].alive) alive[na++] = i;
         for (int k = start; k < na && shown < per; k++, shown++) {
             Survivor& s = G.st.surv[alive[k]]; int y = 42 + shown * 22;
-            gfx_text(c, 12, y + 5, s.name, s.onExpedition ? pal::cyan : pal::cream);
+            headCrop(c, s, 10, y);
+            gfx_text(c, 30, y + 5, s.name, s.onExpedition ? pal::cyan : pal::cream);
             char sk[24]; snprintf(sk, sizeof sk, "G%d M%d F%d R%d", s.skill[SK_GUARD], s.skill[SK_MEDIC], s.skill[SK_FARM], s.skill[SK_MECH]);
             gfx_text(c, 92, y + 5, sk, pal::dim);
             if (ui_button(c, 196, y, 18, 18, "<", 0, !s.onExpedition)) s.job = (uint8_t)((s.job + JOB_COUNT - 1) % JOB_COUNT);
@@ -919,7 +934,9 @@ static void panelInfirmary(Canvas& c) {
     for (int k = 0; k < n && k < 8; k++) {
         const Survivor& s = G.st.surv[ids[k]];
         px col; const char* st = survStatus(s, col);
-        if (ui_button(c, 8, 22 + k * 20, 100, 18, s.name, UB_LEFT | (sel == k ? UB_SELECTED : 0))) sel = k;
+        char nm[24]; snprintf(nm, sizeof nm, "   %s", s.name);
+        if (ui_button(c, 8, 22 + k * 20, 100, 18, nm, UB_LEFT | (sel == k ? UB_SELECTED : 0))) sel = k;
+        headCrop(c, s, 10, 22 + k * 20);
         gfx_fill(c, 104, 28 + k * 20, 4, 6, col); (void)st;
     }
     Survivor& s = G.st.surv[ids[sel]];
@@ -1024,7 +1041,10 @@ static void mapThumb(Canvas& c, int x, int y, int w, int h, int loc) {
 static void panelWorldMap(Canvas& c) {
     ui_panel(c, 4, 3, 312, 218, "World Map - Select Location");
     for (int l = 0; l < LOC_COUNT; l++) {
-        if (ui_button(c, 8, 22 + l * 24, 130, 21, LOCATIONS[l].name, UB_LEFT | (sel == l ? UB_SELECTED : 0))) sel = l;
+        char ln[32]; snprintf(ln, sizeof ln, "   %s", LOCATIONS[l].name);
+        static const int LIC[LOC_COUNT] = {S_ICON_SHIELD, S_ICON_MED, S_ICON_FOOD, S_ICON_TRAIN, S_ICON_MAT, S_ICON_TREE, S_ICON_HOUSE};
+        if (ui_button(c, 8, 22 + l * 24, 130, 21, ln, UB_LEFT | (sel == l ? UB_SELECTED : 0))) sel = l;
+        gfx_blit(c, g_spr[LIC[l]], 14, 28 + l * 24);
         if (LOCATIONS[l].map < 0) gfx_fillA(c, 8, 22 + l * 24, 130, 21, pal::ink, 100);
     }
     mapThumb(c, 144, 22, 168, 104, sel);

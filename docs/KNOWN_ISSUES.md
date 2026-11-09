@@ -6,7 +6,6 @@
 - **Emulator visuals not inspected.** The Azahar boot was confirmed from its log only.
 - Night lighting uses 8 px cells, so edges look stepped.
 - The 45° character directions reuse front/back sprites with a turned head.
-- Character sprites are simpler than the Try 2 mockup characters (16 px readability trade-off).
 - Quitting mid-expedition: on reload the squad returns home empty-handed with −15 HP. Deaths that happened before quitting stay saved.
 - The trapped survivor's HP is not persisted between visits.
 - Audio has not been reviewed by ear.

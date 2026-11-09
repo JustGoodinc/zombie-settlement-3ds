@@ -46,14 +46,14 @@ static void gallery(const char* dir) {
     // characters: rows = variant x direction, columns = poses (2x scale)
     {
         int cols = P_COUNT, rows = (SURV_VARIANTS + ZOMB_VARIANTS) * 5, S = 2;
-        int W = cols * 18 * S, H = rows * 18 * S;
+        int W = cols * 26 * S, H = rows * 26 * S;
         px* img = (px*)malloc(W * H * sizeof(px)); for (int i = 0; i < W * H; i++) img[i] = rgb(60, 58, 54);
         Canvas c; c.init(img, W, H);
         static const int D5[5] = {2, 1, 0, 7, 6};
         for (int z = 0; z < 2; z++) for (int v = 0; v < (z ? ZOMB_VARIANTS : SURV_VARIANTS); v++) for (int d = 0; d < 5; d++) for (int p = 0; p < P_COUNT; p++) {
             bool f; const Sprite& s = art_char(z != 0, v, D5[d], (Pose)p, f);
             int row = (z ? SURV_VARIANTS : 0) * 5 + v * 5 + d;
-            gfx_blit(c, s, p * 18 * S + S, row * 18 * S + S, S, f);
+            gfx_blit(c, s, p * 26 * S + S, row * 26 * S + S, S, f);
         }
         char path[512]; snprintf(path, sizeof path, "%s/characters.png", dir); gfx_writePNG(path, img, W, H); free(img);
     }
