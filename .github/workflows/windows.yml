@@ -1,0 +1,41 @@
+name: Windows
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -A x64
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Tests
+        run: build\Release\zs_tests.exe
+      - name: Benchmark (PC proxy)
+        run: build\Release\zs_tool.exe --bench
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/ZombieSettlement | Out-Null
+          Copy-Item build/Release/ZombieSettlement.exe dist/ZombieSettlement/
+          Copy-Item README.md, LICENSE, docs/FBI_INSTALLATION.md dist/ZombieSettlement/
+          Compress-Archive -Path dist/ZombieSettlement/* -DestinationPath dist/ZombieSettlement-Windows.zip -Force
+          if ((Get-Item dist/ZombieSettlement-Windows.zip).Length -lt 100000) { throw "package too small" }
+      - name: Smoke test packaged exe outside the build dir
+        shell: pwsh
+        run: |
+          Expand-Archive dist/ZombieSettlement-Windows.zip -DestinationPath $env:RUNNER_TEMP/zs -Force
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP/zs/ZombieSettlement.exe" -PassThru
+          Start-Sleep -Seconds 6
+          if ($p.HasExited) { throw "game exited early with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZombieSettlement-Windows
+          path: dist/ZombieSettlement-Windows.zip

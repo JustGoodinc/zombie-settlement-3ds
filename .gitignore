@@ -1,0 +1,16 @@
+build/
+build3ds/
+dist/
+*.elf
+*.3dsx
+*.smdh
+*.cia
+*.map
+*.obj
+*.pdb
+test_saves/
+tool_saves/
+tools-bin/
+saves/
+build_core.bat
+screenshots/zs_*.png

@@ -1,0 +1,31 @@
+#pragma once
+#include "gfx.h"
+#include "anim.h"
+
+enum TileArt {
+    TA_GRASS, TA_ASPHALT, TA_LINE, TA_DIRT, TA_TILE, TA_WOOD, TA_CARPET, TA_CONCRETE,
+    TA_WALL_TOP, TA_WALL_FRONT, TA_WINDOW, TA_WINDOW_BROKEN, TA_BARS, TA_FENCE, TA_EXTRACT,
+    TA_GARDEN, TA_PALISADE, TA_DOOR_CLOSED, TA_DOOR_OPEN, TA_DOOR_LOCKED, TA_DOOR_BROKEN,
+    TA_CELLDOOR, TA_GATE_CLOSED, TA_GATE_OPEN, TA_CRACK1, TA_CRACK2, TA_COUNT
+};
+
+enum SprId {
+    S_DESK, S_FILING, S_LOCKER, S_CRATE, S_MEDCAB, S_SHELF, S_CAR, S_TREE, S_TREE2, S_BENCH, S_COT,
+    S_CHAIR, S_PLANT, S_COOLER, S_FIRE0, S_FIRE1, S_FIRE2, S_RADIO, S_GENPROP0, S_GENPROP1,
+    S_WORKBENCH, S_LAMP, S_BLOOD0, S_BLOOD1, S_BLOOD2, S_BAG, S_BEDROLL, S_WRECK,
+    S_ICON_FOOD, S_ICON_MED, S_ICON_AMMO, S_ICON_MAT, S_ICON_FUEL, S_ICON_SHIELD, S_ICON_SKULL,
+    S_ICON_BIO, S_ICON_PEOPLE, S_ICON_CLOCK, S_LOGO_ZOMBIE,
+    S_COUNT
+};
+
+enum { SURV_VARIANTS = 8, ZOMB_VARIANTS = 4, PORTRAITS = 8, BLD_TYPES = 6, BLD_LEVELS = 4 };
+
+extern Sprite g_tile[TA_COUNT][4];
+extern Sprite g_spr[S_COUNT];
+extern Sprite g_item[40];                 // item icons, 8 px per inventory cell
+extern Sprite g_portrait[PORTRAITS];      // 24x24, drawn at 2x
+extern Sprite g_building[BLD_TYPES][BLD_LEVELS];  // 48x48, level 0 = empty plot
+
+void art_init();
+// Character pose lookup: zombie=false -> survivor variants. dir is dir8() index.
+const Sprite& art_char(bool zombie, int variant, int dir, Pose p, bool& flip);

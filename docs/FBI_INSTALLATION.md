@@ -1,0 +1,20 @@
+# Installing the .cia with FBI
+
+Requires a homebrew-capable Nintendo 3DS with FBI installed (custom firmware). Install only on a 3DS you own.
+
+## QR install
+1. Open **FBI** on the 3DS.
+2. Choose **Remote Install**.
+3. Choose **Scan QR Code**.
+4. Point the camera at the QR code (in the README or the release, on your PC or phone).
+5. Confirm the install.
+6. Wait for the CIA to download and install.
+7. Return to the HOME Menu and launch **Zombie Settlement**.
+
+The QR encodes the direct GitHub Release asset URL of `ZombieSettlement-3DS.cia`. GitHub serves release assets through an HTTPS redirect to its CDN. FBI follows redirects, but older FBI builds can fail on modern TLS. If the scan fails:
+
+- **Manual install:** copy the `.cia` to the SD card, then in FBI go to SD → select the file → Install CIA.
+- **Homebrew Launcher:** copy `ZombieSettlement-3DS.3dsx` to `sdmc:/3ds/`.
+
+## Status
+The QR code is generated only after the release asset is publicly downloadable. **A QR installation has not been verified on real hardware.** This page will be updated once someone confirms it.
