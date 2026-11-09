@@ -20,7 +20,7 @@ World: olive grass, dusty asphalt, lino checker, wood, carpet and concrete, all 
 
 ## Grid and metrics
 - Tiles 16×16. Characters 16×24 chibi (big head with eyes and mouth, shaded hair/clothes, backpack from behind), pivot at the feet (drawn at x−w/2, y−h+2).
-- Inventory art uses 8 px per grid cell: drawn at 2× (16 px cells) in the backpack view and 1× in the compact container view (12 px cells).
+- Inventory art uses 8 px per grid cell: drawn at 3× (24 px cells) for the 6×4 starter pack, 2× (16 px) for larger packs, and 1× in the compact container view (12 px cells).
 - Portraits 24×24 (1× in the HUD, 2× in menus).
 - Font: 5×8 bitmap, 6 px advance, 10 px line, 1 px drop shadow. Bold variant (7 px advance) for titles, tabs and buttons.
 - Panels: bevelled metal (light top-left, dark bottom-right), rivets, gradient title bar. Buttons and tabs: vertical gradient + bevel, gold border when focused or selected. Bars are segmented. The bottom screen has a worn metal frame.
