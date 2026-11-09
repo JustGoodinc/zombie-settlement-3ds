@@ -3,7 +3,7 @@
 _Last updated: 2026-11-09 (session 1)_
 
 ## Current milestone
-Phases 1–7 have a first playable implementation; Phase 10 (CI/release) is in progress. Phase 8 (the remaining six locations) has not started. Detailed status: [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md).
+Phases 1–7 have a first playable implementation; Phase 10 (CI/release) is done for v0.1.0. Phase 8 (the remaining six locations) has not started. Detailed status: [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md).
 
 ## Working (with evidence)
 - Windows exe builds (MSVC 14.51, static CRT, 496 KB).
@@ -39,7 +39,6 @@ Azahar emulator: `C:\Users\admin\Tools\Azahar\azahar-windows-msvc-2126.2\azahar.
 - The loot refresh timer starts on departure (see WORLD_MAP_SPECIFICATION).
 
 ## Immediate next actions
-1. Hand the CIA/QR to the owner for a hardware test; record results in TEST_RESULTS and PERFORMANCE_RESULTS.
+1. Owner hardware test: install via the FBI QR, report Old 3DS FPS ("Show FPS" in Settings); record in TEST_RESULTS and PERFORMANCE_RESULTS.
 2. Inspect the 3DS build visually in Azahar (the owner declined screen control once; ask first).
-3. Ask the owner to test the CIA and QR on hardware, and to report Old 3DS FPS ("Show FPS" in Settings).
-4. Phase 8: Grocery Store map (ASCII in `src/world/maps.cpp`, add a `MAP_*` id, set `LOCATIONS[2].map`).
+3. Phase 8: Grocery Store map (ASCII in `src/world/maps.cpp`, add a `MAP_*` id, set `LOCATIONS[2].map`).
