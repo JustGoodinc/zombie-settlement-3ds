@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.2 — CIA fix
+- Fix: the v0.1.1 CIA crashed the 3DS system loader on real hardware. The makerom spec is now based on the hardware-proven ftpd template (valid CpuSpeed, MemoryType and memory permissions).
+
 ## v0.1.1 — Try 2 visual pass
 - Characters rebuilt at 16×24 (faces, shading, backpacks; zombies hunched with torn clothes and red eyes).
 - Warm colour grade, vignette, drop shadows, wall ambient occlusion, scattered ground detail.
