@@ -7,6 +7,8 @@
 - Zombies: pale and balding with dark eyes, a gaping bloody mouth, blood on the scalp and torn, bloodied clothes; they reach forward when seen side-on.
 - Weapons are pixel-art sprites held in the hand (pistol, revolver, SMG, shotgun, rifle, knife, bat, crowbar, machete) with a big starburst muzzle flash.
 - Default camera zoom is now 200% (the mockup framing). Saved settings keep their zoom; change it in Settings.
+- Portraits redrawn in the same style (big glinting eyes, brows, blush, caps with brims and emblems, long hair).
+- Settlement facelift: a compact walled compound where each facility has its own shape that grows with its level: slate-roofed house with lit windows and dormers, lamp-lit watchtower with railing, sandbags and a pennant, red-cross canvas infirmary tent, tin-roof workshop shed with tools and workbench, stacked shipping containers, greenhouse with a smoking cookhouse. Chimney smoke, window glow and flicker after dusk, fireflies, a stone fire pit with sparks, lamp posts. The settlement camera frames one zoom step wider than expeditions.
 - Every menu uses thumb rails: tabs on the left edge, actions on the right edge with Back at the bottom, content in the middle. Includes the desk/crate/stash screen (Take All / Take / Store on the left, Inspect or Donate / Rotate / Back on the right). D-Pad / Circle Pad: push off either side of a backpack grid to reach that rail; up from the grid reaches the loot slots.
 
 ## v0.1.4 — menu controls and thumb layout

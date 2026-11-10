@@ -74,6 +74,22 @@ static void duel(const char* path) {
     gfx_writePNG(path, topB, TOP_W, TOP_H);
     printf("duel written to %s\n", path);
 }
+// the Try 2 "Settlement (Overview)" panel restaged: every facility built, by day and at dusk,
+// plus a 100%-zoom overview of the whole compound. Writes <dir>/base_day.png, base_dusk.png, base_all.png
+static void base(const char* dir) {
+    game_newGame(); G.set.tutorialDone = true;
+    const int LV[BLD_TYPES] = {2, 3, 2, 2, 3, 3};
+    for (int b = 0; b < BLD_TYPES; b++) G.st.bLevel[b] = (uint8_t)LV[b];
+    G.st.generator = true;
+    level_enter(MAP_SETTLEMENT, -1); ui_open(PN_HUD);
+    char p[512];
+    const struct { const char* n; float clock; int zoom; } shots[3] = {{"base_day", 11 * 60, 200}, {"base_dusk", 19 * 60 + 30, 200}, {"base_all", 13 * 60, 100}};
+    for (auto& s : shots) {
+        G.clock = s.clock; G.set.zoom = (uint8_t)s.zoom; step(40);
+        snprintf(p, sizeof p, "%s/%s.png", dir, s.n); gfx_writePNG(p, topB, TOP_W, TOP_H);
+        printf("  wrote %s\n", p);
+    }
+}
 
 static void gallery(const char* dir) {
     // characters: rows = variant x direction, columns = poses (2x scale)
@@ -284,6 +300,7 @@ int main(int argc, char** argv) {
     else if (argc >= 3 && !strcmp(argv[1], "--handoff")) handoff(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--lineup")) lineup(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--duel")) duel(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "--base")) base(argv[2]);
     else { printf("usage: zs_tool --gallery DIR | --shots DIR | --bench | --icons DIR\n"); return 1; }
     return 0;
 }

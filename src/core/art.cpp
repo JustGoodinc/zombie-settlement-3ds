@@ -242,39 +242,43 @@ const Sprite& art_char(bool zombie, int variant, int dir, Pose p, bool& flip) {
 }
 
 // ---------------------------------------------------------------- portraits
-ROWS(PORTRAIT,
-"........................", "........kkkkkkkk........", "......kkhhhhhhhhkk......", ".....khhhhhhhhhhhhk.....",
-"....khhhhhhhhhhhhhhk....", "....khhhhhhhhhhhhhhk....", "....khsssssssssssshk....", "...khsssssssssssssshk...",
-"...ksskkksssssskkkssk...", "...ksswesssssssswessk...", "...ksssssssSSsssssssk...", "...ksssssssSSsssssssk...",
-"...kSssssssssssssssSk...", "...kssssssSkkSssssssk...", "...kSssssssssssssssSk...", "....kSssssssssssssSk....",
-".....kkSssssssssSkk.....", ".......kssssssssk.......", ".....kkbbbssssbbbkk.....", "...kkbbbbbbssbbbbbbkk...",
-"..kbbbbbbbbbbbbbbbbbbk..", ".kbbbbbbbbbbbbbbbbbbbbk.", ".kbbbbbbbbbbbbbbbbbbbbk.", ".kbbbbbbbbbbbbbbbbbbbbk.");
+ROWS(PORTRAIT,   // 24x24 bust, same face language as the 16x24 sprites (Try 2 portraits)
+"........................", "........kkkkkkkk........", "......kkHHHHhhhhkk......", ".....kHHHhhhhhhhhhk.....",
+"....kHHhhhhhhhhhhhhk....", "....kHhhhhhhhhhhhhjk....", "...kHhhhhhhhhhhhhhjjk...", "...khhhjhhhhhjhhhhjjk...",
+"...kjhshhhsshhshhhjjk...", "...kjhsssssssssssshjk...", "...kjhsjjsssssjjsshjk...", "...kjhswessssswesshjk...",
+"...kjhseessssseesshjk...", "...kjsseessssseessSjk...", "...kjsisssssSsssisSjk...", "....kSsssssSSsssssSk....",
+".....kSssssssssssSk.....", "......kkSSSSSSSSkk......", ".........kssssk.........", "....kkbbbMbsssbbbbkk....",
+"..kkbbMMbbbbmbbbbbmbkk..", ".kbbMbbbbbbbmbbbbbbbmbk.", ".kbMbbbbbbbbmbbbbbbbbmk.", ".kbbbbbbbbbbmbbbbbbbbbk.");
 
 static void buildPortraits() {
-    Sprite base = PARSE(PORTRAIT);
     for (int v = 0; v < PORTRAITS; v++) {
-        Sprite s = spr_copy(base);
-        if (v & 1) {  // long hair variant
-            px h = pal_char('h'), k = pal_char('k');
-            for (int y = 6; y <= 18; y++) {
-                spr_set(s, 2, y, k); spr_set(s, 3, y, h); spr_set(s, 4, y, h);
-                spr_set(s, 21, y, k); spr_set(s, 20, y, h); spr_set(s, 19, y, h);
-            }
-        }
         const CharPal& p = SURV_PAL[v];
-        const px from[5] = {pal_char('h'), pal_char('s'), pal_char('S'), pal_char('b'), pal_char('n')};
-        const px to[5] = {p.hair, p.skin, p.skinS, p.shirt, p.pants};
-        spr_recolor(s, from, to, 5);
-        // backdrop
+        Sprite s = PARSE(PORTRAIT);
+        px H = pal_char('h'), L = pal_char('H'), J = pal_char('j'), k = pal_char('k');
+        if (p.style == 1) {   // cap: crown, brim jutting out to the right, red emblem
+            for (int y = 1; y <= 8; y++) for (int x = 0; x < 24; x++) { px c = spr_get(s, x, y); if (c == pal_char('s')) spr_set(s, x, y, H); }
+            for (int x = 4; x <= 21; x++) spr_set(s, x, 9, J);
+            spr_set(s, 3, 9, k); spr_set(s, 22, 9, k); spr_set(s, 21, 10, k); spr_set(s, 22, 10, k);   // brim edge + underside
+            for (int y = 4; y <= 5; y++) for (int x = 14; x <= 15; x++) spr_set(s, x, y, pal_char('r'));
+            spr_set(s, 14, 4, rgb(240, 200, 190));
+        } else if (p.style == 2) {   // long hair falling past the jaw onto the shoulders
+            for (int y = 9; y <= 19; y++) {
+                spr_set(s, 1, y, k); spr_set(s, 2, y, L); spr_set(s, 3, y, H); spr_set(s, 4, y, J);
+                spr_set(s, 22, y, k); spr_set(s, 21, y, J); spr_set(s, 20, y, H); spr_set(s, 19, y, J);
+            }
+            spr_set(s, 2, 20, k); spr_set(s, 3, 20, k); spr_set(s, 21, 20, k); spr_set(s, 20, 20, k);
+        }
+        Sprite col = recolorChar(s, p, false);
+        freeS(s);
+        // backdrop: dark slate gradient like the Try 2 portrait frames
         Sprite out = spr_new(24, 24);
         for (int y = 0; y < 24; y++) for (int x = 0; x < 24; x++) {
-            px v2 = spr_get(s, x, y);
-            out.d[y * 24 + x] = v2 != KEYC ? v2 : gfx_mix(rgb(52, 50, 56), rgb(36, 34, 40), y * 10);
+            px v2 = spr_get(col, x, y);
+            out.d[y * 24 + x] = v2 != KEYC ? v2 : gfx_mix(rgb(58, 60, 76), rgb(30, 30, 40), y * 10);
         }
-        freeS(s);
+        freeS(col);
         g_portrait[v] = out;
     }
-    freeS(base);
 }
 
 // ---------------------------------------------------------------- tiles
@@ -734,83 +738,239 @@ static void buildItems() {
 #undef IT
 }
 
-// ---------------------------------------------------------------- settlement buildings
+// ---------------------------------------------------------------- settlement buildings (Try 2 style)
+// Each facility has its own silhouette and grows with its level. World art may be wider than the
+// 3x3-tile plot and taller (drawn bottom-centred on the plot); g_building holds 48x48 menu thumbnails.
+Sprite g_bldWorld[BLD_TYPES][BLD_LEVELS];
+BldFx g_bldFx[BLD_TYPES][BLD_LEVELS];
+
+static void texRect(Sprite& s, int x, int y, int w, int h, px c, int amt, uint32_t seed) {
+    for (int j = y; j < y + h; j++) for (int i = x; i < x + w; i++) spr_set(s, i, j, noisy(c, hash32(seed + j * 977 + i * 31), amt));
+}
+static void hline(Sprite& s, int x0, int x1, int y, px c) { for (int x = x0; x <= x1; x++) spr_set(s, x, y, c); }
+static void vline(Sprite& s, int x, int y0, int y1, px c) { for (int y = y0; y <= y1; y++) spr_set(s, x, y, c); }
+static void dline(Sprite& s, int x0, int y0, int x1, int y1, px c) {
+    int n = abs(x1 - x0) > abs(y1 - y0) ? abs(x1 - x0) : abs(y1 - y0); if (!n) n = 1;
+    for (int i = 0; i <= n; i++) spr_set(s, x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, c);
+}
+// dark outline around every opaque shape (like the character sprites)
+static void outlineAll(Sprite& s) {
+    px k = pal_char('k');
+    Sprite o = spr_copy(s);
+    for (int y = 0; y < s.h; y++) for (int x = 0; x < s.w; x++) {
+        if (spr_get(o, x, y) != KEYC) continue;
+        if (spr_get(o, x - 1, y) != KEYC || spr_get(o, x + 1, y) != KEYC || spr_get(o, x, y - 1) != KEYC || spr_get(o, x, y + 1) != KEYC) spr_set(s, x, y, k);
+    }
+    free(o.d);
+}
+static void litWindow(Sprite& s, BldFx& fx, int x, int y, int w, int h, bool cross = true) {
+    px frame = rgb(58, 40, 30), glass = rgb(248, 196, 86), hi = rgb(255, 238, 170);
+    spr_rect(s, x, y, w, h, frame);
+    spr_rect(s, x + 1, y + 1, w - 2, h - 2, glass);
+    spr_rect(s, x + 1, y + 1, (w - 2) / 2, 1, hi);
+    if (cross) { vline(s, x + w / 2, y + 1, y + h - 2, frame); if (h > 5) hline(s, x + 1, x + w - 2, y + h / 2, frame); }
+    if (fx.nwin < 4) { int8_t* r = fx.win[fx.nwin++]; r[0] = (int8_t)x; r[1] = (int8_t)y; r[2] = (int8_t)w; r[3] = (int8_t)h; }
+}
+// sloped roof seen from the front, wider at the eaves: rows of shingles or corrugated ribs
+static void roofTrap(Sprite& s, int x, int y, int w, int h, int inset, px base, px line, int style, uint32_t seed) {
+    for (int r = 0; r < h; r++) {
+        int in = inset * (h - 1 - r) / (h > 1 ? h - 1 : 1), x0 = x + in, x1 = x + w - 1 - in;
+        for (int i = x0; i <= x1; i++) {
+            px c = noisy(base, hash32(seed + r * 131 + i), 7);
+            if (style == 0) { if (r % 3 == 2) c = line; else if (((i + (r / 3) * 2) % 4) == 0) c = gfx_mix(c, line, 140); }   // shingles
+            if (style == 1) { if ((i & 1) == 0) c = gfx_scale(c, 215); if (hash32(seed + i * 7 + r / 4) % 9 == 0) c = gfx_mix(c, rgb(150, 82, 40), 150); }   // corrugated + rust
+            if (style == 2) { if (r % 4 == 3) c = line; }   // canvas / planks
+            if (r == 0) c = gfx_scale(c, 180);
+            spr_set(s, i, y + r, c);
+        }
+    }
+    hline(s, x, x + w - 1, y + h, gfx_scale(line, 140));   // eave shadow line
+}
+
+static void bldQuarters(Sprite& s, BldFx& fx, int lv, int W, int H) {
+    int wallH = 22, roofH = H - wallH - 2, wy = H - wallH - 1;
+    // wall: stone footing + timber planks
+    texRect(s, 4, wy, W - 8, wallH, rgb(132, 106, 78), 10, 11);
+    for (int x = 6; x < W - 4; x += 5) vline(s, x, wy, H - 6, rgb(100, 80, 58));
+    for (int x = 4; x < W - 4; x++) for (int y = H - 5; y < H - 1; y++) spr_set(s, x, y, noisy(((x / 4 + y) & 1) ? rgb(118, 116, 110) : rgb(98, 96, 92), hash32(x * 13 + y), 10));
+    // roof (slate)
+    roofTrap(s, 1, 2, W - 2, roofH, 6, rgb(96, 104, 128), rgb(62, 68, 88), 0, 77 + lv);
+    if (lv >= 2) {   // dormers with lit windows
+        for (int k = 0; k < 2; k++) {
+            int dx = k ? W - 20 : 12, dy = 6;
+            texRect(s, dx, dy + 3, 9, 7, rgb(132, 106, 78), 8, 5 + k);
+            for (int r = 0; r < 4; r++) hline(s, dx - 1 + r, dx + 9 - r, dy + 3 - r, rgb(80, 88, 110));
+            litWindow(s, fx, dx + 2, dy + 4, 5, 5, false);
+        }
+    }
+    if (lv >= 3) { texRect(s, W - 14, 0, 5, 8, rgb(120, 116, 110), 14, 9); hline(s, W - 15, W - 9, 0, rgb(80, 78, 74)); fx.smokeX = (int8_t)(W - 12); fx.smokeY = 0; }
+    // doors + windows
+    int dw = lv >= 2 ? 12 : 8, dx = W / 2 - dw / 2;
+    spr_rect(s, dx - 1, H - 17, dw + 2, 16, rgb(52, 36, 28));
+    texRect(s, dx, H - 16, dw, 15, rgb(84, 60, 44), 8, 21);
+    if (lv >= 2) vline(s, dx + dw / 2, H - 16, H - 2, rgb(52, 36, 28));
+    spr_set(s, dx + dw / 2 - 2, H - 9, rgb(232, 192, 64)); spr_set(s, dx + dw / 2 + 1, H - 9, rgb(232, 192, 64));
+    litWindow(s, fx, 8, wy + 5, 10, 8); litWindow(s, fx, W - 18, wy + 5, 10, 8);
+    texRect(s, dx - 2, H - 2, dw + 4, 2, rgb(128, 126, 120), 10, 3);   // stone step
+    if (lv >= 3) { spr_rect(s, dx - 5, wy + 4, 2, 3, rgb(60, 50, 40)); spr_set(s, dx - 5, wy + 7, rgb(255, 220, 120)); spr_set(s, dx - 4, wy + 7, rgb(255, 220, 120)); }
+}
+
+static void bldTower(Sprite& s, BldFx& fx, int lv, int W, int H) {
+    int cabTop = 6, cabBot = 26, deck = cabBot + 1;
+    px wood = rgb(124, 88, 56), woodD = rgb(86, 60, 38), woodL = rgb(156, 116, 76);
+    // legs (back pair darker), braces, ladder
+    texRect(s, 9, deck, 3, H - deck - 1, woodD, 10, 1); texRect(s, W - 12, deck, 3, H - deck - 1, woodD, 10, 2);
+    texRect(s, 4, deck, 4, H - deck, wood, 10, 3); texRect(s, W - 8, deck, 4, H - deck, wood, 10, 4);
+    for (int k = 0; k < 2; k++) {
+        int y0 = deck + 3 + k * (H - deck) / 2, y1 = y0 + (H - deck) / 2 - 4;
+        dline(s, 7, y0, W - 8, y1, woodL); dline(s, W - 8, y0, 7, y1, woodL);
+    }
+    vline(s, W / 2 - 3, deck, H - 1, woodD); vline(s, W / 2 + 2, deck, H - 1, woodD);
+    for (int y = deck + 3; y < H - 1; y += 4) hline(s, W / 2 - 3, W / 2 + 2, y, woodL);
+    // deck + cabin
+    texRect(s, 1, deck - 1, W - 2, 4, woodL, 10, 5); hline(s, 1, W - 2, deck + 2, woodD);
+    texRect(s, 4, cabTop + 6, W - 8, cabBot - cabTop - 6, wood, 10, 6);
+    for (int x = 6; x < W - 4; x += 4) vline(s, x, cabTop + 6, cabBot - 1, woodD);
+    litWindow(s, fx, 7, cabTop + 9, 10, 8); litWindow(s, fx, W - 17, cabTop + 9, 10, 8);
+    roofTrap(s, 0, cabTop - 4, W, 10, 5, rgb(92, 66, 44), rgb(60, 42, 28), 2, 9);
+    if (lv >= 2) {   // railing + sandbags at the base
+        for (int x = 2; x < W - 2; x += 5) vline(s, x, deck - 5, deck - 1, woodL);
+        hline(s, 1, W - 2, deck - 5, woodL);
+        for (int k = 0; k < 4; k++) { int bx = 1 + k * (W - 6) / 3; texRect(s, bx, H - 5, 6, 4, rgb(176, 156, 112), 12, 40 + k); hline(s, bx, bx + 5, H - 2, rgb(130, 112, 78)); }
+    }
+    if (lv >= 3) { vline(s, W - 4, 0, cabTop - 2, rgb(70, 70, 74)); fx.flagX = (int8_t)(W - 3); fx.flagY = 0; spr_rect(s, 3, cabTop - 1, 4, 3, rgb(200, 200, 190)); spr_set(s, 2, cabTop, rgb(255, 250, 200)); }
+}
+
+static void bldInfirmary(Sprite& s, BldFx& fx, int lv, int W, int H) {
+    px canvas = rgb(218, 214, 200), canvasD = rgb(180, 176, 162), red = rgb(196, 44, 40);
+    int eave = H - 16;
+    roofTrap(s, 2, 4, W - 4, eave - 4, 10, canvas, canvasD, 2, 33 + lv);
+    hline(s, 12, W - 13, 4, gfx_scale(canvas, 230));   // ridge pole
+    texRect(s, 4, eave + 1, W - 8, H - eave - 2, canvasD, 6, 7);
+    // door flap tied back
+    int cx = W / 2;
+    for (int r = 0; r < 13; r++) hline(s, cx - r / 2 - 1, cx + r / 2, eave + 1 + r, rgb(52, 46, 44));
+    dline(s, cx - 1, eave + 1, cx - 8, H - 3, canvas); dline(s, cx, eave + 1, cx + 7, H - 3, canvas);
+    // red crosses: roof + wall
+    spr_rect(s, cx - 2, 10, 4, 12, red); spr_rect(s, cx - 6, 14, 12, 4, red);
+    spr_rect(s, 8, eave + 4, 2, 6, red); spr_rect(s, 6, eave + 6, 6, 2, red);
+    // guy ropes + pegs
+    dline(s, 2, eave, 0, H - 1, rgb(160, 150, 120)); dline(s, W - 3, eave, W - 1, H - 1, rgb(160, 150, 120));
+    if (lv >= 2) {   // supply crate with a cross + lantern glow inside
+        texRect(s, W - 14, H - 9, 9, 8, rgb(150, 116, 74), 10, 12); spr_rect(s, W - 10, H - 7, 1, 4, red); spr_rect(s, W - 12, H - 6, 5, 1, red);
+        fx.win[fx.nwin][0] = (int8_t)(cx - 3); fx.win[fx.nwin][1] = (int8_t)(eave + 6); fx.win[fx.nwin][2] = 6; fx.win[fx.nwin][3] = 6; fx.nwin++;
+    }
+    if (lv >= 3) { vline(s, 5, H - 18, H - 2, rgb(150, 150, 156)); spr_rect(s, 4, H - 19, 4, 4, rgb(170, 210, 230)); }   // IV stand
+}
+
+static void bldWorkshop(Sprite& s, BldFx& fx, int lv, int W, int H) {
+    int roofB = 20;
+    px post = rgb(112, 80, 52);
+    // back wall in shadow + pegboard with tools
+    texRect(s, 3, roofB, W - 6, H - roofB - 3, rgb(58, 46, 40), 10, 3);
+    for (int x = 5; x < W - 4; x += 5) vline(s, x, roofB, H - 4, rgb(48, 38, 34));
+    texRect(s, 10, roofB + 3, W - 20, 10, rgb(150, 120, 84), 8, 4);
+    px tool = rgb(176, 178, 184);
+    vline(s, 14, roofB + 4, roofB + 11, tool); spr_rect(s, 13, roofB + 4, 3, 2, tool);           // wrench
+    vline(s, 20, roofB + 6, roofB + 11, rgb(120, 84, 50)); spr_rect(s, 18, roofB + 4, 5, 2, tool); // hammer
+    for (int i = 0; i < 8; i++) spr_set(s, 26 + i, roofB + 5 + i / 3, tool);                        // saw
+    // corrugated tin lean-to on posts
+    roofTrap(s, 0, 3, W, roofB - 3, 3, rgb(150, 154, 160), rgb(100, 104, 110), 1, 51 + lv);
+    for (int k = 0; k < 3; k++) { int x = k == 0 ? 2 : (k == 1 ? W / 2 - 1 : W - 5); texRect(s, x, roofB + 1, 3, H - roofB - 2, post, 10, 60 + k); }
+    // workbench with a vice
+    texRect(s, 8, H - 12, W - 16, 4, rgb(150, 108, 66), 8, 70); hline(s, 8, W - 9, H - 9, rgb(100, 70, 44));
+    vline(s, 10, H - 8, H - 2, rgb(100, 70, 44)); vline(s, W - 11, H - 8, H - 2, rgb(100, 70, 44));
+    spr_rect(s, W - 20, H - 15, 6, 3, rgb(90, 92, 98)); spr_rect(s, 16, H - 14, 8, 2, rgb(170, 60, 40));   // vice, red toolbox
+    if (lv >= 2) { spr_rect(s, W / 2 + 4, H - 6, 7, 4, rgb(70, 70, 76)); spr_rect(s, W / 2 + 3, H - 7, 9, 2, rgb(96, 96, 104)); }   // anvil
+    if (lv >= 3) { vline(s, W / 2 - 8, roofB + 1, roofB + 4, rgb(60, 60, 60)); spr_rect(s, W / 2 - 10, roofB + 5, 5, 3, rgb(255, 214, 110));
+                   fx.win[fx.nwin][0] = (int8_t)(W / 2 - 12); fx.win[fx.nwin][1] = (int8_t)(roofB + 4); fx.win[fx.nwin][2] = 9; fx.win[fx.nwin][3] = 6; fx.nwin++; }
+}
+
+static void container(Sprite& s, int x, int y, int w, int h, px base, uint32_t seed) {
+    texRect(s, x, y, w, 4, gfx_mix(base, rgb(255, 255, 255), 50), 8, seed);   // top face
+    for (int i = x; i < x + w; i++) for (int j = y + 4; j < y + h; j++) {
+        px c = noisy(base, hash32(seed + i * 17 + j), 8);
+        if ((i - x) % 3 == 0) c = gfx_scale(c, 200); else if ((i - x) % 3 == 1) c = gfx_mix(c, rgb(255, 255, 255), 24);
+        spr_set(s, i, j, c);
+    }
+    hline(s, x, x + w - 1, y + 4, gfx_scale(base, 150));
+    for (int k = 0; k < 4; k++) vline(s, x + w - 3 - k * 3, y + 6, y + h - 2, rgb(190, 190, 186));   // door lock rods
+    spr_rect(s, x + 4, y + 8, 8, 2, rgb(230, 230, 220));   // stencil
+}
+static void bldStorage(Sprite& s, BldFx& fx, int lv, int W, int H) {
+    (void)fx;
+    int ch = 22;
+    container(s, 1, H - ch - 1, W - 2 - (lv >= 3 ? 12 : 0), ch, rgb(156, 66, 46), 5);
+    if (lv >= 2) container(s, 6, H - 2 * ch + 2, W - 18, ch - 2, rgb(52, 112, 114), 9);
+    if (lv >= 3) for (int k = 0; k < 2; k++) { int bx = W - 12, by = H - 8 - k * 7; texRect(s, bx, by, 10, 7, rgb(160, 124, 80), 10, 30 + k); hline(s, bx, bx + 9, by + 3, rgb(110, 84, 54)); }
+}
+
+static void bldKitchen(Sprite& s, BldFx& fx, int lv, int W, int H) {
+    px frame = rgb(200, 204, 200), glass = rgb(150, 196, 188), leaf = rgb(84, 150, 64), leafD = rgb(52, 104, 46);
+    int gw = W - 14, roofB = 18;
+    // stove-pipe cookhouse at the right
+    texRect(s, gw, roofB + 2, W - gw - 1, H - roofB - 3, rgb(128, 104, 76), 10, 2);
+    roofTrap(s, gw - 1, roofB - 4, W - gw + 1, 6, 2, rgb(110, 80, 56), rgb(80, 58, 40), 2, 3);
+    vline(s, W - 5, 2, roofB - 3, rgb(40, 40, 44)); vline(s, W - 4, 2, roofB - 3, rgb(70, 70, 76));
+    fx.smokeX = (int8_t)(W - 5); fx.smokeY = 1;
+    litWindow(s, fx, gw + 2, roofB + 6, 8, 6);
+    // greenhouse: glass gable roof + walls full of plants
+    for (int r = 0; r < roofB - 2; r++) {
+        int in = (roofB - 3 - r) / 2;
+        for (int i = 1 + in; i < gw - 1 - in; i++) spr_set(s, i, 2 + r, ((i + r) % 7 == 0) ? rgb(220, 240, 236) : gfx_mix(glass, leaf, (hash32(i * 3 + r) % 3) ? 60 : 140));
+    }
+    for (int i = 1; i < gw - 1; i++) for (int j = roofB; j < H - 2; j++) spr_set(s, i, j, (hash32(i * 31 + j * 7 + lv) % 4) ? gfx_mix(glass, leaf, 170) : leafD);
+    for (int x = 1; x < gw; x += 6) vline(s, x, roofB, H - 2, frame);
+    hline(s, 1, gw - 2, roofB, frame); hline(s, 1, gw - 2, H - 2, frame);
+    for (int r = 0; r < 4; r++) for (int x = 3; x < gw - 2; x += 4) spr_set(s, x, H - 6 - r * 3, r & 1 ? rgb(220, 70, 50) : rgb(240, 170, 40));   // tomatoes / squash
+    spr_rect(s, gw / 2 - 2, H - 10, 5, 8, rgb(80, 120, 110));   // door
+    if (lv >= 2) { texRect(s, W - 9, H - 9, 7, 8, rgb(70, 92, 120), 10, 7); hline(s, W - 9, W - 3, H - 9, rgb(110, 140, 170)); }   // rain barrel
+}
+
 static void buildBuildings() {
-    struct Style { px roof, roofDk, wall, trim; };
-    static const Style ST[BLD_TYPES] = {
-        {rgb(186, 182, 172), rgb(140, 136, 128), rgb(150, 140, 120), rgb(176, 48, 48)},  // infirmary
-        {rgb(130, 96, 70), rgb(96, 70, 52), rgb(110, 100, 90), rgb(232, 192, 64)},       // workshop (rusty tin)
-        {rgb(96, 110, 60), rgb(70, 82, 44), rgb(120, 96, 66), rgb(160, 140, 100)},       // storage (olive tarp)
-        {rgb(120, 86, 56), rgb(90, 64, 42), rgb(140, 110, 76), rgb(110, 160, 70)},       // kitchen / garden
-        {rgb(70, 80, 100), rgb(52, 60, 76), rgb(126, 112, 92), rgb(190, 176, 140)},      // living quarters
-        {rgb(104, 76, 48), rgb(76, 54, 34), rgb(92, 66, 42), rgb(140, 142, 146)},        // defences / watchtower
+    static const int SZ[BLD_TYPES][BLD_LEVELS][2] = {   // world sprite size per level (w, h)
+        {{48, 48}, {48, 46}, {56, 50}, {58, 52}},   // infirmary tent
+        {{48, 48}, {52, 50}, {58, 52}, {62, 54}},   // workshop shed
+        {{48, 48}, {50, 26}, {50, 46}, {60, 46}},   // storage containers
+        {{48, 48}, {48, 50}, {54, 52}, {58, 54}},   // greenhouse + cookhouse
+        {{48, 48}, {50, 52}, {60, 62}, {62, 66}},   // living quarters house
+        {{48, 48}, {36, 70}, {40, 78}, {42, 86}},   // watchtower
     };
     for (int b = 0; b < BLD_TYPES; b++) for (int lv = 0; lv < BLD_LEVELS; lv++) {
-        Sprite s = spr_new(48, 48);
-        const Style& st = ST[b];
+        BldFx& fx = g_bldFx[b][lv]; fx = BldFx{}; fx.smokeX = fx.flagX = -1;
+        int W = SZ[b][lv][0], H = SZ[b][lv][1];
+        Sprite s = spr_new(W, H);
         if (lv == 0) {  // empty plot: staked dirt
             for (int y = 6; y < 46; y++) for (int x = 3; x < 45; x++) s.d[y * 48 + x] = noisy(rgb(92, 72, 52), hash32(b * 999 + y * 48 + x), 18);
             for (int i = 3; i < 45; i += 3) { spr_set(s, i, 6, rgb(200, 190, 160)); spr_set(s, i, 45, rgb(200, 190, 160)); }
             for (int i = 6; i < 46; i += 3) { spr_set(s, 3, i, rgb(200, 190, 160)); spr_set(s, 44, i, rgb(200, 190, 160)); }
             int cs[4][2] = {{2, 4}, {44, 4}, {2, 43}, {44, 43}};
             for (auto& c : cs) spr_rect(s, c[0], c[1], 2, 4, rgb(120, 90, 56));
-            g_building[b][lv] = s; continue;
+            g_bldWorld[b][lv] = s; g_building[b][lv] = spr_copy(s); continue;
         }
-        if (b == B_DEFENSES) {  // watchtower on stilts
-            spr_rect(s, 12, 18, 3, 28, pal_char('k')); spr_rect(s, 33, 18, 3, 28, pal_char('k'));
-            spr_rect(s, 13, 18, 1, 28, st.roof); spr_rect(s, 34, 18, 1, 28, st.roof);
-            for (int i = 0; i < 20; i++) { spr_set(s, 14 + i, 22 + i, st.roofDk); spr_set(s, 33 - i, 22 + i, st.roofDk); }
-            spr_rect(s, 8, 8, 32, 12, pal_char('k')); spr_rect(s, 9, 9, 30, 10, st.wall);
-            for (int x = 10; x < 38; x += 4) spr_rect(s, x, 9, 1, 10, st.roofDk);
-            spr_rect(s, 6, 2, 36, 7, pal_char('k')); spr_rect(s, 7, 3, 34, 5, st.roof);
-            if (lv >= 2) { spr_rect(s, 4, 18, 40, 2, st.trim); }  // reinforced rail
-            if (lv >= 3) { spr_rect(s, 22, 0, 1, 4, pal_char('k')); spr_rect(s, 23, 0, 5, 3, rgb(176, 48, 48)); spr_set(s, 40, 12, rgb(250, 230, 140)); }
-            g_building[b][lv] = s; continue;
-        }
-        int x0 = 4, x1 = 44, roofTop = 6 - (lv >= 2 ? 2 : 0), roofBot = 26, wallBot = 44;
-        // shadow
-        spr_rect(s, x0 + 2, wallBot, x1 - x0, 3, rgb(30, 34, 24));
-        // roof (3/4 view): slanted planes with ridge
-        spr_rect(s, x0 - 1, roofTop - 1, x1 - x0 + 2, roofBot - roofTop + 2, pal_char('k'));
-        for (int y = roofTop; y < roofBot; y++) for (int x = x0; x < x1; x++) {
-            px c = y < (roofTop + roofBot) / 2 ? st.roof : st.roofDk;
-            if (b == B_WORKSHOP && (x & 3) == 0) c = gfx_scale(c, 200);          // corrugated
-            if (b == B_QUARTERS && ((y - roofTop) % 4 == 3)) c = gfx_scale(c, 210); // shingles
-            s.d[y * 48 + x] = noisy(c, hash32(b * 7 + lv * 131 + y * 48 + x), 6);
-        }
-        spr_rect(s, x0, (roofTop + roofBot) / 2, x1 - x0, 1, gfx_scale(st.roof, 240));
-        // front wall
-        spr_rect(s, x0 - 1, roofBot, x1 - x0 + 2, wallBot - roofBot + 1, pal_char('k'));
-        for (int y = roofBot + 1; y < wallBot; y++) for (int x = x0; x < x1; x++) {
-            px c = st.wall;
-            if (b == B_STORAGE || b == B_DEFENSES || b == B_KITCHEN) if ((x % 5) == 0) c = gfx_scale(c, 200);  // planks
-            s.d[y * 48 + x] = noisy(c, hash32(b * 13 + y * 48 + x), 8);
-        }
-        // door + windows (lit)
-        spr_rect(s, 20, 33, 8, 11, pal_char('k')); spr_rect(s, 21, 34, 6, 10, rgb(84, 60, 40)); spr_set(s, 25, 39, rgb(232, 192, 64));
-        spr_rect(s, 8, 31, 8, 6, pal_char('k')); spr_rect(s, 9, 32, 6, 4, rgb(200, 170, 90));
-        spr_rect(s, 32, 31, 8, 6, pal_char('k')); spr_rect(s, 33, 32, 6, 4, rgb(200, 170, 90));
-        // type emblem on the roof
-        int ex = 24, ey = (roofTop + roofBot) / 2 - 4;
+        // draw inside a 1px margin so the outline fits
+        Sprite in = spr_new(W - 2, H - 2);
         switch (b) {
-        case B_INFIRMARY: spr_rect(s, ex - 1, ey - 3, 3, 9, st.trim); spr_rect(s, ex - 4, ey, 9, 3, st.trim); break;
-        case B_WORKSHOP: spr_rect(s, ex - 4, ey + 1, 8, 2, st.trim); spr_rect(s, ex + 3, ey - 1, 3, 6, st.trim); break;
-        case B_STORAGE: spr_rect(s, ex - 4, ey - 2, 8, 7, rgb(170, 134, 90)); spr_rect(s, ex - 4, ey + 1, 8, 1, pal_char('k')); break;
-        case B_KITCHEN: spr_rect(s, ex + 8, roofTop - 4, 3, 6, rgb(70, 70, 70)); for (int i = 0; i < 3; i++) spr_set(s, ex - 2 + i * 2, ey, st.trim); break;
-        case B_QUARTERS: spr_rect(s, ex - 5, ey, 10, 3, rgb(190, 176, 140)); spr_rect(s, ex - 5, ey - 1, 3, 2, rgb(220, 210, 190)); break;
+        case B_QUARTERS: bldQuarters(in, fx, lv, W - 2, H - 2); break;
+        case B_DEFENSES: bldTower(in, fx, lv, W - 2, H - 2); break;
+        case B_INFIRMARY: bldInfirmary(in, fx, lv, W - 2, H - 2); break;
+        case B_WORKSHOP: bldWorkshop(in, fx, lv, W - 2, H - 2); break;
+        case B_STORAGE: bldStorage(in, fx, lv, W - 2, H - 2); break;
+        default: bldKitchen(in, fx, lv, W - 2, H - 2); break;
         }
-        if (b == B_KITCHEN) {  // garden beds in front
-            for (int x = 2; x < 46; x += 2) { spr_set(s, x, 45, rgb(90, 150, 60)); spr_set(s, x + 1, 46, rgb(70, 120, 50)); }
-        }
-        if (lv >= 2) {  // annex / extension
-            spr_rect(s, 40, 20, 8, 25, pal_char('k')); spr_rect(s, 41, 21, 6, 6, st.roofDk); spr_rect(s, 41, 27, 6, 17, st.wall);
-        }
-        if (lv >= 3) {  // reinforced trim + lantern + antenna
-            spr_rect(s, x0, wallBot - 2, x1 - x0, 2, st.trim);
-            spr_rect(s, 6, roofTop - 6, 1, 6, pal_char('k')); spr_set(s, 6, roofTop - 7, rgb(176, 48, 48));
-            spr_set(s, 18, 30, rgb(250, 230, 140)); spr_set(s, 30, 30, rgb(250, 230, 140));
-        }
-        g_building[b][lv] = s;
+        for (int y = 0; y < in.h; y++) for (int x = 0; x < in.w; x++) { px v = spr_get(in, x, y); if (v != KEYC) spr_set(s, x + 1, y + 1, v); }
+        free(in.d);
+        outlineAll(s);
+        for (int k = 0; k < fx.nwin; k++) { fx.win[k][0]++; fx.win[k][1]++; }
+        if (fx.smokeX >= 0) { fx.smokeX++; fx.smokeY++; }
+        if (fx.flagX >= 0) { fx.flagX++; fx.flagY++; }
+        g_bldWorld[b][lv] = s;
+        // 48x48 menu thumbnail: nearest-neighbour fit, bottom-centred
+        Sprite t = spr_new(48, 48);
+        float k = W > H ? 48.0f / W : 48.0f / H; if (k > 1) k = 1;
+        int tw = (int)(W * k), th = (int)(H * k), ox = (48 - tw) / 2, oy = 48 - th;
+        for (int y = 0; y < th; y++) for (int x = 0; x < tw; x++) spr_set(t, ox + x, oy + y, spr_get(s, (int)(x / k), (int)(y / k)));
+        g_building[b][lv] = t;
     }
 }
 

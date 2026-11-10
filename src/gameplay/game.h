@@ -192,8 +192,10 @@ struct Settler {           // lightweight settlement NPC (one per survivor)
 extern Settler g_npc[MAX_SURV];
 extern Game G;
 // world viewport in world pixels (the top screen shows this area scaled by the zoom setting)
-inline int view_w() { int z = G.set.zoom ? G.set.zoom : 100; return (TOP_W * 100 + z - 1) / z; }   // rounded up so scaling never reads past the edge
-inline int view_h() { int z = G.set.zoom ? G.set.zoom : 100; return (TOP_H * 100 + z - 1) / z; }
+// the settlement is framed one step wider than expeditions (Try 2 overview vs combat panels)
+inline int view_zoom() { int z = G.set.zoom ? G.set.zoom : 100; if (G.scene == SC_SETTLEMENT) z = z >= 200 ? 150 : (z >= 150 ? 125 : 100); return z; }
+inline int view_w() { int z = view_zoom(); return (TOP_W * 100 + z - 1) / z; }   // rounded up so scaling never reads past the edge
+inline int view_h() { int z = view_zoom(); return (TOP_H * 100 + z - 1) / z; }
 
 // ---- game.cpp
 void game_init();

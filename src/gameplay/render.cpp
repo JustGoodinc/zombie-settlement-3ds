@@ -228,7 +228,7 @@ void render_world(Canvas& c, float alpha) {
         int x = p.tx * 16 - camX, y = p.ty * 16 - camY;
         switch (p.type) {
         case PR_TREE: gfx_fillA(c, x - 6, y + 6, 32, 12, rgb(0, 0, 0), 90); gfx_fillA(c, x - 2, y + 4, 24, 16, rgb(0, 0, 0), 50); break;
-        case PR_PLOT: if (G.st.bLevel[p.special]) shadow(g_building[p.special][G.st.bLevel[p.special] > 3 ? 3 : G.st.bLevel[p.special]], x, y, 4, 3, 150); break;
+        case PR_PLOT: if (G.st.bLevel[p.special]) { const Sprite& bs = g_bldWorld[p.special][G.st.bLevel[p.special] > 3 ? 3 : G.st.bLevel[p.special]]; shadow(bs, x + 24 - bs.w / 2, y + 48 - bs.h, 4, 3, 150); } break;
         case PR_CAR: shadow(g_spr[S_CAR], x, y, 2, 3, 140); break;
         case PR_WRECK: shadow(g_spr[S_WRECK], x, y, 2, 3, 140); break;
         case PR_TENT: shadow(g_spr[S_TENT], x, y - 8, 3, 3, 150); break;
@@ -295,24 +295,51 @@ void render_world(Canvas& c, float alpha) {
             case PR_CHAIR: gfx_blit(c, g_spr[S_CHAIR], x, y); break;
             case PR_PLANT: gfx_blit(c, g_spr[S_PLANT], x, y); break;
             case PR_COOLER: gfx_blit(c, g_spr[S_COOLER], x, y); break;
-            case PR_FIRE: gfx_blit(c, g_spr[S_FIRE0 + (int)(G.uiTime * 8) % 3], x, y); break;
+            case PR_FIRE: {   // stone fire pit (Try 2): ring of stones, charred logs, flames, rising sparks
+                for (int a = 0; a < 12; a++) { float ang = a * 0.5236f; int sx = x + 8 + (int)(cosf(ang) * 9), sy = y + 11 + (int)(sinf(ang) * 5); gfx_fill(c, sx - 1, sy - 1, 3, 2, a & 1 ? rgb(128, 124, 116) : rgb(104, 100, 94)); gfx_pset(c, sx - 1, sy - 1, rgb(160, 156, 148)); }
+                gfx_fill(c, x + 3, y + 10, 10, 2, rgb(60, 40, 28)); gfx_fill(c, x + 5, y + 9, 6, 1, rgb(90, 50, 30));
+                gfx_blit(c, g_spr[S_FIRE0 + (int)(G.uiTime * 8) % 3], x, y - 2);
+                for (int k = 0; k < 3; k++) { float t = fmodf(G.uiTime * 0.8f + k * 0.33f, 1.0f); gfx_pset(c, x + 8 + (int)(sinf(t * 9 + k) * 3), y + 2 - (int)(t * 16), t < 0.5f ? rgb(255, 210, 90) : rgb(230, 110, 40)); }
+                break;
+            }
             case PR_RADIO: gfx_blit(c, g_spr[S_RADIO], x, y); if ((int)(G.uiTime * 2) & 1) gfx_pset(c, x + 12, y + 4, rgb(255, 80, 60)); break;
             case PR_WORKBENCH: gfx_blit(c, g_spr[S_WORKBENCH], x, y); break;
             case PR_LAMP: gfx_blit(c, g_spr[S_LAMP], x, y - 4); break;
             case PR_GENERATOR: if (G.st.generator) gfx_blit(c, g_spr[S_GENPROP0 + ((int)(G.uiTime * 14) & 1)], x, y); break;
             case PR_PLOT: {
-                int b = p.special, lv = G.st.bLevel[b];
-                gfx_blit(c, g_building[b][lv > 3 ? 3 : lv], x, y);
+                int b = p.special, lv = G.st.bLevel[b] > 3 ? 3 : G.st.bLevel[b];
+                const Sprite& bs = g_bldWorld[b][lv]; const BldFx& fx = g_bldFx[b][lv];
+                int bx = x + 24 - bs.w / 2, by = y + 48 - bs.h;
+                gfx_blit(c, bs, bx, by);
+                if (lv > 0) {
+                    float dark = 1.0f - daylight();
+                    // lit windows: the odd flicker, and a warm halo after dusk
+                    for (int k = 0; k < fx.nwin; k++) {
+                        const int8_t* r = fx.win[k];
+                        if (dark > 0.35f) gfx_fillA(c, bx + r[0] - 2, by + r[1] - 2, r[2] + 4, r[3] + 4, rgb(255, 190, 90), (int)(80 * dark));
+                        if ((hash32((uint32_t)(G.uiTime * 6) + b * 31 + k) % 23) == 0) gfx_fillA(c, bx + r[0] + 1, by + r[1] + 1, r[2] - 2, r[3] - 2, rgb(120, 70, 30), 90);
+                    }
+                    if (fx.smokeX >= 0)   // chimney smoke drifting up and away
+                        for (int k = 0; k < 4; k++) {
+                            float t = fmodf(G.uiTime * 0.45f + k * 0.25f + b * 0.1f, 1.0f);
+                            int sx = bx + fx.smokeX + (int)(sinf(t * 5 + k) * 2 + t * 7), sy = by + fx.smokeY - (int)(t * 22), sz = 2 + (int)(t * 4);
+                            gfx_fillA(c, sx - sz / 2, sy - sz / 2, sz, sz, rgb(150, 150, 156), (int)(150 * (1 - t)));
+                        }
+                    if (fx.flagX >= 0)    // pennant snapping in the wind
+                        for (int i = 0; i < 8; i++) {
+                            int wob = (int)(sinf(G.uiTime * 7 - i * 0.9f) * 1.4f), fh = 5 - i / 2;
+                            for (int j = 0; j < fh; j++) gfx_pset(c, bx + fx.flagX + i, by + fx.flagY + j + wob + i / 3, j == 0 ? rgb(230, 80, 60) : rgb(190, 44, 36));
+                        }
+                }
                 if (lv > 0 && G.st.bDamage[b]) {
-                    for (int s = 0; s < G.st.bDamage[b] * 3; s++) gfx_fill(c, x + 8 + (hash32(b * 17 + s) % 30), y + 10 + (hash32(b * 7 + s) % 24), 3, 2, rgb(30, 26, 22));
+                    for (int s = 0; s < G.st.bDamage[b] * 3; s++) gfx_fill(c, bx + 6 + (hash32(b * 17 + s) % (bs.w - 12)), by + bs.h / 3 + (hash32(b * 7 + s) % (bs.h / 2)), 3, 2, rgb(30, 26, 22));
                     int sy = (int)fmodf(G.uiTime * 10 + b * 9, 20);   // drifting smoke
-                    gfx_fillA(c, x + 30, y + 4 - sy, 4, 4, rgb(90, 90, 96), 140 - sy * 6);
+                    gfx_fillA(c, bx + bs.w / 2, by + 4 - sy, 4, 4, rgb(90, 90, 96), 140 - sy * 6);
                 }
                 if (G.st.bBuildFx[b] > 0) {   // construction dust + scaffold flicker
-                    for (int s = 0; s < 6; s++) gfx_pset(c, x + (hash32(G.tick + s) % 48), y + 30 + (hash32(G.tick * 3 + s) % 16), rgb(170, 150, 120));
-                    if ((G.tick / 4) & 1) gfx_rect(c, x + 2, y + 2, 44, 44, pal::gold);
+                    for (int s = 0; s < 6; s++) gfx_pset(c, bx + (hash32(G.tick + s) % bs.w), by + bs.h - 18 + (hash32(G.tick * 3 + s) % 16), rgb(170, 150, 120));
+                    if ((G.tick / 4) & 1) gfx_rect(c, bx + 1, by + 1, bs.w - 2, bs.h - 2, pal::gold);
                 }
-                if (b == B_QUARTERS && lv && is_night()) { gfx_fill(c, x + 9, y + 32, 6, 4, rgb(240, 200, 100)); gfx_fill(c, x + 33, y + 32, 6, 4, rgb(240, 200, 100)); }
                 break;
             }
             }
@@ -389,6 +416,28 @@ void render_world(Canvas& c, float alpha) {
         }
     }
     // ---- post-light overlays (stay readable at night)
+    if (G.scene == SC_SETTLEMENT && day < 0.65f) {
+        // windows stay lit through the dark: re-light the panes and bloom a warm halo
+        float dk = (0.65f - day) / 0.65f;
+        for (int k = 0; k < m.nprop; k++) {
+            const Prop& p = m.prop[k];
+            if (p.type != PR_PLOT || !G.st.bLevel[p.special]) continue;
+            int lv = G.st.bLevel[p.special] > 3 ? 3 : G.st.bLevel[p.special];
+            const Sprite& bs = g_bldWorld[p.special][lv]; const BldFx& fx = g_bldFx[p.special][lv];
+            int bx = p.tx * 16 + 24 - bs.w / 2 - camX, by = p.ty * 16 + 48 - bs.h - camY;
+            for (int w = 0; w < fx.nwin; w++) {
+                const int8_t* r = fx.win[w];
+                gfx_fillA(c, bx + r[0] - 3, by + r[1] - 3, r[2] + 6, r[3] + 6, rgb(255, 170, 70), (int)(45 * dk));
+                gfx_fillA(c, bx + r[0] + 1, by + r[1] + 1, r[2] - 2, r[3] - 2, rgb(255, 214, 120), (int)(200 * dk));
+            }
+        }
+        // fireflies drifting over the grass
+        for (int i = 0; i < 14; i++) {
+            float t = G.uiTime * 0.3f + i * 1.7f;
+            int fxp = (int)(hash32(i * 977) % (uint32_t)view_w()) + (int)(sinf(t) * 10), fyp = (int)(hash32(i * 613) % (uint32_t)view_h()) + (int)(cosf(t * 1.3f) * 6);
+            if (sinf(G.uiTime * 2.2f + i * 2.1f) > 0.2f) { gfx_pset(c, fxp, fyp, rgb(220, 255, 120)); gfx_fillA(c, fxp - 1, fyp - 1, 3, 3, rgb(180, 240, 90), (int)(70 * dk)); }
+        }
+    }
     if (g_highlightProp >= 0) {
         const Prop& p = m.prop[g_highlightProp];
         bool searched = G.curLoc >= 0 && G.loc[G.curLoc].generated[p.container];
@@ -543,7 +592,7 @@ void game_render(Canvas& top, Canvas& bot, float alpha) {
     if (G.panel == PN_ANIMTEST) render_animtest(top);
     else if (G.scene == SC_TITLE || !G.inLevel) { camX = camY = 0; render_title(top); }
     else {
-        int z = G.set.zoom ? G.set.zoom : 100;
+        int z = view_zoom();
         if (z == 100) render_world(top, alpha);
         else {
             // render the smaller world view, then nearest-neighbour scale it to the full top screen

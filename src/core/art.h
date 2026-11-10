@@ -29,7 +29,10 @@ extern Sprite g_item[40];                 // item icons, 8 px per inventory cell
 extern Sprite g_held[40];                 // weapons as held in the hand (side view, muzzle right)
 extern int8_t g_heldGrip[40][2], g_heldMuzzle[40][2];
 extern Sprite g_portrait[PORTRAITS];      // 24x24, drawn at 2x
-extern Sprite g_building[BLD_TYPES][BLD_LEVELS];  // 48x48, level 0 = empty plot
+extern Sprite g_building[BLD_TYPES][BLD_LEVELS];  // 48x48 menu thumbnails, level 0 = empty plot
+extern Sprite g_bldWorld[BLD_TYPES][BLD_LEVELS];  // in-world art: own silhouette per type, drawn bottom-centred on the 3x3 plot
+struct BldFx { int8_t smokeX, smokeY, flagX, flagY; int8_t nwin; int8_t win[4][4]; };   // chimney, flag pole, lit windows (night glow)
+extern BldFx g_bldFx[BLD_TYPES][BLD_LEVELS];
 
 void art_init();
 // Character pose lookup: zombie=false -> survivor variants. dir is dir8() index.
