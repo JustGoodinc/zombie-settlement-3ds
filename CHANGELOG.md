@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — five launch maps, playtested
+## v0.3.0 — five launch maps, playtested
 - Five expedition maps at launch: **Police Station**, **Hospital** (wards, surgery, a keycard-locked pharmacy, ER, lobby and ambulance bay), **Supermarket** (loading dock, stockroom, aisles, checkouts, car park), **Train Yard** (harbour quay with shipping containers, three rail lines with boxcars, rail depot warehouse and yard office) and **Neighborhood** (five furnished homes with beds, sofas, fridges and kitchens, fenced yards, a street of parked cars, an abandoned backyard camp, and someone locked in a bedroom with the key in a neighbour's desk). Scrapyard and Woods are retired; old saves still load.
 - Each place stocks what it should: supermarket shelves hold food, hospital shelves medicine, home desks and pantries household supplies, freight containers materials, fuel and tools. Most supermarket and depot shelves are picked over, so the stores look full without hundreds of searches.
 - New art: rail track, harbour water, shipping containers in four paints, boxcars, beds, sofas, fridges, and HOSPITAL / MARKET / RAIL DEPOT signs.

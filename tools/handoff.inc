@@ -315,7 +315,7 @@ static void hexOf(px c, char* out) { snprintf(out, 8, "#%02X%02X%02X", ((c >> 11
 static void writeDocs(int assetCount) {
     char p[512]; snprintf(p, sizeof p, "%s/DESIGN_HANDOFF.md", g_out);
     FILE* m = fopen(p, "w");
-    fprintf(m, "# Staying Alive - Design Handoff\n\nVersion 0.2.2. Every image in this package was rendered by the shipping game code (`zs_tool --handoff`), so it matches the build exactly.\n\n");
+    fprintf(m, "# Staying Alive - Design Handoff\n\nVersion 0.3.0. Every image in this package was rendered by the shipping game code (`zs_tool --handoff`), so it matches the build exactly.\n\n");
     fprintf(m, "Open `index.html` for the visual version of this document.\n\n");
     fprintf(m, "## 1. Platform and canvas\n\n| Screen | Size | Role |\n|---|---|---|\n| Top | 400 x 240 | Gameplay world + HUD (3/4 top-down) |\n| Bottom | 320 x 240 | Touch menus, inventory, maps |\n\n");
     fprintf(m, "- PC shows both screens stacked (8 px gap, bottom centred), integer-scaled, mouse = stylus.\n- Pixel art is 1:1 on device; nearest-neighbour scaling only. Camera zoom (100/125/150/200%%, default 125%%) scales the world layer only; HUD and text render after scaling at native resolution.\n- Screenshots in `screens/` are composites at 2x; `screens/native/` has each screen at 1x.\n\n");
@@ -352,7 +352,7 @@ static void writeDocs(int assetCount) {
                ".sw{display:inline-block;width:28px;height:18px;vertical-align:middle;border:1px solid #000;margin-right:8px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:22px}"
                ".card{background:#1e1e22;border:1px solid #3a3a40;border-radius:6px;padding:10px}.card img{width:100%%;display:block;border-radius:3px}.card b{display:block;margin-top:8px;color:#e8c040}.card p{margin:4px 0 0;color:#b9b09f;font-size:13px}"
                ".big{max-width:100%%;border:1px solid #3a3a40}</style></head><body><main>");
-    fprintf(h, "<h1>Staying Alive - Design Handoff</h1><p>Version 0.2.2 &middot; Windows + Nintendo 3DS &middot; %d screens &middot; %d asset files. Every image was rendered by the shipping game code.</p>", g_nshots, assetCount);
+    fprintf(h, "<h1>Staying Alive - Design Handoff</h1><p>Version 0.3.0 &middot; Windows + Nintendo 3DS &middot; %d screens &middot; %d asset files. Every image was rendered by the shipping game code.</p>", g_nshots, assetCount);
     fprintf(h, "<h2>Platform</h2><table><tr><th>Screen</th><th>Size</th><th>Role</th></tr><tr><td>Top</td><td>400&times;240</td><td>Gameplay world + HUD</td></tr><tr><td>Bottom</td><td>320&times;240</td><td>Touch menus, inventory, maps</td></tr></table>"
                "<p>Pixel art 1:1 on device, nearest-neighbour only. Camera zoom 100/125/150/200%% (default 125%%) scales the world layer; HUD and text stay native.</p>");
     fprintf(h, "<h2>Colour</h2><p>RGB565 on device; hex values are the exact rendered colours.</p><table><tr><th>Token</th><th>Hex</th><th>Use</th></tr>");
