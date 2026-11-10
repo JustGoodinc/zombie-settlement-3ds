@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — menu controls and thumb layout
+## v0.1.4 — menu controls and thumb layout
 - D-Pad and Circle Pad both move through every paused menu; holding either repeats.
 - Backpack and container grids: D-Pad / Circle Pad move the cursor (fixed: the D-Pad was being swallowed there), A picks up / places, Y rotates, X uses. Push right past the bag to reach the action buttons; Left or B goes back to the grid.
 - Gameplay bottom screen rebuilt around thumb rails: tall buttons down the left and right edges (Base, Survivors, Expedition / Journal, Backpack, Pause; on expeditions Backpack, Squad / Flashlight, Pause), with their pad shortcut shown. Map and objective sit in the middle.
