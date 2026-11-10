@@ -59,7 +59,7 @@ cmake -S . -B build -A x64 && cmake --build build --config Release
 make
 ```
 
-Tests: `build\zs_tests.exe`. Developer tool: `zs_tool --gallery DIR`, `--shots DIR`, `--bench`, `--icons DIR`.
+Tests: `build\zs_tests.exe`. Developer tool: `zs_tool --gallery DIR`, `--shots DIR`, `--bench`, `--icons DIR`, `--handoff DIR` (design handoff: every screen, every asset, audio, HTML + Markdown spec).
 Details: [docs/WINDOWS_BUILD.md](docs/WINDOWS_BUILD.md), [docs/NINTENDO_3DS_BUILD.md](docs/NINTENDO_3DS_BUILD.md).
 
 ## Licence

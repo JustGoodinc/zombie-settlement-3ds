@@ -764,7 +764,8 @@ static void panelBuilding(Canvas& c) {
         gfx_rect(c, x, y, 100, 46, on ? pal::gold : (foc ? pal::goldDk : pal::border));
         blitHalf(c, g_building[k][lv > 3 ? 3 : (lv ? lv : 1)], x + 4, y + 4);
         if (!lv) gfx_fillA(c, x + 4, y + 4, 24, 24, pal::ink, 140);
-        gfx_text(c, x + 32, y + 6, BUILDINGS[k].name, pal::cream);
+        static const char* SHORT[B_COUNT] = {"Infirmary", "Workshop", "Storage", "Kitchen", "Quarters", "Defenses"};   // fits the 68 px card label
+        gfx_text(c, x + 32, y + 6, SHORT[k], pal::cream);
         char l[16]; snprintf(l, sizeof l, lv ? "Lv %d/%d" : "Not built", lv, BUILDINGS[k].maxLevel); gfx_text(c, x + 32, y + 18, l, lv ? pal::dim : pal::grey);
         if (G.st.bDamage[k]) gfx_text(c, x + 32, y + 30, "Damaged", pal::red);
     }
@@ -778,10 +779,10 @@ static void panelBuilding(Canvas& c) {
     if (tab == 0) { cost = d.cost[0]; can = lv == 0; why = lv ? "Already built" : ""; }
     else if (tab == 1) { if (lv > 0 && lv < d.maxLevel) { cost = d.cost[lv]; can = true; } why = lv == 0 ? "Build it first" : (lv >= d.maxLevel ? "Max level" : ""); }
     else { cost = repairCost; can = G.st.bDamage[b] > 0; why = can ? "" : "No damage"; }
-    if (cost) { gfx_text(c, 206, 129, "Cost:", pal::dim); costLine(c, 206, 141, cost); }
+    if (cost && !why[0]) { gfx_text(c, 206, 129, "Cost:", pal::dim); costLine(c, 206, 141, cost); }
     if (tab == 1 && lv > 0 && lv < d.maxLevel) gfx_wrap(c, 206, 154, 104, d.perk[lv + 1], pal::green);
     else if (lv > 0) gfx_wrap(c, 206, 154, 104, d.perk[lv], pal::cream);
-    if (why[0]) gfx_text(c, 206, 141, why, pal::grey);
+    if (why[0]) gfx_text(c, 206, 129, why, pal::grey);   // the reason replaces the cost (they used to overlap)
     bool afford = cost && can_afford(cost);
     if (ui_button(c, 206, 198, 104, 20, T[tab], UB_GOLD, can && afford)) {
         pay(cost);

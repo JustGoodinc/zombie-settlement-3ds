@@ -239,6 +239,8 @@ static void icons(const char* dir) {
     printf("icons written to %s\n", dir);
 }
 
+#include "handoff.inc"
+
 int main(int argc, char** argv) {
     game_init();
     save_setDir("tool_saves/");
@@ -246,6 +248,7 @@ int main(int argc, char** argv) {
     else if (argc >= 3 && !strcmp(argv[1], "--shots")) shots(argv[2]);
     else if (argc >= 2 && !strcmp(argv[1], "--bench")) bench();
     else if (argc >= 3 && !strcmp(argv[1], "--icons")) icons(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "--handoff")) handoff(argv[2]);
     else { printf("usage: zs_tool --gallery DIR | --shots DIR | --bench | --icons DIR\n"); return 1; }
     return 0;
 }

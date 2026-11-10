@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 static const float PI2 = 6.2831853f;
 struct Buf { int16_t* d = nullptr; int n = 0; uint8_t prio = 1; };
@@ -145,4 +146,33 @@ void audio_mix(int16_t* out, int frames) {
         if (total > 1) total = 1; if (total < -1) total = -1;
         out[i] = (int16_t)(total * 32000);
     }
+}
+
+// Design-handoff export: every effect as a 16-bit mono WAV (22050 Hz).
+static void writeWav(const char* path, const int16_t* d, int n) {
+    FILE* f = fopen(path, "wb"); if (!f) return;
+    uint32_t dsz = n * 2, rsz = 36 + dsz, sr = AUDIO_RATE, br = AUDIO_RATE * 2, fl = 16; uint16_t fmt[2] = {1, 1}, ba[2] = {2, 16};
+    fwrite("RIFF", 1, 4, f); fwrite(&rsz, 4, 1, f); fwrite("WAVEfmt ", 1, 8, f); fwrite(&fl, 4, 1, f);
+    fwrite(fmt, 2, 2, f); fwrite(&sr, 4, 1, f); fwrite(&br, 4, 1, f); fwrite(ba, 2, 2, f);
+    fwrite("data", 1, 4, f); fwrite(&dsz, 4, 1, f); fwrite(d, 2, n, f); fclose(f);
+}
+static const char* SFX_NAMES[SFX_COUNT] = {"pistol", "revolver", "shotgun", "rifle", "smg", "empty_click", "reload", "melee_swing", "melee_hit",
+    "zombie_groan", "zombie_step", "footstep", "door", "glass_break", "door_bang", "search", "pickup", "inventory_move", "menu_move", "menu_ok",
+    "menu_back", "build", "heal", "death", "alarm", "hurt", "zombie_die", "casing", "bite"};
+const char* audio_sfxName(int s) { return SFX_NAMES[s]; }
+int audio_exportWavs(const char* dir) {
+    char p[512]; int n = 0;
+    for (int s = 0; s < SFX_COUNT; s++) if (sfx[s].d) { snprintf(p, sizeof p, "%s/sfx_%02d_%s.wav", dir, s, SFX_NAMES[s]); writeWav(p, sfx[s].d, sfx[s].n); n++; }
+    // ambience + music beds, rendered through the real mixer
+    struct Bed { const char* name; bool night, indoor, settle, title; } beds[4] = {
+        {"bed_title_music", false, false, false, true}, {"bed_settlement_day", false, false, true, false},
+        {"bed_expedition_night_outdoor", true, false, false, false}, {"bed_expedition_indoor", false, true, false, false}};
+    static int16_t buf[AUDIO_RATE * 16];
+    for (auto& b : beds) {
+        for (auto& v : voices) v.s = -1;
+        audio_ambience(b.night, b.indoor, b.settle, b.title); audio_volumes(10, 8, 8); audio_pause(false);
+        audio_mix(buf, AUDIO_RATE * 16);
+        snprintf(p, sizeof p, "%s/%s.wav", dir, b.name); writeWav(p, buf, AUDIO_RATE * 16); n++;
+    }
+    return n;
 }

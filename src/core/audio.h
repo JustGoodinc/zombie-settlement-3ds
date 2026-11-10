@@ -21,3 +21,5 @@ void audio_volumes(int master, int sfx, int music);  // 0..10
 void audio_pause(bool paused);                       // dims ambience while menus pause the game
 void audio_mix(int16_t* out, int frames);            // mono
 int  audio_activeVoices();
+int  audio_exportWavs(const char* dir);   // design handoff: writes every effect + ambience beds
+const char* audio_sfxName(int s);
