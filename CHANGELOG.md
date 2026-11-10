@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased — Staying Alive: new characters, weapons and thumb rails everywhere
+## v0.2.0 — Staying Alive: Try 2 redesign
+- Compared against the mockup panel by panel (settlement, combat, characters, portraits) and iterated: Try 2 compound layout framed fence to fence, grey picket fence, warm dirt yard, big army tent, stone fire pit, iron lamp posts, warm evening light pools, settlers gathering at the fire; red-brick police station facade with glass doors and a lit POLICE sign, 3/4 police car, bold HUD (framed portrait, thick bars, big ammo digits), big blood splats, long tracers, readable nights (render only; stealth unchanged); 3/4 portraits with cap brims and pack straps; cleaner zombies with blood streaks.
 - The game is now called **Staying Alive** (title screen, window, 3DS banner/HOME menu name, release file names). Saves stay where they were, and the 3DS title ID is unchanged so the CIA installs over the old one.
-- Characters redrawn to match the Try 2 mockup: chibi heads with 2x2 eyes, glints, brows, blush and jagged bangs; caps with brims and badges; collars, belts and shoes. Side view is now a 3/4 view like the mockup.
+- Characters redrawn to match the Try 2 mockup side by side: stocky chibi build (broad shoulders, thick arms, big hands and boots), serious faces with dark eyes under heavy brows, caps with brims jutting to one side. Side view is a 3/4 view like the mockup.
 - Animation is built from hand-drawn parts (head, torso/arms, legs): real walk and run cycles with arm swing and steps, a new aim pose with the arm extended, crouch/reach with bent legs.
 - Zombies: pale and balding with dark eyes, a gaping bloody mouth, blood on the scalp and torn, bloodied clothes; they reach forward when seen side-on.
 - Weapons are pixel-art sprites held in the hand (pistol, revolver, SMG, shotgun, rifle, knife, bat, crowbar, machete) with a big starburst muzzle flash.
