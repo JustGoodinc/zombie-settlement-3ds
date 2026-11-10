@@ -60,13 +60,13 @@ static void captureScreens() {
     for (int i = 0; i < 12; i++) g_keyName[i] = PC[i];
     g_inputStyle = 0;
     for (int s = 0; s < 3; s++) save_delete(s);
-    G.set.tutorialDone = false; G.set.zoom = 125;
+    G.set.tutorialDone = false; G.set.zoom = 200;
     // ---- front end
     G.scene = SC_TITLE; G.inLevel = false; ui_open(PN_MAIN); step(20);
     cap("01_title_main_menu", "Front end", "Title + Main Menu", "Animated title scene (top). Main menu (bottom): New Game, Continue, Load, Settings, Controls, Credits, Quit on PC. Continue/Load disable when no save exists.");
-    tapC(160, 36); step(6);
+    tapC(31, 108); step(6);   // New Game (left rail)
     cap("02_new_game_slots", "Front end", "New Game: choose a slot", "Three save slots with day/time summary. Start/Delete per slot.");
-    tapC(223, 43); step(6);
+    tapC(289, 36); step(6);   // Start (right rail)
     cap("03_tutorial_offer", "Front end", "Tutorial offer (modal)", "Confirm dialog shown on New Game while the tutorial has never been finished or skipped.");
     tapC(98, 151); step(30);   // Yes
     cap("04_tutorial_step1", "Tutorial", "Tutorial banner: step 1/10", "Top-screen banner: step counter, title, glyph of the control to use, wrapped hint, skip hint. Bottom HUD gains Skip Tutorial.");
@@ -96,13 +96,13 @@ static void captureScreens() {
     cap("15_hud_xbox", "Controls", "HUD footer - Xbox", ""); g_inputStyle = 0;
     ui_open(PN_BASE); step(8);
     cap("16_base_buildings", "Settlement", "Base - Buildings tab", "Building list with mini building art and level; detail card with large art, description, Manage.");
-    tapC(6 + 2 * 77 + 37, 10); step(6);
+    tapC(31, 140); step(6);
     cap("17_base_jobs", "Settlement", "Base - Jobs tab", "Per-survivor job cycling with skill hints; live security score.");
-    tapC(6 + 3 * 77 + 37, 10); step(6);
+    tapC(31, 196); step(6);
     cap("18_base_resources", "Settlement", "Base - Resources tab", "Resources, food forecast, population, security bar, walls, generator/scanner, Journal and Stash shortcuts.");
     for (int t = 0; t < 3; t++) {
         g_buildingSel = t == 0 ? B_WORKSHOP : B_INFIRMARY;
-        ui_open(PN_BUILDING); if (t) { tapC(6 + t * 70 + 33, 10); } step(6);
+        ui_open(PN_BUILDING); if (t) { tapC(31, 36 + t * 72); } step(6);
         static const char* N[3] = {"19_build_tab_build", "20_build_tab_upgrade", "21_build_tab_repair"};
         static const char* T[3] = {"Build menu - Build", "Build menu - Upgrade", "Build menu - Repair"};
         cap(N[t], "Settlement", T[t], "Six facility cards (art, level, damage), detail panel with cost icons (red when unaffordable), perk text, primary action, facility-specific action.");
@@ -111,13 +111,13 @@ static void captureScreens() {
     cap("22_build_quarters", "Settlement", "Living Quarters (sleep/rest)", "Facility actions: Sleep until morning, Rest 2h.");
     ui_open(PN_SURVIVORS); step(6);
     cap("23_survivors", "Survivors", "Survivors - roster", "Roster with portraits, detail with 2x portrait, level/job/trait/status, health and six skill bars, Set Leader/Backpack/Quarantine.");
-    tapC(6 + 77 + 37, 10); step(6);
+    tapC(31, 84); step(6);
     cap("24_survivors_squad", "Survivors", "Survivors - Squad tab", "");
-    G.st.surv[4].alive = false; G.st.surv[4].deathDay = 3; tapC(6 + 3 * 77 + 37, 10); step(6);
+    G.st.surv[4].alive = false; G.st.surv[4].deathDay = 3; tapC(31, 196); step(6);
     cap("25_survivors_status_memorial", "Survivors", "Survivors - Status / memorial", "Deceased survivors stay listed with day of death.");
     G.st.surv[4].alive = true;
     G.st.surv[2].infection = INF_ADVANCED; G.st.surv[2].infKnown = true; G.st.surv[2].hp = 40;
-    ui_open(PN_INFIRMARY); step(4); tapC(58, 22 + 2 * 20 + 9); step(4);
+    ui_open(PN_INFIRMARY); step(4); tapC(110, 45); step(4);
     cap("26_infirmary", "Settlement", "Infirmary - treatment", "Patient list with status colour, portrait, infection progress bar, treat cost, quarantine, examine.");
     G.st.surv[2].infection = INF_NONE; G.st.surv[2].hp = 100;
     ui_open(PN_WORKSHOP); step(6);
@@ -135,22 +135,22 @@ static void captureScreens() {
     cap("30_journal", "Settlement", "Incident journal", "Paged history; colour by kind (info, good, warning, death with skull).");
     ui_open(PN_INVENTORY); step(6);
     cap("31_inventory_grid", "Inventory", "Inventory - grid", "6x4 starter backpack at 24 px cells; equipped badge, stack counts, durability strips; info panel with Use/Equip, Rotate, To Stash/Drop.");
-    tapC(8 + 12, 24 + 12); step(4);
+    tapC(100, 17); step(4);
     cap("32_inventory_selected", "Inventory", "Inventory - item selected", "Selected item: gold frame, stats and actions.");
-    tapC(75 + 26, 10); step(4); cap("33_inventory_equip", "Inventory", "Inventory - Equip tab", "");
-    tapC(130 + 25, 10); step(4); cap("34_inventory_items", "Inventory", "Inventory - Items tab", "");
+    tapC(31, 66); step(4); cap("33_inventory_equip", "Inventory", "Inventory - Equip tab", "");
+    tapC(31, 110); step(4); cap("34_inventory_items", "Inventory", "Inventory - Items tab", "");
     ui_open(PN_PAUSE); step(6);
     cap("35_pause_settlement", "Front end", "Pause - settlement", "Save is only available at the settlement.");
     ui_open(PN_SAVELOAD); step(6);
     cap("36_save_load", "Front end", "Save / Load", "");
     ui_open(PN_WORLDMAP); step(6);
     cap("37_world_map", "Expedition", "World map - Police Station", "Location list with icons, map preview, loot, threat, restock timer, Deploy.");
-    tapC(73, 22 + 24 + 10); step(4);
+    tapC(31, 48); step(4);
     cap("38_world_map_unscouted", "Expedition", "World map - unscouted location", "Unscouted locations are visibly disabled; Deploy greys out.");
-    tapC(73, 22 + 10); step(2); tapC(186, 206); step(6);
+    tapC(31, 16); step(2); tapC(289, 36); step(6);
     G.squad[1] = 4; step(2);
     cap("39_expedition_prep", "Expedition", "Expedition preparation", "Leader picker, equipment summary, companions (max 2), security-while-away warning, Deploy.");
-    tapC(70, 208); step(40);
+    tapC(289, 36); step(40);
     // ---- expedition
     cap("40_police_arrival", "Expedition", "Police Station - arrival", "Parking lot, POLICE sign with strobes, cars, cones, extraction chevrons. Bottom HUD: explored-only minimap, objective, glyph hints.");
     Unit& u = G.u[G.ctrl];
@@ -231,7 +231,7 @@ static const char* SPR_NAMES[S_COUNT] = {
 static const char* TILE_NAMES[TA_COUNT] = {"grass", "asphalt", "parking_line", "dirt", "lino", "wood", "carpet", "concrete", "wall_top", "wall_front",
     "window", "window_broken", "cell_bars", "fence", "extraction", "garden", "palisade", "door_closed", "door_open", "door_locked", "door_broken",
     "cell_door", "gate_closed", "gate_open", "crack_overlay_1", "crack_overlay_2"};
-static const char* POSE_NAMES[P_COUNT] = {"stand", "breathe", "walk_a", "walk_b", "run_a", "run_b", "crouch", "reach", "lean_back", "lean_fwd", "hurt", "fall", "dead", "look"};
+static const char* POSE_NAMES[P_COUNT] = {"stand", "breathe", "walk_a", "walk_b", "run_a", "run_b", "crouch", "reach", "lean_back", "lean_fwd", "hurt", "fall", "dead", "look", "aim"};
 static const char* DIR_NAMES[8] = {"e", "se", "s", "sw", "w", "nw", "n", "ne"};
 static const char* BLD_NAMES[BLD_TYPES] = {"infirmary", "workshop", "storage", "kitchen_garden", "living_quarters", "defenses"};
 
@@ -280,7 +280,7 @@ static int exportAssets() {
         static px buf[256 * 80]; Canvas c; c.init(buf, 256, 80); gfx_clear(c, pal::panel);
         char line[33];
         for (int r = 0; r < 3; r++) { for (int i = 0; i < 32; i++) { int ch = 32 + r * 32 + i; line[i] = (char)(ch > 126 ? ' ' : ch); } line[32] = 0; gfx_text(c, 2, 2 + r * 12, line, pal::cream, 1, false); }
-        gfx_textB(c, 2, 42, "BOLD: Zombie Settlement 0123", pal::cream); gfx_text(c, 2, 56, "Regular with shadow: Scavenge.", pal::cream); gfx_text(c, 2, 68, "x2", pal::gold, 2);
+        gfx_textB(c, 2, 42, "BOLD: Staying Alive 0123", pal::cream); gfx_text(c, 2, 56, "Regular with shadow: Scavenge.", pal::cream); gfx_text(c, 2, 68, "x2", pal::gold, 2);
         snprintf(p, sizeof p, "%s/ui/font_sheet@3x.png", d); writePNGA(p, buf, 256, 80, 3, false); n++;
     }
     {
@@ -315,7 +315,7 @@ static void hexOf(px c, char* out) { snprintf(out, 8, "#%02X%02X%02X", ((c >> 11
 static void writeDocs(int assetCount) {
     char p[512]; snprintf(p, sizeof p, "%s/DESIGN_HANDOFF.md", g_out);
     FILE* m = fopen(p, "w");
-    fprintf(m, "# Zombie Settlement - Design Handoff\n\nVersion 0.1.4. Every image in this package was rendered by the shipping game code (`zs_tool --handoff`), so it matches the build exactly.\n\n");
+    fprintf(m, "# Staying Alive - Design Handoff\n\nVersion 0.1.4. Every image in this package was rendered by the shipping game code (`zs_tool --handoff`), so it matches the build exactly.\n\n");
     fprintf(m, "Open `index.html` for the visual version of this document.\n\n");
     fprintf(m, "## 1. Platform and canvas\n\n| Screen | Size | Role |\n|---|---|---|\n| Top | 400 x 240 | Gameplay world + HUD (3/4 top-down) |\n| Bottom | 320 x 240 | Touch menus, inventory, maps |\n\n");
     fprintf(m, "- PC shows both screens stacked (8 px gap, bottom centred), integer-scaled, mouse = stylus.\n- Pixel art is 1:1 on device; nearest-neighbour scaling only. Camera zoom (100/125/150/200%%, default 125%%) scales the world layer only; HUD and text render after scaling at native resolution.\n- Screenshots in `screens/` are composites at 2x; `screens/native/` has each screen at 1x.\n\n");
@@ -344,14 +344,14 @@ static void writeDocs(int assetCount) {
     // index.html: same content, visual
     snprintf(p, sizeof p, "%s/index.html", g_out);
     FILE* h = fopen(p, "w");
-    fprintf(h, "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Zombie Settlement - Design Handoff</title><style>"
+    fprintf(h, "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Staying Alive - Design Handoff</title><style>"
                "body{margin:0;background:#141416;color:#e2d8c4;font:15px/1.5 system-ui,sans-serif}main{max-width:1180px;margin:0 auto;padding:32px}"
                "h1{color:#e8c040;font-size:28px;margin:0 0 4px}h2{border-bottom:1px solid #5c5c64;padding-bottom:6px;margin-top:40px;color:#e8c040}h3{color:#b9b09f;margin-top:28px}"
                "img{image-rendering:pixelated}code{background:#26262b;padding:1px 5px;border-radius:3px}table{border-collapse:collapse}td,th{border:1px solid #3a3a40;padding:4px 10px;text-align:left}"
                ".sw{display:inline-block;width:28px;height:18px;vertical-align:middle;border:1px solid #000;margin-right:8px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:22px}"
                ".card{background:#1e1e22;border:1px solid #3a3a40;border-radius:6px;padding:10px}.card img{width:100%%;display:block;border-radius:3px}.card b{display:block;margin-top:8px;color:#e8c040}.card p{margin:4px 0 0;color:#b9b09f;font-size:13px}"
                ".big{max-width:100%%;border:1px solid #3a3a40}</style></head><body><main>");
-    fprintf(h, "<h1>Zombie Settlement - Design Handoff</h1><p>Version 0.1.4 &middot; Windows + Nintendo 3DS &middot; %d screens &middot; %d asset files. Every image was rendered by the shipping game code.</p>", g_nshots, assetCount);
+    fprintf(h, "<h1>Staying Alive - Design Handoff</h1><p>Version 0.1.4 &middot; Windows + Nintendo 3DS &middot; %d screens &middot; %d asset files. Every image was rendered by the shipping game code.</p>", g_nshots, assetCount);
     fprintf(h, "<h2>Platform</h2><table><tr><th>Screen</th><th>Size</th><th>Role</th></tr><tr><td>Top</td><td>400&times;240</td><td>Gameplay world + HUD</td></tr><tr><td>Bottom</td><td>320&times;240</td><td>Touch menus, inventory, maps</td></tr></table>"
                "<p>Pixel art 1:1 on device, nearest-neighbour only. Camera zoom 100/125/150/200%% (default 125%%) scales the world layer; HUD and text stay native.</p>");
     fprintf(h, "<h2>Colour</h2><p>RGB565 on device; hex values are the exact rendered colours.</p><table><tr><th>Token</th><th>Hex</th><th>Use</th></tr>");

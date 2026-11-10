@@ -129,7 +129,7 @@ static bool readFile(const char* p, uint8_t** data, int* len) {
 }
 
 static bool validate(const uint8_t* d, int n, int& payload, char* err, int el) {
-    if (n < 14 || memcmp(d, "ZSAV", 4) != 0) { snprintf(err, el, "Not a Zombie Settlement save"); return false; }
+    if (n < 14 || memcmp(d, "ZSAV", 4) != 0) { snprintf(err, el, "Not a Staying Alive save"); return false; }
     int ver = d[4] | (d[5] << 8);
     if (ver != SAVE_VERSION) { snprintf(err, el, "Unsupported save version %d", ver); return false; }
     payload = d[6] | (d[7] << 8) | (d[8] << 16) | (d[9] << 24);
@@ -206,7 +206,7 @@ bool save_info(int slot, char* out, int len) {
 void settings_load() {
     char p[256]; snprintf(p, sizeof p, "%ssettings.ini", g_dir);
     FILE* f = fopen(p, "r"); if (!f) return;
-    int a, b, c, d, e, s, fps, fs, slot, zoom = 125, tut = 0;
+    int a, b, c, d, e, s, fps, fs, slot, zoom = 200, tut = 0;
     int n = fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d", &a, &b, &c, &d, &e, &s, &fps, &fs, &slot, &zoom, &tut);
     if (n >= 9) {   // older files have 9 fields; zoom + tutorial flag were added later
         Settings& st = G.set;
@@ -214,7 +214,7 @@ void settings_load() {
         st.master = cl(a, 0, 10); st.sfx = cl(b, 0, 10); st.music = cl(c, 0, 10);
         st.dayMinutes = (d == 15 || d == 30 || d == 60) ? (uint8_t)d : 30; st.winScale = cl(e, 1, 3);
         st.shake = s != 0; st.showFps = fps != 0; st.fullscreen = fs != 0; G.saveSlot = slot >= 0 && slot < 3 ? slot : 0;
-        st.zoom = (zoom == 100 || zoom == 125 || zoom == 150 || zoom == 200) ? (uint8_t)zoom : 125;
+        st.zoom = (zoom == 100 || zoom == 125 || zoom == 150 || zoom == 200) ? (uint8_t)zoom : 200;
         st.tutorialDone = n >= 11 && tut != 0;
     }
     fclose(f);

@@ -49,7 +49,7 @@ static void loadBindings() {
     if (!f) {
         f = fopen(p, "w");
         if (f) {
-            fputs("# Zombie Settlement key bindings. Format: BUTTON=KEY[,KEY]. Keys: letters, SPACE, SHIFT, CTRL, ENTER, ESC, TAB, BACKSPACE, arrows.\n"
+            fputs("# Staying Alive key bindings. Format: BUTTON=KEY[,KEY]. Keys: letters, SPACE, SHIFT, CTRL, ENTER, ESC, TAB, BACKSPACE, arrows.\n"
                   "MOVE_UP=W\nMOVE_DOWN=S\nMOVE_LEFT=A\nMOVE_RIGHT=D\nA=E,K\nB=SHIFT,BACKSPACE\nX=R\nY=SPACE,J\nL=Q\nR=F\nSTART=ESC,ENTER\nSELECT=TAB,I\n"
                   "UP=UP\nDOWN=DOWN\nLEFT=LEFT\nRIGHT=RIGHT\n", f);
             fclose(f);
@@ -220,14 +220,14 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int) {
         "Sprint (hold B) / Dodge (tap B): Shift\nLock facing (L): Q   Flashlight (R): F\nWeapons: Left/Right  Heal: Up  Squad: Down\n"
         "Inventory (Select): Tab or I   Pause (Start): Esc\nTouchscreen: click the bottom screen\nGamepad: stick, A/B, X=Fire, Y=Reload\nF11 fullscreen  F12 screenshot  controls.ini rebinds";
 
-    WNDCLASSA wc = {}; wc.lpfnWndProc = wndProc; wc.hInstance = inst; wc.lpszClassName = "ZombieSettlement";
+    WNDCLASSA wc = {}; wc.lpfnWndProc = wndProc; wc.hInstance = inst; wc.lpszClassName = "StayingAlive";
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW); wc.hIcon = LoadIcon(inst, MAKEINTRESOURCE(1));
     RegisterClassA(&wc);
     game_init();
     settings_load();
     RECT r = {0, 0, FB_W * G.set.winScale, FB_H * G.set.winScale};
     AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, FALSE);
-    hwnd = CreateWindowA("ZombieSettlement", "Zombie Settlement", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, nullptr, nullptr, inst, nullptr);
+    hwnd = CreateWindowA("StayingAlive", "Staying Alive", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, nullptr, nullptr, inst, nullptr);
     layout();
     HMODULE xi = LoadLibraryA("xinput1_4.dll"); if (!xi) xi = LoadLibraryA("xinput9_1_0.dll");
     if (xi) xget = (XGetState)GetProcAddress(xi, "XInputGetState");

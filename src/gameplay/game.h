@@ -122,7 +122,7 @@ struct Settings {
     bool shake = true, showFps = false;
     uint8_t winScale = 2;                     // Windows window scale
     bool fullscreen = false;
-    uint8_t zoom = 125;                       // camera zoom percent: 100 / 125 / 150 / 200
+    uint8_t zoom = 200;                       // camera zoom percent: 100 / 125 / 150 / 200 (200 = Try 2 framing)
     bool tutorialDone = false;
 };
 

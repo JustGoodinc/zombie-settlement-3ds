@@ -208,6 +208,9 @@ px pal_char(char ch) {
     case 'Y': return rgb(160, 128, 32);  case 'z': return rgb(122, 150, 106);
     case 'Z': return rgb(74, 106, 74);   case 'h': return rgb(58, 42, 26);
     case 'c': return rgb(80, 160, 192);  case 'G': return rgb(154, 228, 64);
+    case 'H': return rgb(96, 74, 50);    case 'M': return rgb(150, 116, 80);
+    case 'u': return rgb(240, 200, 160); case 'x': return rgb(46, 34, 30);
+    case 'i': return rgb(228, 138, 118);
     default: return KEYC;
     }
 }

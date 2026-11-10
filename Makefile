@@ -31,13 +31,13 @@ include $(DEVKITARM)/3ds_rules
 #     - icon.png
 #     - <libctru folder>/default_icon.png
 #---------------------------------------------------------------------------------
-TARGET		:=	ZombieSettlement
+TARGET		:=	StayingAlive
 BUILD		:=	build3ds
 SOURCES		:=	src/core src/gameplay src/world src/settlement src/ui src/platform/n3ds
 DATA		:=
 INCLUDES	:=	src
 GRAPHICS	:=
-APP_TITLE	:=	Zombie Settlement
+APP_TITLE	:=	Staying Alive
 APP_DESCRIPTION	:=	Scavenge. Survive. Rebuild.
 APP_AUTHOR	:=	JustGoodinc
 ICON		:=	assets/icons/icon.png

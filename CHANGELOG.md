@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Staying Alive: new characters, weapons and thumb rails everywhere
+- The game is now called **Staying Alive** (title screen, window, 3DS banner/HOME menu name, release file names). Saves stay where they were, and the 3DS title ID is unchanged so the CIA installs over the old one.
+- Characters redrawn to match the Try 2 mockup: chibi heads with 2x2 eyes, glints, brows, blush and jagged bangs; caps with brims and badges; collars, belts and shoes. Side view is now a 3/4 view like the mockup.
+- Animation is built from hand-drawn parts (head, torso/arms, legs): real walk and run cycles with arm swing and steps, a new aim pose with the arm extended, crouch/reach with bent legs.
+- Zombies: pale and balding with dark eyes, a gaping bloody mouth, blood on the scalp and torn, bloodied clothes; they reach forward when seen side-on.
+- Weapons are pixel-art sprites held in the hand (pistol, revolver, SMG, shotgun, rifle, knife, bat, crowbar, machete) with a big starburst muzzle flash.
+- Default camera zoom is now 200% (the mockup framing). Saved settings keep their zoom; change it in Settings.
+- Every menu uses thumb rails: tabs on the left edge, actions on the right edge with Back at the bottom, content in the middle. Includes the desk/crate/stash screen (Take All / Take / Store on the left, Inspect or Donate / Rotate / Back on the right). D-Pad / Circle Pad: push off either side of a backpack grid to reach that rail; up from the grid reaches the loot slots.
+
 ## v0.1.4 — menu controls and thumb layout
 - D-Pad and Circle Pad both move through every paused menu; holding either repeats.
 - Backpack and container grids: D-Pad / Circle Pad move the cursor (fixed: the D-Pad was being swallowed there), A picks up / places, Y rotates, X uses. Push right past the bag to reach the action buttons; Left or B goes back to the grid.

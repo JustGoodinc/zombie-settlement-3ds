@@ -15,7 +15,7 @@ set CORE=src\core\*.cpp src\gameplay\*.cpp src\world\*.cpp src\settlement\*.cpp 
 cl %FLAGS% /c %CORE% /Fobuild\obj\ || exit /b 1
 lib /nologo /OUT:build\zs_core.lib build\obj\*.obj || exit /b 1
 rc /nologo /fo build\app.res src\platform\windows\app.rc || exit /b 1
-cl %FLAGS% src\platform\windows\main_win.cpp build\app.res build\zs_core.lib winmm.lib user32.lib gdi32.lib shell32.lib /Fobuild\ /Febuild\ZombieSettlement.exe /link /SUBSYSTEM:WINDOWS || exit /b 1
+cl %FLAGS% src\platform\windows\main_win.cpp build\app.res build\zs_core.lib winmm.lib user32.lib gdi32.lib shell32.lib /Fobuild\ /Febuild\StayingAlive.exe /link /SUBSYSTEM:WINDOWS || exit /b 1
 cl %FLAGS% tests\tests.cpp build\zs_core.lib /Fobuild\ /Febuild\zs_tests.exe || exit /b 1
 cl %FLAGS% tools\zs_tool.cpp build\zs_core.lib /Fobuild\ /Febuild\zs_tool.exe || exit /b 1
 echo BUILD OK

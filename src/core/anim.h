@@ -17,7 +17,7 @@ enum class AnimState : uint8_t {
 // each of 5 stored directions (S, SE, E, NE, N; west-facing ones are mirrored).
 enum Pose : uint8_t {
     P_STAND, P_BREATHE, P_WALK_A, P_WALK_B, P_RUN_A, P_RUN_B, P_CROUCH, P_REACH,
-    P_LEAN_BACK, P_LEAN_FWD, P_HURT, P_FALL, P_DEAD, P_LOOK, P_COUNT
+    P_LEAN_BACK, P_LEAN_FWD, P_HURT, P_FALL, P_DEAD, P_LOOK, P_AIM, P_COUNT
 };
 
 enum AnimEvent : uint8_t {

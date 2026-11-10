@@ -102,31 +102,54 @@ static void drawChar(Canvas& c, bool zombie, int variant, float x, float y, uint
     int sx = (int)(x + fx * f.kick) - camX - s.w / 2, sy = (int)(y + fy * f.kick * 0.5f + f.bob) - camY - s.h + 2;
     if (shadow && f.pose != P_DEAD) { gfx_fillA(c, (int)x - camX - 6, (int)y - camY - 1, 12, 3, rgb(0, 0, 0), 120); gfx_fillA(c, (int)x - camX - 4, (int)y - camY - 2, 8, 5, rgb(0, 0, 0), 60); }
     // weapon: drawn behind the body when facing away from the camera
+    // weapon: a pixel-art sprite in the hand. Orientation 0 right, 1 down, 2 left, 3 up.
+    static const int VMAP[8] = {2, 1, 0, 1, 2, 3, 4, 3};
+    int sd = VMAP[dir & 7];
+    bool aiming = f.pose == P_AIM, crouched = f.pose == P_CROUCH || f.pose == P_REACH;
+    int hx, hy, orient, behind = 0;
+    if (sd == 2) {          // side
+        hx = aiming ? 15 : (f.pose == P_WALK_A || f.pose == P_RUN_A || f.pose == P_REACH ? 15 : (f.pose == P_WALK_B || f.pose == P_RUN_B ? 12 : 13)); hy = aiming ? 16 : 18;
+        orient = 0;
+    } else if (sd <= 1) {   // facing the camera
+        if (aiming && sd == 1) { hx = 12; hy = 17; orient = 0; }
+        else { hx = aiming ? 8 : 13; hy = aiming ? 18 : (f.pose == P_WALK_A ? 17 : 18); orient = 1; }
+    } else {                // facing away
+        if (aiming) { hx = sd == 3 ? 12 : 8; hy = 16; orient = sd == 3 ? 0 : 3; behind = 1; }
+        else { hx = 13; hy = 18; orient = 1; }
+    }
+    if (crouched) hy += 2;
+    if (a.state == AnimState::Melee) { orient = a.frame == 0 ? 3 : (a.frame == 1 ? (sd == 2 || sd == 1 ? 0 : (sd == 0 ? 1 : 3)) : 1); behind = sd >= 3 && a.frame != 2; }
+    if (a.state == AnimState::Reload) orient = 1;
+    if (flip) { hx = 15 - hx; if (orient == 0) orient = 2; }
     auto weapon = [&]() {
-        if (weaponId <= 0 || f.pose == P_DEAD || f.pose == P_FALL) return;
-        const ItemDef& d = idef(weaponId);
-        int hx = sx + 8 + (int)(fx * 3), hy = sy + 15 + (int)(fy * 2);
-        float len = d.cat == IC_FIREARM ? (d.w >= 4 ? 10.0f : (d.w == 3 ? 8.0f : 6.0f)) : (d.w >= 3 ? 9.0f : 6.0f);
-        float ax = fx, ay = fy;
-        if (a.state == AnimState::Melee) {   // swing arc: anticipation -> strike
-            float ang = atan2f(fy, fx) + (a.frame == 0 ? -1.2f : (a.frame == 1 ? 0.0f : 0.7f));
-            ax = cosf(ang); ay = sinf(ang);
+        if (weaponId <= 0 || weaponId >= 40 || !g_held[weaponId].d || f.pose == P_DEAD || f.pose == P_FALL || zombie) return;
+        const Sprite& w = g_held[weaponId];
+        int gx = g_heldGrip[weaponId][0], gy = g_heldGrip[weaponId][1], ox = sx + hx, oy = sy + hy;
+        auto map = [&](int x, int y, int& X, int& Y) {
+            int dx = x - gx, dy = y - gy;
+            switch (orient) { case 0: X = dx; Y = dy; break; case 2: X = -dx; Y = dy; break; case 1: X = -dy; Y = dx; break; default: X = dy; Y = -dx; break; }
+            X += ox; Y += oy;
+        };
+        for (int y = 0; y < w.h; y++) for (int x = 0; x < w.w; x++) {
+            px v = w.d[y * w.w + x]; if (v == KEYC) continue;
+            int X, Y; map(x, y, X, Y); gfx_pset(c, X, Y, v);
         }
-        if (a.state == AnimState::Reload) { ax = fx * 0.5f; ay = 0.8f; }
-        px col = d.cat == IC_FIREARM ? rgb(40, 40, 46) : (weaponId == IT_BAT ? rgb(150, 120, 80) : rgb(150, 150, 156));
-        gfx_line(c, hx, hy, hx + (int)(ax * len), hy + (int)(ay * len), col);
-        gfx_line(c, hx + 1, hy, hx + 1 + (int)(ax * len), hy + (int)(ay * len), gfx_scale(col, 160));
-        if (muzzle > 0 && d.cat == IC_FIREARM) {
-            int mx = hx + (int)(ax * (len + 3)), my = hy + (int)(ay * (len + 3));
-            gfx_fill(c, mx - 1, my - 1, 3, 3, rgb(255, 230, 140));
-            gfx_pset(c, mx + (int)(ax * 3), my + (int)(ay * 3), rgb(255, 200, 80));
-            gfx_pset(c, mx - (int)(ay * 2), my + (int)(ax * 2), rgb(255, 200, 80));
-            gfx_pset(c, mx + (int)(ay * 2), my - (int)(ax * 2), rgb(255, 200, 80));
+        if (muzzle > 0 && idef(weaponId).cat == IC_FIREARM) {   // starburst flash like Try 2
+            int mx, my; map(g_heldMuzzle[weaponId][0] + 1, g_heldMuzzle[weaponId][1], mx, my);
+            int fxd = orient == 0 ? 1 : orient == 2 ? -1 : 0, fyd = orient == 1 ? 1 : orient == 3 ? -1 : 0;
+            mx += fxd * 2; my += fyd * 2;   // flash starts past the barrel tip
+            px core = rgb(255, 250, 220), mid = rgb(255, 214, 90), outer = rgb(240, 140, 40);
+            for (int k = 1; k <= 9; k++) { px col = k < 4 ? core : (k < 7 ? mid : outer); gfx_pset(c, mx + fxd * k, my + fyd * k, col); if (k < 6) { gfx_pset(c, mx + fxd * k + fyd, my + fyd * k + fxd, k < 3 ? core : mid); gfx_pset(c, mx + fxd * k - fyd, my + fyd * k - fxd, k < 3 ? core : mid); } }   // forward cone
+            for (int k = 2; k <= 4; k++) {
+                gfx_pset(c, mx + fyd * k, my + fxd * k, k == 1 ? mid : outer); gfx_pset(c, mx - fyd * k, my - fxd * k, k == 1 ? mid : outer);   // side rays
+                gfx_pset(c, mx + (fxd + fyd) * k, my + (fyd + fxd) * k, outer); gfx_pset(c, mx + (fxd - fyd) * k, my + (fyd - fxd) * k, outer);   // diagonals
+            }
+            gfx_fill(c, mx - 1, my - 2, 3, 5, mid); gfx_fill(c, mx - 2, my - 1, 5, 3, mid); gfx_fill(c, mx - 1, my - 1, 3, 3, core);
         }
     };
-    if (fy < -0.3f) weapon();
+    if (behind) weapon();
     gfx_blitEx(c, s, sx, sy, flip, 256, rgb(255, 250, 240), flash > 0 ? 170 : 0);
-    if (fy >= -0.3f) weapon();
+    if (!behind) weapon();
 }
 
 struct DrawItem { int16_t y; uint8_t kind; uint8_t idx; };
@@ -478,11 +501,10 @@ void render_title(Canvas& c) {
         float dx = x - 200.0f, dy = y - 150.0f, ang = atan2f(dx, dy);
         if (fabsf(ang - a) < 0.25f) gfx_fillA(c, x, y, 2, 2, rgb(255, 240, 200), 40);
     }
-    gfx_text(c, 52 + 3, 40 + 3, "ZOMBIE", rgb(80, 10, 10), 5, false);
-    gfx_text(c, 52, 40, "ZOMBIE", pal::cream, 5, false);
-    gfx_text(c, 34 + 2, 88 + 2, "SETTLEMENT", rgb(80, 10, 10), 3, false);
-    gfx_text(c, 34, 88, "SETTLEMENT", pal::red, 3, false);
-    gfx_textC(c, 200, 124, "Scavenge. Survive. Rebuild.", pal::dim);
+    { int w1 = gfx_textW("STAYING", 4), w2 = gfx_textW("ALIVE", 6);
+      gfx_text(c, 200 - w1 / 2 + 3, 34 + 3, "STAYING", rgb(80, 10, 10), 4, false); gfx_text(c, 200 - w1 / 2, 34, "STAYING", pal::cream, 4, false);
+      gfx_text(c, 200 - w2 / 2 + 3, 72 + 3, "ALIVE", rgb(80, 10, 10), 6, false); gfx_text(c, 200 - w2 / 2, 72, "ALIVE", pal::red, 6, false); }
+    gfx_textC(c, 200, 128, "Scavenge. Survive. Rebuild.", pal::dim);
 }
 
 extern int g_animTestState, g_animTestVariant; extern bool g_animTestZombie; extern float g_animTestSpeed;

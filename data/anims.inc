@@ -3,10 +3,10 @@
 // Keep in sync with docs/ANIMATION_BIBLE.md.
 //  state                 loop  prio intr  next               frames
 {AnimState::Idle,         true,  0, true,  AnimState::Idle,   6, {{P_STAND,90,0,0,0},{P_BREATHE,70,0,0,0},{P_STAND,90,0,0,0},{P_BREATHE,70,0,0,0},{P_STAND,80,0,0,0},{P_LOOK,60,0,0,0}}},
-{AnimState::Walk,         true,  1, true,  AnimState::Walk,   4, {{P_WALK_A,14,0,0,EV_FOOTSTEP},{P_STAND,10,0,0,0},{P_WALK_B,14,0,0,EV_FOOTSTEP},{P_STAND,10,0,0,0}}},
+{AnimState::Walk,         true,  1, true,  AnimState::Walk,   4, {{P_WALK_A,14,0,0,EV_FOOTSTEP},{P_STAND,10,0,-1,0},{P_WALK_B,14,0,0,EV_FOOTSTEP},{P_STAND,10,0,-1,0}}},
 {AnimState::Run,          true,  1, true,  AnimState::Run,    4, {{P_RUN_A,10,1,0,EV_FOOTSTEP},{P_LEAN_FWD,6,1,-1,0},{P_RUN_B,10,1,0,EV_FOOTSTEP},{P_LEAN_FWD,6,1,-1,0}}},
-{AnimState::Aim,          true,  1, true,  AnimState::Aim,    1, {{P_STAND,50,0,0,0}}},
-{AnimState::Shoot,        false, 3, true,  AnimState::Aim,    3, {{P_LEAN_BACK,4,-2,0,EV_MUZZLE},{P_LEAN_BACK,5,-1,0,0},{P_STAND,8,0,0,EV_DONE}}},
+{AnimState::Aim,          true,  1, true,  AnimState::Aim,    1, {{P_AIM,50,0,0,0}}},
+{AnimState::Shoot,        false, 3, true,  AnimState::Aim,    3, {{P_AIM,4,-2,0,EV_MUZZLE},{P_AIM,5,-1,0,0},{P_AIM,8,0,0,EV_DONE}}},
 {AnimState::Reload,       false, 4, true,  AnimState::Idle,   4, {{P_CROUCH,20,0,0,0},{P_REACH,30,0,0,EV_RELOAD},{P_CROUCH,30,0,0,0},{P_REACH,20,0,0,EV_RELOAD|EV_DONE}}},
 {AnimState::Melee,        false, 5, false, AnimState::Idle,   4, {{P_LEAN_BACK,10,-1,0,0},{P_LEAN_FWD,6,2,0,EV_SWING},{P_LEAN_FWD,8,2,0,EV_IMPACT},{P_STAND,12,0,0,EV_DONE}}},
 {AnimState::Dodge,        false, 6, false, AnimState::Idle,   3, {{P_CROUCH,6,1,1,0},{P_RUN_A,10,2,-1,EV_FOOTSTEP},{P_CROUCH,8,1,1,EV_DONE}}},

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ZombieSettlement CXX)
+project(StayingAlive CXX)
 if(WIN32)
     enable_language(RC)
 endif()
@@ -16,8 +16,8 @@ if(MSVC)
 endif()
 
 if(WIN32)
-    add_executable(ZombieSettlement WIN32 src/platform/windows/main_win.cpp src/platform/windows/app.rc)
-    target_link_libraries(ZombieSettlement zs_core winmm user32 gdi32 shell32)
+    add_executable(StayingAlive WIN32 src/platform/windows/main_win.cpp src/platform/windows/app.rc)
+    target_link_libraries(StayingAlive zs_core winmm user32 gdi32 shell32)
 endif()
 
 add_executable(zs_tests tests/tests.cpp)

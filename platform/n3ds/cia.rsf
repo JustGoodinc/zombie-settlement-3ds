@@ -2,7 +2,7 @@
 # Based on the hardware-proven template from mtheall/ftpd (meta/ftpd-cia.rsf); only identity fields changed.
 # v0.1.1 used a hand-written spec with an invalid CpuSpeed (268MHz) and no MemoryType, and Luma's loader rejected it.
 BasicInfo:
-  Title                   : "ZombieSettlement"
+  Title                   : "StayingAlive"
   ProductCode             : "CTR-H-ZSET"
   Logo                    : Homebrew # Nintendo / Licensed / Distributed / iQue / iQueForSystem
 

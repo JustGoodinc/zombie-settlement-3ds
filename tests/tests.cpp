@@ -465,7 +465,7 @@ static void testTutorialZoom() {
     CHECK(G.set.zoom == 150 && G.set.tutorialDone);
     FILE* f = fopen("test_saves/settings.ini", "w"); fputs("8 8 6 30 2 1 0 0 0\n", f); fclose(f);   // old 9-field file
     settings_load();
-    CHECK(G.set.zoom == 125 && !G.set.tutorialDone);
+    CHECK(G.set.zoom == 200 && !G.set.tutorialDone);
     G.set.zoom = 125;
 }
 static void press(uint32_t b) { Input i; i.down = b; i.held = b; frames(1, i); frames(1); }

@@ -42,6 +42,39 @@ static void shot(const char* dir, const char* name) {
     printf("  wrote %s\n", p);
 }
 
+// art review: the Try 2 style-guide lineup (3 survivors + 3 zombies facing the camera) and every
+// direction's walk cycle + aim, at 4x, for side-by-side comparison with the mockup
+static void lineup(const char* path) {
+    const int S = 4, W = 8 * 20 * S, H = 4 * 28 * S;
+    px* img = (px*)malloc(W * H * sizeof(px)); for (int i = 0; i < W * H; i++) img[i] = rgb(66, 64, 66);
+    Canvas c; c.init(img, W, H);
+    const int SV[3] = {2, 1, 3}; bool f;
+    for (int i = 0; i < 3; i++) gfx_blit(c, art_char(false, SV[i], 2, P_STAND, f), (1 + i) * 20 * S, 2 * S, S, f);
+    for (int i = 0; i < 3; i++) gfx_blit(c, art_char(true, i, 2, P_STAND, f), (4 + i) * 20 * S, 2 * S, S, f);
+    const int D[3] = {2, 0, 6}; const Pose PS[6] = {P_STAND, P_WALK_A, P_STAND, P_WALK_B, P_AIM, P_RUN_A};
+    for (int r = 0; r < 3; r++) for (int k = 0; k < 6; k++) gfx_blit(c, art_char(false, 0, D[r], PS[k], f), (1 + k) * 20 * S, (1 + r) * 28 * S + 2 * S, S, f);
+    gfx_writePNG(path, img, W, H); free(img);
+    printf("lineup written to %s\n", path);
+}
+// the Try 2 "Exploration & Combat" panel restaged: leader facing east firing at zombies (top screen, 200% zoom)
+static void duel(const char* path) {
+    game_newGame(); G.set.tutorialDone = true; G.set.zoom = 200;
+    G.squad[0] = 0; G.squad[1] = -1; G.squad[2] = -1; G.st.surv[0].onExpedition = true;
+    level_leave(); level_enter(MAP_POLICE, 0); ui_open(PN_HUD); step(10);
+    Unit& u = G.u[G.ctrl];
+    G.nz = 0;
+    for (int k = 0; k < 2; k++) {
+        Zombie& z = G.z[G.nz++]; memset(&z, 0, sizeof z);
+        z.x = z.px = u.x + 70 + k * 6; z.y = z.py = u.y - 14 + k * 30; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 0.01f; z.variant = (uint8_t)k; z.hx = -1;
+        z.anim = Animator(); z.anim.play(AnimState::ZWalk, true);
+    }
+    u.fx = 1; u.fy = 0; u.dir = 0;
+    Survivor& s = G.st.surv[u.sv]; if (s.equip >= 0) { s.pack.it[s.equip].mag = 12; s.pack.it[s.equip].dur = 300; }
+    Input y; y.down = BTN_Y; y.held = BTN_Y; step(1, y);
+    gfx_writePNG(path, topB, TOP_W, TOP_H);
+    printf("duel written to %s\n", path);
+}
+
 static void gallery(const char* dir) {
     // characters: rows = variant x direction, columns = poses (2x scale)
     {
@@ -210,8 +243,8 @@ static void icons(const char* dir) {
     for (int y = 0; y < 128; y++) for (int x = 0; x < 256; x++) bn[y * 256 + x] = gfx_mix(rgb(14, 16, 26), rgb(46, 36, 36), y * 2);
     for (int x = 0; x < 256; x += 16) gfx_blit(b, g_tile[TA_WALL_FRONT][(x / 16) & 3], x, 96), gfx_blit(b, g_tile[TA_ASPHALT][(x / 16) & 3], x, 112);
     for (int i = 0; i < 5; i++) gfx_blit(b, art_char(true, i % 4, 2, P_STAND, f), 20 + i * 48, 92, 1);
-    gfx_text(b, 16 + 2, 18 + 2, "ZOMBIE", rgb(80, 10, 10), 4, false); gfx_text(b, 16, 18, "ZOMBIE", pal::cream, 4, false);
-    gfx_text(b, 18 + 2, 56 + 2, "SETTLEMENT", rgb(80, 10, 10), 2, false); gfx_text(b, 18, 56, "SETTLEMENT", pal::red, 2, false);
+    gfx_text(b, 128 - gfx_textW("STAYING", 4) / 2 + 2, 14 + 2, "STAYING", rgb(80, 10, 10), 4, false); gfx_text(b, 128 - gfx_textW("STAYING", 4) / 2, 14, "STAYING", pal::cream, 4, false);
+    gfx_text(b, 128 - gfx_textW("ALIVE", 5) / 2 + 2, 48 + 2, "ALIVE", rgb(80, 10, 10), 5, false); gfx_text(b, 128 - gfx_textW("ALIVE", 5) / 2, 48, "ALIVE", pal::red, 5, false);
     snprintf(p, sizeof p, "%s/banner.png", dir); gfx_writePNG(p, bn, 256, 128);
     // Windows .ico containing the PNG (Vista+ format)
     snprintf(p, sizeof p, "%s/icon.png", dir);
@@ -249,6 +282,8 @@ int main(int argc, char** argv) {
     else if (argc >= 2 && !strcmp(argv[1], "--bench")) bench();
     else if (argc >= 3 && !strcmp(argv[1], "--icons")) icons(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--handoff")) handoff(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "--lineup")) lineup(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "--duel")) duel(argv[2]);
     else { printf("usage: zs_tool --gallery DIR | --shots DIR | --bench | --icons DIR\n"); return 1; }
     return 0;
 }

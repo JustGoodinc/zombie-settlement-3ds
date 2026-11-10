@@ -1,4 +1,4 @@
-# Zombie Settlement
+# Staying Alive (formerly Zombie Settlement)
 
 A top-down pixel-art zombie survival and settlement-management game for **Windows PC** and **Nintendo 3DS**, built from one shared C++17 codebase.
 
