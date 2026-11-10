@@ -11,12 +11,12 @@ Requires a homebrew-capable Nintendo 3DS with FBI installed (custom firmware). I
 6. Wait for the CIA to download and install.
 7. Return to the HOME Menu and launch **Zombie Settlement**.
 
-The QR encodes the direct GitHub Release asset URL of `ZombieSettlement-3DS.cia`. GitHub serves release assets through an HTTPS redirect to its CDN. FBI follows redirects, but older FBI builds can fail on modern TLS. If the scan fails:
+The QR encodes the direct GitHub Release asset URL of `StayingAlive-3DS.cia`. GitHub serves release assets through an HTTPS redirect to its CDN. FBI follows redirects, but older FBI builds can fail on modern TLS. If the scan fails:
 
 - **Manual install:** copy the `.cia` to the SD card, then in FBI go to SD → select the file → Install CIA.
-- **Homebrew Launcher:** copy `ZombieSettlement-3DS.3dsx` to `sdmc:/3ds/`.
+- **Homebrew Launcher:** copy `StayingAlive-3DS.3dsx` to `sdmc:/3ds/`.
 
-## Status (v0.1.4)
-![FBI QR](ZombieSettlement-FBI-QR.png)
+## Status (v0.2.0)
+![FBI QR](StayingAlive-FBI-QR.png)
 
-The QR encodes `https://github.com/JustGoodinc/zombie-settlement-3ds/releases/download/v0.1.4/ZombieSettlement-3DS.cia`. The release workflow downloaded that public URL and confirmed it is byte-identical to the uploaded CIA before generating the code, and a separate local check confirmed 302 → 200, 408 512 bytes. **A QR installation on real hardware has not been verified yet.**
+The QR encodes `https://github.com/JustGoodinc/zombie-settlement-3ds/releases/download/v0.2.0/StayingAlive-3DS.cia`. The release workflow downloaded that public URL and confirmed it is byte-identical to the uploaded CIA before generating the code, and a separate local check confirmed 302 → 200, 433 600 bytes. **A QR installation on real hardware has not been verified yet.**

@@ -17,16 +17,16 @@ Early playable vertical slice (v0.1). See [docs/DEVELOPMENT_ROADMAP.md](docs/DEV
 
 | Platform | File | How |
 |---|---|---|
-| Windows 10/11 x64 | `ZombieSettlement-Windows.zip` | Unzip anywhere, run `ZombieSettlement.exe`. No installer or runtime needed. |
-| 3DS (Homebrew Launcher) | `ZombieSettlement-3DS.3dsx` | Copy to `sdmc:/3ds/`. |
-| 3DS (HOME Menu) | `ZombieSettlement-3DS.cia` | Install with FBI. See [docs/FBI_INSTALLATION.md](docs/FBI_INSTALLATION.md). |
+| Windows 10/11 x64 | `StayingAlive-Windows.zip` | Unzip anywhere, run `StayingAlive.exe`. No installer or runtime needed. |
+| 3DS (Homebrew Launcher) | `StayingAlive-3DS.3dsx` | Copy to `sdmc:/3ds/`. |
+| 3DS (HOME Menu) | `StayingAlive-3DS.cia` | Install with FBI. See [docs/FBI_INSTALLATION.md](docs/FBI_INSTALLATION.md). |
 
-### FBI QR install (v0.1.4)
+### FBI QR install (v0.2.0)
 
-<img src="docs/ZombieSettlement-FBI-QR.png" width="200" alt="FBI QR code for ZombieSettlement-3DS.cia">
+<img src="docs/StayingAlive-FBI-QR.png" width="200" alt="FBI QR code for StayingAlive-3DS.cia">
 
 On a homebrew-capable 3DS: **FBI → Remote Install → Scan QR Code**, scan this code, confirm, then launch from the HOME Menu.
-The code points directly at [`ZombieSettlement-3DS.cia`](https://github.com/JustGoodinc/zombie-settlement-3ds/releases/download/v0.1.4/ZombieSettlement-3DS.cia) (v0.1.4 release asset, 408 512 bytes). Not yet tested on a real 3DS. Details and fallbacks: [docs/FBI_INSTALLATION.md](docs/FBI_INSTALLATION.md).
+The code points directly at [`StayingAlive-3DS.cia`](https://github.com/JustGoodinc/zombie-settlement-3ds/releases/download/v0.2.0/StayingAlive-3DS.cia) (v0.2.0 release asset, 433 600 bytes). Not yet tested on a real 3DS. Details and fallbacks: [docs/FBI_INSTALLATION.md](docs/FBI_INSTALLATION.md).
 
 Downloads: [latest release](https://github.com/JustGoodinc/zombie-settlement-3ds/releases/latest).
 
