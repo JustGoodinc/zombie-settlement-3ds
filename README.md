@@ -21,12 +21,12 @@ Early playable vertical slice (v0.1). See [docs/DEVELOPMENT_ROADMAP.md](docs/DEV
 | 3DS (Homebrew Launcher) | `ZombieSettlement-3DS.3dsx` | Copy to `sdmc:/3ds/`. |
 | 3DS (HOME Menu) | `ZombieSettlement-3DS.cia` | Install with FBI. See [docs/FBI_INSTALLATION.md](docs/FBI_INSTALLATION.md). |
 
-### FBI QR install (v0.1.3)
+### FBI QR install (v0.1.4)
 
 <img src="docs/ZombieSettlement-FBI-QR.png" width="200" alt="FBI QR code for ZombieSettlement-3DS.cia">
 
 On a homebrew-capable 3DS: **FBI → Remote Install → Scan QR Code**, scan this code, confirm, then launch from the HOME Menu.
-The code points directly at [`ZombieSettlement-3DS.cia`](https://github.com/JustGoodinc/zombie-settlement-3ds/releases/download/v0.1.3/ZombieSettlement-3DS.cia) (v0.1.3 release asset, 407 488 bytes). Not yet tested on a real 3DS. Details and fallbacks: [docs/FBI_INSTALLATION.md](docs/FBI_INSTALLATION.md).
+The code points directly at [`ZombieSettlement-3DS.cia`](https://github.com/JustGoodinc/zombie-settlement-3ds/releases/download/v0.1.4/ZombieSettlement-3DS.cia) (v0.1.4 release asset, 408 512 bytes). Not yet tested on a real 3DS. Details and fallbacks: [docs/FBI_INSTALLATION.md](docs/FBI_INSTALLATION.md).
 
 Downloads: [latest release](https://github.com/JustGoodinc/zombie-settlement-3ds/releases/latest).
 
