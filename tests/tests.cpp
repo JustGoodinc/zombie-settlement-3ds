@@ -2,6 +2,7 @@
 #include "../src/gameplay/game.h"
 #include "../src/core/audio.h"
 #include "../src/core/art.h"
+#include "../src/ui/ui.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -467,6 +468,39 @@ static void testTutorialZoom() {
     CHECK(G.set.zoom == 125 && !G.set.tutorialDone);
     G.set.zoom = 125;
 }
+static void press(uint32_t b) { Input i; i.down = b; i.held = b; frames(1, i); frames(1); }
+static void testMenuNav() {
+    SECTION("menus: D-pad and Circle Pad navigate every paused menu, holding repeats");
+    save_setDir("test_saves/");
+    game_newGame(); G.set.tutorialDone = true;
+    ui_open(PN_PAUSE); frames(2);
+    int f0 = g_ui.focus;
+    press(BTN_DOWN); CHECK(g_ui.focus != f0);                              // D-pad press
+    int f1 = g_ui.focus;
+    Input st; st.ay = 1; frames(1, st); CHECK(g_ui.focus != f1);         // Circle Pad push
+    int f2 = g_ui.focus; frames(14, st); CHECK(g_ui.focus != f2);        // held Circle Pad repeats
+    frames(1); press(BTN_UP); int f3 = g_ui.focus;
+    Input hd; hd.held = BTN_UP; frames(15, hd); CHECK(g_ui.focus != f3); // held D-pad repeats
+    ui_open(PN_HUD); frames(2);
+    int fh = g_ui.focus; Input walk; walk.ay = 1; walk.held = BTN_DOWN; frames(20, walk);
+    CHECK(G.panel == PN_HUD && g_ui.focus == fh);                         // walking never moves HUD focus
+
+    SECTION("backpack: D-pad / Circle Pad move items; right edge reaches the buttons");
+    game_newGame(); G.set.tutorialDone = true;
+    Survivor& s = G.st.surv[G.st.leader];
+    s.pack.n = 0; s.equip = -1;
+    Item p = makeItem(IT_PISTOL); p.x = 0; p.y = 0; CHECK(s.pack.place(p));
+    ui_open(PN_INVENTORY); frames(2);
+    for (int k = 0; k < 8; k++) { press(BTN_LEFT); press(BTN_UP); }     // cursor to 0,0 (edges clamp)
+    press(BTN_A);                                                          // pick up
+    Input r; r.ax = 1; frames(1, r); frames(1);                           // Circle Pad right
+    press(BTN_RIGHT); press(BTN_RIGHT);                                    // D-pad right x2
+    press(BTN_A);                                                          // place
+    CHECK(G.panel == PN_INVENTORY && s.pack.n == 1 && s.pack.it[0].x == 3 && s.pack.it[0].y == 0);
+    for (int k = 0; k < 8; k++) press(BTN_RIGHT);                          // off the right edge onto the buttons
+    press(BTN_B); CHECK(G.panel == PN_INVENTORY);                          // B on the buttons: back to the grid
+    press(BTN_B); CHECK(G.panel != PN_INVENTORY);                          // B on the grid: close
+}
 int main() {
     game_init();
     testCombat();
@@ -478,6 +512,7 @@ int main() {
     testAnimation();
     testMenus();
     testTutorialZoom();
+    testMenuNav();
     printf("\n%d passed, %d failed\n", passes, fails);
     return fails;
 }

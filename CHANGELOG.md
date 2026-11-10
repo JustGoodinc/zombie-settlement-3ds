@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — menu controls and thumb layout
+- D-Pad and Circle Pad both move through every paused menu; holding either repeats.
+- Backpack and container grids: D-Pad / Circle Pad move the cursor (fixed: the D-Pad was being swallowed there), A picks up / places, Y rotates, X uses. Push right past the bag to reach the action buttons; Left or B goes back to the grid.
+- Gameplay bottom screen rebuilt around thumb rails: tall buttons down the left and right edges (Base, Survivors, Expedition / Journal, Backpack, Pause; on expeditions Backpack, Squad / Flashlight, Pause), with their pad shortcut shown. Map and objective sit in the middle.
+- Backpack and container action buttons are taller and sit on the right edge.
+
 ## v0.1.3 — readability, tutorial, zoom
 - Button prompts redrawn: coloured 3DS buttons (A red, B yellow, X blue, Y green), shoulder/START/SELECT pills, D-pad and Circle Pad icons. On PC they show your actual keys from controls.ini (keycaps) and switch to Xbox labels when a gamepad is used.
 - Controls screen is now a glyph + action table; bigger footer prompts; HUD hints use glyphs.

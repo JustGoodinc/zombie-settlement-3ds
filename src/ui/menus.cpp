@@ -131,9 +131,15 @@ static void headCrop(Canvas& c, const Survivor& s, int x, int y) {
 // ---------------------------------------------------------------- inventory grid
 struct InvState {
     int sel = -1, held = -1, heldRot = 0, origX = 0, origY = 0, origRot = 0, curX = 0, curY = 0;
-    bool dragging = false, touchHeld = false; int grabDX = 0, grabDY = 0, startTx = 0, startTy = 0;
+    bool dragging = false, touchHeld = false, onRail = false, railFocus = false; int grabDX = 0, grabDY = 0, startTx = 0, startTy = 0;
 };
 static InvState inv;
+// after drawing a right-edge action button: take focus there if the grid just handed it over
+static bool railGrab(bool act) {
+    if (inv.railFocus && g_ui.count && g_ui.rects[g_ui.count - 1].enabled) { g_ui.focus = g_ui.count - 1; inv.railFocus = false; }
+    return act;
+}
+static void railEnd() { if (inv.railFocus) { inv.railFocus = false; inv.onRail = false; } }   // nothing to focus: stay on the grid
 
 static bool gridValid(const Grid& g) {
     for (int i = 0; i < g.n; i++) {
@@ -212,7 +218,7 @@ static void invInfo(Canvas& c, Survivor& s, int x, int y, int w, int idx, bool c
     if (idx < 0 || idx >= s.pack.n) {
         gfx_text(c, x + 6, y + 6, s.name, pal::cream);
         char b[48]; snprintf(b, sizeof b, "Bag %dx%d  %d items", s.pack.w, s.pack.h, s.pack.n); gfx_text(c, x + 6, y + 18, b, pal::dim);
-        gfx_wrap(c, x + 6, y + 34, w - 12, "Tap an item to select it. Drag to move. Rotate with Y or the button. Items can be stacked or swapped.", pal::dim);
+        gfx_wrap(c, x + 6, y + 34, w - 12, "Tap or drag items. D-Pad or Circle Pad moves the cursor; push right past the bag to reach the buttons. Y rotates, X uses.", pal::dim);
         return;
     }
     Item& it = s.pack.it[idx]; const ItemDef& d = idef(it.id);
@@ -229,20 +235,20 @@ static void invInfo(Canvas& c, Survivor& s, int x, int y, int w, int idx, bool c
     else if (d.cat == IC_MELEE) { gfx_text(c, x + 6, ly, "Never wears out", pal::cream); ly += 10; }
     if (d.cat == IC_MEDICAL && d.heal) { snprintf(b, sizeof b, "Heals %d", d.heal); gfx_text(c, x + 6, ly, b, pal::green); ly += 10; }
     if (it.mod) { snprintf(b, sizeof b, "Upgraded +%d", it.mod); gfx_text(c, x + 6, ly, b, pal::gold); ly += 10; }
-    int by = y + 196 - 22 * (showDrop ? 3 : 2) - 4;
+    int by = y + 196 - 30 * (showDrop ? 3 : 2) - 2;   // tall right-edge buttons: easy thumb taps
     bool usable = d.cat == IC_MEDICAL || d.cat == IC_BACKPACK || d.cat == IC_FIREARM || d.cat == IC_MELEE;
     const char* useLbl = (d.cat == IC_FIREARM || d.cat == IC_MELEE) ? (s.equip == idx ? "Equipped" : "Equip") : "Use";
-    if (ui_button(c, x + 6, by, w - 12, 18, useLbl, 0, canUse && usable && s.equip != idx)) {
+    if (railGrab(ui_button(c, x + 4, by, w - 8, 26, useLbl, 0, canUse && usable && s.equip != idx))) {
         int sv = (int)(&s - G.st.surv), ui_ = -1;
         for (int k = 0; k < G.nu; k++) if (G.u[k].sv == sv) ui_ = k;
         survivor_useItem(sv, idx, ui_);
         if (inv.sel >= s.pack.n) inv.sel = -1;
     }
-    if (ui_button(c, x + 6, by + 22, w - 12, 18, "Rotate", 0, d.w != d.h)) {
+    if (railGrab(ui_button(c, x + 4, by + 30, w - 8, 26, "Rotate", 0, d.w != d.h))) {
         int nr = it.rot ^ 1;
         if (s.pack.move(idx, it.x, it.y, nr)) audio_play(SFX_INV); else say("No room to rotate here.");
     }
-    if (showDrop && ui_button(c, x + 6, by + 44, w - 12, 18, G.scene == SC_SETTLEMENT ? "To Stash" : "Drop", 0, true)) {
+    if (showDrop && railGrab(ui_button(c, x + 4, by + 60, w - 8, 26, G.scene == SC_SETTLEMENT ? "To Stash" : "Drop", 0, true))) {
         Item copy = it;
         if (G.scene == SC_SETTLEMENT) {
             G.st.stash.cap = (uint8_t)settle_stashCap();
@@ -283,11 +289,22 @@ static void gridInteract(Canvas& c, Survivor& s, int gx, int gy, int cell) {
         }
         inv.touchHeld = false; inv.dragging = false; inv.held = -1;
     }
-    // buttons / keyboard fallback: cursor + A pick/place, Y rotate, X use
+    // D-pad / circle pad: cursor (hold to repeat) + A pick/place, Y rotate, X use.
+    // Pushing right off the grid hands focus to the action buttons; left from there comes back.
+    if (in.touchDown && cellAt(in.tx, in.ty, cx, cy)) inv.onRail = false;
+    if (inv.onRail && g_ui.navEdge == 3) inv.onRail = false;
     uint32_t d = in.down;
-    if (!in.touching) {
-        int mx = (d & BTN_RIGHT ? 1 : 0) - (d & BTN_LEFT ? 1 : 0), my = (d & BTN_DOWN ? 1 : 0) - (d & BTN_UP ? 1 : 0);
-        if (mx || my) { inv.curX = (inv.curX + mx + g.w) % g.w; inv.curY = (inv.curY + my + g.h) % g.h; audio_play(SFX_MENU_MOVE, 0.4f); if (inv.held < 0) inv.sel = g.at(inv.curX, inv.curY); }
+    if (!in.touching && !inv.onRail) {
+        int dir = g_ui.navDir;
+        int mx = dir == 4 ? 1 : dir == 3 ? -1 : 0, my = dir == 2 ? 1 : dir == 1 ? -1 : 0;
+        if (mx > 0 && inv.curX == g.w - 1 && inv.held < 0) { inv.onRail = true; inv.railFocus = true; mx = 0; }
+        if (mx || my) {
+            int nx = inv.curX + mx, ny = inv.curY + my;
+            if (nx < 0) nx = 0; if (ny < 0) ny = 0; if (ny >= g.h) ny = g.h - 1;
+            if (nx >= g.w) nx = g.w - 1;   // holding an item: the right edge stops the cursor
+            if (nx != inv.curX || ny != inv.curY) { inv.curX = nx; inv.curY = ny; audio_play(SFX_MENU_MOVE, 0.4f); }
+            if (inv.held < 0) { int i = g.at(inv.curX, inv.curY); if (i >= 0) inv.sel = i; }   // selection sticks on empty cells
+        }
         if (d & BTN_A) {
             if (inv.held < 0) { int i = g.at(inv.curX, inv.curY); if (i >= 0) { inv.held = i; inv.sel = i; inv.heldRot = g.it[i].rot; inv.grabDX = inv.curX - g.it[i].x; inv.grabDY = inv.curY - g.it[i].y; audio_play(SFX_MENU_MOVE); } }
             else {
@@ -350,7 +367,8 @@ static void panelInventory(Canvas& c) {
         invInfo(c, s, 176, 22, 140, inv.sel, true, true);
         char b[40]; snprintf(b, sizeof b, "%s  HP %d/%d", s.name, (int)s.hp, s.maxHp);
         gfx_text(c, 8, 28 + s.pack.h * cell, b, pal::dim);
-        footer(c, inv.held >= 0 ? "Place" : "Move", "Back", "Use", "Rotate");
+        railEnd();
+        footer(c, inv.onRail ? "Select" : (inv.held >= 0 ? "Place" : "Move"), "Back", "Use", "Rotate");
     } else if (tab == 1 || tab == 2 || tab == 3) {
         // list views: equipment / all items / key items
         ui_panel(c, 6, 22, 164, 200);
@@ -441,19 +459,19 @@ static void panelContainer(Canvas& c) {
         if (s.equip < 0) survivor_equipBest(s);
         return true;
     };
-    if (ui_button(c, ax + 6, ay + 62, 82, 18, "Take All", UB_GOLD | hl(TH_TAKEALL), ct->n > 0)) {
+    if (railGrab(ui_button(c, ax + 4, ay + 56, 84, 24, "Take All", UB_GOLD | hl(TH_TAKEALL), ct->n > 0))) {
         int moved = 0, start = ct->n;
         for (int i = ct->n - 1; i >= 0; i--) if (takeOne(i)) moved++;
         audio_play(moved ? SFX_PICKUP : SFX_EMPTY);
         if (moved < start) say("Some items didn't fit. They stay here.");
         sel = 0;
     }
-    if (ui_button(c, ax + 92, ay + 62, 82, 18, "Take", 0, fromCont)) {
+    if (railGrab(ui_button(c, ax + 92, ay + 56, 84, 24, "Take", 0, fromCont))) {
         if (takeOne(sel)) { audio_play(SFX_PICKUP); if (sel >= ct->n) sel = ct->n ? ct->n - 1 : 0; }
         else { audio_play(SFX_EMPTY); say("No room in the backpack. Item left in place."); }
     }
     bool canStore = !fromCont && inv.sel >= 0 && inv.sel < s.pack.n && ct->n < ct->cap;
-    if (ui_button(c, ax + 6, ay + 84, 82, 18, "Store", 0, canStore)) {
+    if (railGrab(ui_button(c, ax + 4, ay + 84, 84, 24, "Store", 0, canStore))) {
         Item it = s.pack.it[inv.sel];
         if (ct->push(it)) { packRemove(s, inv.sel); inv.sel = -1; audio_play(SFX_INV); }
     }
@@ -461,21 +479,22 @@ static void panelContainer(Canvas& c) {
         // stash only: hand supplies over to the settlement's shared resources
         const Item* d = shown;
         bool can = d && (idef(d->id).cat == IC_AMMO || idef(d->id).cat == IC_MEDICAL || idef(d->id).cat == IC_FOOD || idef(d->id).cat == IC_MATERIAL || idef(d->id).cat == IC_FUEL);
-        if (ui_button(c, ax + 92, ay + 84, 82, 18, "Donate", 0, can)) {
+        if (railGrab(ui_button(c, ax + 92, ay + 84, 84, 24, "Donate", 0, can))) {
             int amt = deliver_item(*d);
             char b[48]; snprintf(b, sizeof b, "+%d %s for the settlement.", amt, RES_NAMES[idef(d->id).res]); say(b);
             if (fromCont) ct->remove(sel); else { packRemove(s, inv.sel); inv.sel = -1; }
             audio_play(SFX_PICKUP);
         }
-    } else if (ui_button(c, ax + 92, ay + 84, 82, 18, "Inspect", 0, shown != nullptr)) {
+    } else if (railGrab(ui_button(c, ax + 92, ay + 84, 84, 24, "Inspect", 0, shown != nullptr))) {
         char b[96]; const ItemDef& d = idef(shown->id);
         snprintf(b, sizeof b, "%s: %dx%d cells%s", d.name, d.w, d.h, d.wpn.dur ? ", has durability" : ""); say(b);
     }
-    if (ui_button(c, ax + 6, ay + 106, 168, 18, "Back", 0, true) || (ui_pressedB() && inv.held < 0)) {
+    if (railGrab(ui_button(c, ax + 4, ay + 112, 172, 24, "Back", 0, true)) || (ui_pressedB() && inv.held < 0)) {
         if (g_contBag >= 0 && G.curLoc >= 0 && ct->n == 0) G.loc[G.curLoc].bags[g_contBag].used = false;
         ui_back();
     }
-    footer(c, "Confirm", "Back", nullptr, "Rotate");
+    railEnd();
+    footer(c, inv.onRail ? "Confirm" : (inv.held >= 0 ? "Place" : "Move"), "Back", nullptr, "Rotate");
 }
 
 // ---------------------------------------------------------------- HUD (gameplay bottom screen)
@@ -521,48 +540,61 @@ static const char* objective() {
     return "Search for supplies. Extract at the south road.";
 }
 
+// tall thumb-rail button: icon over label, optional pad glyph (shortcut) in the corner
+static bool railBtn(Canvas& c, int x, int y, int w, int h, int icon, const char* label, int style = 0, uint32_t glyph = 0) {
+    bool pressedNow = g_ui.pressed == g_ui.count && g_ui.in.touching;
+    bool act = ui_button(c, x, y, w, h, "", style);
+    int yo = pressedNow ? 1 : 0, cy = y + h / 2 + yo;
+    if (icon >= 0) { const Sprite& s = g_spr[icon]; int k = s.w > 12 ? 1 : 2; gfx_blit(c, s, x + (w - s.w * k) / 2, cy - s.h * k - 1, k); }
+    if (gfx_textWB(label) <= w - 4) gfx_textCB(c, x + w / 2, cy + 4, label, pal::cream); else gfx_textC(c, x + w / 2, cy + 4, label, pal::cream);
+    if (glyph) ui_btn(c, x + w - ui_btnW(glyph) - 3, y + h - 13 + yo, glyph);
+    return act;
+}
+
 static void panelHud(Canvas& c) {
+    // thumb rails down both edges (reachable without letting go of the Circle Pad / ABXY);
+    // information stays in the middle column
+    const int RW = 60, LX = 2, RX = BOT_W - RW - 2, CX = LX + RW + 4, CW = RX - CX - 4, TOP = 2, H = 220;
     if (G.scene == SC_SETTLEMENT) {
-        ui_panel(c, 4, 3, 312, 50, "Settlement");
-        resRow(c, 12, 22, false);
+        ui_panel(c, CX, TOP, CW, 48, "Settlement");
+        resRow(c, CX + 5, TOP + 19, true);
         char b[64]; int sec = settle_security();
-        snprintf(b, sizeof b, "Pop %d/%d   Security %d (%s)", settle_population(), settle_capacity(), sec, security_rating(sec));
-        gfx_blit(c, g_spr[S_ICON_PEOPLE], 12, 36); gfx_text(c, 22, 36, b, sec < 25 ? pal::red : pal::cream);
-        minimap(c, 4, 58, 150, 112);
+        snprintf(b, sizeof b, "Pop %d/%d  Security %d", settle_population(), settle_capacity(), sec);
+        gfx_blit(c, g_spr[S_ICON_PEOPLE], CX + 5, TOP + 33); gfx_text(c, CX + 16, TOP + 33, b, sec < 25 ? pal::red : pal::cream);
+        minimap(c, CX, TOP + 52, CW, 96);
     } else {
         char t[40]; snprintf(t, sizeof t, "%s", G.curLoc >= 0 ? LOCATIONS[G.curLoc].name : "");
-        ui_panel(c, 4, 3, 312, 168, t);
-        minimap(c, 10, 22, 156, 142);
+        ui_panel(c, CX, TOP, CW, 146, t);
+        minimap(c, CX + 4, TOP + 18, CW - 8, 124);
     }
-    int ox = 170, oy = G.scene == SC_SETTLEMENT ? 58 : 22;
-    gfx_blit(c, g_spr[S_ICON_SHIELD], ox, oy);
-    gfx_text(c, ox + 11, oy, "Objective", pal::gold);
-    gfx_wrap(c, ox, oy + 12, 140, objective(), pal::cream);
-    if (tut_active() && ui_button(c, ox, 150, 140, 18, "Skip Tutorial")) tut_skip();
+    int oy = TOP + 152;
+    gfx_blit(c, g_spr[S_ICON_SHIELD], CX + 2, oy);
+    gfx_text(c, CX + 13, oy, "Objective", pal::gold);
+    int lines = gfx_wrap(c, CX + 2, oy + 11, CW - 4, objective(), pal::cream);
     if (G.scene == SC_EXPEDITION) {
         Survivor* s = invSurv();
         if (s) {
-            char b[40]; snprintf(b, sizeof b, "Bag %d items  %d/%d", s->pack.n, s->pack.w, s->pack.h);
-            gfx_text(c, ox, oy + 60, b, pal::dim);
-            if (s->infection && s->infKnown) gfx_text(c, ox, oy + 72, INF_NAMES[s->infection], pal::red);
+            char b[40]; snprintf(b, sizeof b, "Bag %d items %dx%d", s->pack.n, s->pack.w, s->pack.h);
+            gfx_text(c, CX + 2, oy + 13 + lines * 10, b, pal::dim);
+            if (s->infection && s->infKnown) gfx_text(c, CX + 120, oy + 13 + lines * 10, INF_NAMES[s->infection], pal::red);
         }
     }
-    // touch buttons
-    int by = 178;
+    if (tut_active() && ui_button(c, CX + 24, 202, CW - 48, 18, "Skip Tutorial")) tut_skip();
     if (G.scene == SC_SETTLEMENT) {
-        if (ui_button(c, 4, by, 76, 20, "Base")) ui_open(PN_BASE);
-        if (ui_button(c, 82, by, 76, 20, "Survivors")) ui_open(PN_SURVIVORS);
-        if (ui_button(c, 160, by, 76, 20, "Expedition", hl(TH_EXPEDITION))) ui_open(PN_WORLDMAP);
-        char jb[24]; snprintf(jb, sizeof jb, G.st.unread ? "Journal(%d)" : "Journal", G.st.unread);
-        if (ui_button(c, 238, by, 78, 20, jb, G.st.unread ? UB_GOLD : 0)) ui_open(PN_JOURNAL);
-        if (ui_button(c, 4, by + 24, 154, 20, "Inventory")) { g_invSurvivor = -1; ui_open(PN_INVENTORY); }
-        if (ui_button(c, 162, by + 24, 154, 20, "Pause")) ui_open(PN_PAUSE);
+        const int bh = (H - 2 * 4) / 3;
+        if (railBtn(c, LX, TOP, RW, bh, S_ICON_HOUSE, "Base")) ui_open(PN_BASE);
+        if (railBtn(c, LX, TOP + bh + 4, RW, bh, S_ICON_PEOPLE, "Survivors")) ui_open(PN_SURVIVORS);
+        if (railBtn(c, LX, TOP + 2 * (bh + 4), RW, bh, S_ICON_TRAIN, "Expedition", hl(TH_EXPEDITION))) ui_open(PN_WORLDMAP);
+        char jb[24]; snprintf(jb, sizeof jb, G.st.unread ? "Journal %d" : "Journal", G.st.unread);
+        if (railBtn(c, RX, TOP, RW, bh, S_RADIO, jb, G.st.unread ? UB_GOLD : 0)) ui_open(PN_JOURNAL);
+        if (railBtn(c, RX, TOP + bh + 4, RW, bh, S_ICON_MAT, "Backpack", 0, BTN_SELECT)) { g_invSurvivor = -1; ui_open(PN_INVENTORY); }
+        if (railBtn(c, RX, TOP + 2 * (bh + 4), RW, bh, S_ICON_CLOCK, "Pause", 0, BTN_START)) ui_open(PN_PAUSE);
     } else {
-        if (ui_button(c, 4, by, 102, 20, "Inventory")) { g_invSurvivor = -1; ui_open(PN_INVENTORY); }
-        if (ui_button(c, 109, by, 102, 20, "Squad")) ui_open(PN_SQUAD);
-        if (ui_button(c, 214, by, 102, 20, "Pause")) ui_open(PN_PAUSE);
-        { int hx = 6; const uint32_t B[3] = {BTN_SELECT, BTN_START, BTN_R}; const char* L[3] = {"Backpack", "Pause", "Flashlight"};
-          for (int i = 0; i < 3; i++) { hx += ui_btn(c, hx, by + 26, B[i]) + 4; gfx_text(c, hx, by + 28, L[i], pal::cream); hx += gfx_textW(L[i]) + 12; } }
+        const int bh = (H - 4) / 2;
+        if (railBtn(c, LX, TOP, RW, bh, S_ICON_MAT, "Backpack", 0, BTN_SELECT)) { g_invSurvivor = -1; ui_open(PN_INVENTORY); }
+        if (railBtn(c, LX, TOP + bh + 4, RW, bh, S_ICON_PEOPLE, "Squad")) ui_open(PN_SQUAD);
+        if (railBtn(c, RX, TOP, RW, bh, -1, G.flashlight ? "Light On" : "Light Off", G.flashlight ? UB_SELECTED : 0, BTN_R)) { G.flashlight = !G.flashlight; audio_play(SFX_MENU_MOVE, 0.8f, 0.6f); }
+        if (railBtn(c, RX, TOP + bh + 4, RW, bh, S_ICON_CLOCK, "Pause", 0, BTN_START)) ui_open(PN_PAUSE);
     }
     footer(c, "Interact", "Sprint/Dodge", "Reload", "Fire");
     if (g_ui.in.down & BTN_SELECT) { g_invSurvivor = -1; ui_open(PN_INVENTORY); }
@@ -1289,11 +1321,20 @@ static void confirmDialog(Canvas& c) {
 void ui_render(Canvas& bot) {
     ui_bg(bot);
     Input in = g_input;
-    if (G.panel == PN_HUD) { in.down &= ~(BTN_A | BTN_B | BTN_X | BTN_Y | BTN_UP | BTN_DOWN | BTN_LEFT | BTN_RIGHT | BTN_L | BTN_R); in.ax = in.ay = 0; }
-    if (G.panel == PN_INVENTORY && tab == 0) { in.down &= ~(BTN_UP | BTN_DOWN | BTN_LEFT | BTN_RIGHT); in.ax = in.ay = 0; }  // grid cursor owns the D-pad
-    if (G.panel == PN_CONTAINER) { in.down &= ~(BTN_UP | BTN_DOWN | BTN_LEFT | BTN_RIGHT); in.ax = in.ay = 0; }
-    if (confirmBox.active) { in = g_input; }
+    const uint32_t PLAY = BTN_A | BTN_B | BTN_X | BTN_Y | BTN_UP | BTN_DOWN | BTN_LEFT | BTN_RIGHT | BTN_L | BTN_R;
+    if (G.panel == PN_HUD) { in.down &= ~PLAY; in.held &= ~PLAY; in.ax = in.ay = 0; }   // gameplay owns the pad; HUD is touch-only
+    // backpack grids own the D-pad / circle pad until the cursor is pushed off the right edge onto the buttons
+    int railX = G.panel == PN_CONTAINER ? 136 : (G.panel == PN_INVENTORY && tab == 0) ? 176 : -1;
+    if (confirmBox.active) { in = g_input; railX = -1; }
+    if (railX < 0) inv.onRail = false;
+    int preFocus = g_ui.focus; bool wasRail = inv.onRail;
+    if (railX >= 0 && !inv.onRail) g_ui.navLockNext = true;
     ui_beginFrame(in);
+    if (G.panel == PN_HUD && !confirmBox.active) g_ui.navLock = true;   // no focus box on the touch-only HUD
+    if (railX >= 0 && wasRail && (g_ui.navDir == 3 || (in.down & BTN_B)) && preFocus < g_ui.prevCount && g_ui.prev[preFocus].x >= railX) {
+        g_ui.focus = preFocus; inv.onRail = false; g_ui.navLock = true; g_ui.navDir = 0;   // left (or B) from the buttons: back to the grid
+        g_ui.in.down &= ~BTN_B;
+    }
     // short slide/fade-in for panel changes (UI keeps animating while the world is paused)
     float t = ui_ease(G.panelT / 0.15f);
     bot.ox = (int)((1 - t) * 10);

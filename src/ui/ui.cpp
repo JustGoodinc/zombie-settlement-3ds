@@ -10,19 +10,27 @@ void ui_resetFocus() { g_ui.focus = 0; g_ui.prevCount = 0; g_ui.pressed = -1; }
 
 void ui_beginFrame(const Input& in) {
     Ui& u = g_ui;
-    u.in = in; u.count = 0; u.consumed = false; u.navMoved = false;
-    // D-pad / circle-pad focus navigation over last frame's widget rects
-    uint32_t d = in.down;
+    u.in = in; u.count = 0; u.consumed = false; u.navMoved = false; u.navEdge = 0;
+    u.navLock = u.navLockNext; u.navLockNext = false;
+    // D-pad and circle pad both navigate; holding either repeats (0.3 s delay, then every 0.1 s)
+    uint32_t d = in.down, h = in.held | in.down;
     static float repeatT = 0; static int lastDir = 0;
     int dir = (d & BTN_UP) ? 1 : (d & BTN_DOWN) ? 2 : (d & BTN_LEFT) ? 3 : (d & BTN_RIGHT) ? 4 : 0;
-    int heldDir = (in.ay < -0.6f) ? 1 : (in.ay > 0.6f) ? 2 : (in.ax < -0.6f) ? 3 : (in.ax > 0.6f) ? 4 : 0;
-    if (!dir && heldDir) {
-        if (heldDir != lastDir) { dir = heldDir; repeatT = 0.35f; }
-        else { repeatT -= 1.0f / 30; if (repeatT <= 0) { dir = heldDir; repeatT = 0.15f; } }
+    int heldDir = (h & BTN_UP) ? 1 : (h & BTN_DOWN) ? 2 : (h & BTN_LEFT) ? 3 : (h & BTN_RIGHT) ? 4 : 0;
+    if (!heldDir) {
+        float ax = in.ax < 0 ? -in.ax : in.ax, ay = in.ay < 0 ? -in.ay : in.ay;
+        if (ay > 0.5f && ay >= ax) heldDir = in.ay < 0 ? 1 : 2;
+        else if (ax > 0.5f) heldDir = in.ax < 0 ? 3 : 4;
+    }
+    if (dir) repeatT = 0.3f;
+    else if (heldDir) {
+        if (heldDir != lastDir) { dir = heldDir; repeatT = 0.3f; }
+        else { repeatT -= 1.0f / 30; if (repeatT <= 0) { dir = heldDir; repeatT = 0.1f; } }
     }
     lastDir = heldDir;
+    u.navDir = dir;
     if (u.focus >= u.prevCount) u.focus = u.prevCount ? u.prevCount - 1 : 0;
-    if (dir && u.prevCount > 0) {
+    if (dir && u.prevCount > 0 && !u.navLock) {
         const UiRect& f = u.prev[u.focus];
         int fx = f.x + f.w / 2, fy = f.y + f.h / 2, best = -1; long bestScore = 1L << 30;
         for (int i = 0; i < u.prevCount; i++) {
@@ -35,6 +43,7 @@ void ui_beginFrame(const Input& in) {
             if (score < bestScore) { bestScore = score; best = i; }
         }
         if (best >= 0) { u.focus = best; u.navMoved = true; audio_play(SFX_MENU_MOVE, 0.6f); }
+        else u.navEdge = dir;   // nothing further that way (panels can hand focus back to a grid)
     }
 }
 void ui_endFrame() {
@@ -64,7 +73,7 @@ bool ui_hit(int x, int y, int w, int h, bool enabled) {
     if (u.in.touchDown && inside(u.in, x, y, w, h)) { u.pressed = id; u.focus = id; }
     bool act = false;
     if (u.in.touchUp && u.pressed == id && inside(u.in, x, y, w, h)) act = true;
-    if ((u.in.down & BTN_A) && u.focus == id && !u.in.touching) act = true;
+    if ((u.in.down & BTN_A) && u.focus == id && !u.in.touching && !u.navLock) act = true;
     if (act) u.consumed = true;
     return act;
 }
@@ -223,7 +232,7 @@ void ui_bar(Canvas& c, int x, int y, int w, int h, float v, px col) {
 void ui_icon(Canvas& c, int x, int y, int id) { gfx_blit(c, g_spr[id], x, y); }
 
 bool ui_button(Canvas& c, int x, int y, int w, int h, const char* label, int style, bool enabled) {
-    bool focused = g_ui.focus == g_ui.count;
+    bool focused = g_ui.focus == g_ui.count && !g_ui.navLock;
     bool pressedNow = g_ui.pressed == g_ui.count && g_ui.in.touching;
     bool act = ui_hit(x, y, w, h, enabled);
     bool sel = (style & UB_SELECTED) != 0;

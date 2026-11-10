@@ -14,6 +14,9 @@ struct Ui {
     int pressed = -1;          // widget under the stylus at touch-down
     bool consumed = false;     // an activation already happened this frame
     bool navMoved = false;
+    int navDir = 0;            // this frame's direction (1 up, 2 down, 3 left, 4 right), with hold-repeat
+    int navEdge = 0;           // direction pressed with no widget that way
+    bool navLock = false, navLockNext = false;   // a grid owns the direction keys and A (set every frame it wants them)
 };
 extern Ui g_ui;
 
