@@ -6,6 +6,7 @@
 #include "../gameplay/content.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 Sprite g_tile[TA_COUNT][4];
 Sprite g_spr[S_COUNT];
@@ -22,6 +23,7 @@ static Sprite zombPose[ZOMB_VARIANTS][5][P_COUNT];
 static void hline(Sprite& s, int x0, int x1, int y, px c);
 static void dline(Sprite& s, int x0, int y0, int x1, int y1, px c);
 static void outlineAll(Sprite& s);
+static void vline(Sprite& s, int x, int y0, int y1, px c);
 
 // ---------------------------------------------------------------- characters (16x24 chibi, Try 2 style)
 // Built from hand-drawn parts so every animation frame is drawn, not smeared:
@@ -31,70 +33,71 @@ static void outlineAll(Sprite& s);
 enum { CW = 16, CH = 24 };
 ROWS(HD_FRONT,
 "................", "....kkkkkkkk....", "..kkHHHHhhhhkk..", ".kHHHhhhhhhhhjk.", ".kHhhhhhhhhhhjk.", ".khhhhhhhhhhhjk.",
-".khhjhhhhhjhhjk.", ".kjhhshhhhshhjk.", ".kjsjjssssjjsjk.", ".kSswessssweSSk.", ".kSseessssseeSk.", ".ksissssssssisk.",
-"..kSsssSSsssSk..", "...kkSSSSSSkk...");   // big 2x2 eyes with a glint, brows, blush, jagged bangs
+".khhjhhhhhjhhjk.", ".kjhhshhhhshhjk.", ".kjsjjssssjjsjk.", ".kSseesssseeSSk.", ".kSseesssseeSSk.", ".kssssssSssssSk.",
+"..kSsssSSsssSk..", "...kkSSSSSSkk...");   // dark 2x2 eyes under heavy brows, nose + jaw shading (Try 2)
 ROWS(HD_SIDE,
 "................", "....kkkkkkkk....", "..kkHHHHhhhhkk..", ".kHHHhhhhhhhhhk.", ".kHhhhhhhhhhhhk.", ".khhhhhhhhhhhjk.",
-".khhhhhjhhhhjjk.", ".kjhhhhshhhshjk.", ".kjhhhsjjssjjsk.", ".kjhSsswesswesk.", ".kjhSsseesseesk.", ".kSSssssssssisk.",
+".khhhhhjhhhhjjk.", ".kjhhhhshhhshjk.", ".kjhhhsjjssjjsk.", ".kjhSsseesseeSk.", ".kjhSsseesseeSk.", ".kSSssssssSsssk.",
 "..kSSssssSSssk..", "...kkSSSSSSkk...");   // 3/4 view: face turned right, back of the head on the left
 ROWS(HD_BACK,
 "................", "....kkkkkkkk....", "..kkhhhhhhhhkk..", ".kHHhhhhhhhhhjk.", ".kHhhhhhhhhhhjk.", ".khhhhhhhhhhhjk.",
 ".khhhhhhhhhhjjk.", ".kjhhhhhhhhhjjk.", ".kjhhhhhhhhhjjk.", ".kjjhhhhhhhjjjk.", ".kSjjjjjjjjjjSk.", ".kSjjjjjjjjjjSk.",
 "..kSssssssssSk..", "...kkSSSSSSkk...");
-// torso + arms, 6 rows (drawn at row 14): [view][arm state]
+// torso + arms, 6 rows (drawn at row 14): [view][arm state]. Stocky Try 2 build: shoulders as wide as the
+// head, thick arms hanging slightly out, big hands at the hips.
 enum { A_IDLE, A_SWING_A, A_SWING_B, A_AIM, A_REACH, A_ZOMBIE, A_COUNT };
 static const char* const TORSO[3][A_COUNT][6] = {
   { // front
-    {"..kkMMbssbbbkk..", ".kMMbbbmmbbbbmk.", ".kbMkbbbbbbkbmk.", ".kbmkbbbbbbkmmk.", ".kuskBBBYBBksSk.", ".kkkknnnnnnkkkk."},
-    {"..kkMMbssbbbkk..", ".kMMbbbmmbbbbmk.", ".kbMkbbbbbbkbmk.", ".kbmkbbbbbbksSk.", ".kuskBBBYBBkkkk.", ".kkkknnnnnnk...."},
-    {"..kkMMbssbbbkk..", ".kMMbbbmmbbbbmk.", ".kbMkbbbbbbkbmk.", ".kusbbbbbbbkmmk.", ".kkkkBBBYBBksSk.", "....knnnnnnkkkk."},
-    {"..kkMMbssbbbkk..", ".kMMbbbmmbbbbmk.", ".kbMmbbbbbbmbmk.", ".kbmkmbbbbmkbmk.", ".kbmkBuussBkbmk.", ".kkkknkSSknkkkk."},
-    {"..kkMMbssbbbkk..", ".kMMbbbmmbbbbmk.", ".kbMmbbbbbbmbmk.", ".kbmkmbbbbmkbmk.", ".kbmkBuussBkbmk.", ".kkkknkSSknkkkk."},
-    {"..kkMMbssbbbkk..", ".kMMbbbmmbbbbmk.", "kuskbbbbbbbbkSuk", "kkkkbbbbbbbbkkkk", "...kBBBBBBBBk...", "...kknnnnnnkk..."},
+    {".kkMMbbssbbbbkk.", "kMMbbbbmmbbbbbmk", "kbMkbbbbbbbbkbmk", "kbmkbbbbbbbbkbmk", "kuskBBBBYBBBksSk", "kkkkknnnnnnkkkkk"},
+    {".kkMMbbssbbbbkk.", "kMMbbbbmmbbbbbmk", "kbMkbbbbbbbbkbmk", "kbmkbbbbbbbbksSk", "kuskBBBBYBBBkkkk", "kkkkknnnnnnk...."},
+    {".kkMMbbssbbbbkk.", "kMMbbbbmmbbbbbmk", "kbMkbbbbbbbbkbmk", "kuskbbbbbbbbkbmk", "kkkkBBBBYBBBksSk", "....knnnnnnkkkkk"},
+    {".kkMMbbssbbbbkk.", "kMMbbbbmmbbbbbmk", "kbMmbbbbbbbbmbmk", "kbmkmbbbbbbmkbmk", "kbmkBBuussBBkbmk", "kkkkknkSSknkkkkk"},
+    {".kkMMbbssbbbbkk.", "kMMbbbbmmbbbbbmk", "kbMmbbbbbbbbmbmk", "kbmkmbbbbbbmkbmk", "kbmkBBuussBBkbmk", "kkkkknkSSknkkkkk"},
+    {".kkMMbbssbbbbkk.", "kMMbbbbmmbbbbbmk", "kuskbbbbbbbbkSuk", "kkkkbbbbbbbbkkkk", "...kBBBBYBBBk...", "...kknnnnnnkk..."},
   },
-  { // side (3/4, facing right): body toward the camera, the near arm does the work (Try 2)
-    {"..kkMMbbbssbkk..", ".kMMbbbbbmmbbmk.", ".kbMkbbbbbbkbmk.", ".kbmkbbbbbbkbmk.", ".kuskBBBBBBksSk.", ".kkkknnnnnnkkkk."},
-    {"..kkMMbbbssbkk..", ".kMMbbbbbmmbbmk.", ".kbMkbbbbbbkmmk.", ".kbmkbbbbbbbkmmk", ".kuskBBBBBBk.kus", ".kkkknnnnnnk..kk"},
-    {"..kkMMbbbssbkk..", ".kMMbbbbbmmbbmk.", ".kbMkbbbbbbbbmk.", ".kbmkbbbbbbbbmk.", ".kuskBBBBBBBBk..", ".kkkknnnnnnkkk.."},
-    {"..kkMMbbbssbkk..", ".kMMbbbbbmmbbbkk", ".kbMkbbbbbbbmmus", ".kbmkbbbbbbbkkkk", ".kuskBBBBBBk....", ".kkkknnnnnnk...."},
-    {"..kkMMbbbssbkk..", ".kMMbbbbbmmbbmk.", ".kbMkbbbbbbbmbk.", ".kbmkbbbbbbbkmmk", ".kuskBBBBBBk.kus", ".kkkknnnnnnk..kk"},
-    {"..kkMMbbbssbkk..", ".kMMbbbbbmmbbbkk", ".kbMbbbbbbbbmmus", ".kbmbbbbbbbbkkkk", ".kbmkBBBBBBkmmus", ".kkkknnnnnnkkkkk"},
+  { // side (3/4, facing right): body toward the camera, the near arm does the work
+    {".kkMMbbbssbbbkk.", "kMMbbbbbmmbbbbmk", "kbMkbbbbbbbbkbmk", "kbmkbbbbbbbbkbmk", "kuskBBBBYBBBksSk", "kkkkknnnnnnkkkkk"},
+    {".kkMMbbbssbbbkk.", "kMMbbbbbmmbbbbmk", "kbMkbbbbbbbbkmmk", "kbmkbbbbbbbbbkmk", "kuskBBBBYBBBBkus", "kkkkknnnnnnkk.kk"},
+    {".kkMMbbbssbbbkk.", "kMMbbbbbmmbbbbmk", "kbMkbbbbbbbbkbmk", "kbmkbbbbbbbbkbbk", "kuskBBBBYBBBkkk.", "kkkkknnnnnnkk..."},
+    {".kkMMbbbssbbbkk.", "kMMbbbbmmbbbbbkk", "kbMkbbbbbbbbmmus", "kbmkbbbbbbbbkkkk", "kuskBBBBYBBBk...", "kkkkknnnnnnk...."},
+    {".kkMMbbbssbbbkk.", "kMMbbbbbmmbbbbmk", "kbMkbbbbbbbbkbmk", "kbmkbbbbbbbbkmmk", "kuskBBBBYBBBkkus", "kkkkknnnnnnkk.kk"},
+    {".kkMMbbbssbbbkk.", "kMMbbbbmmbbbbbkk", "kbMbbbbbbbbbmmus", "kbmbbbbbbbbbkkkk", "kbmkBBBBYBBBmmus", "kkkkknnnnnnkkkkk"},
   },
   { // back
-    {"..kkbbbbbbbbkk..", ".kbbkoooooOkbmk.", ".kbbkoOOOOOkbmk.", ".kbmkoooooOkbmk.", ".kuskOOOOOOksSk.", ".kkkknnnnnnkkkk."},
-    {"..kkbbbbbbbbkk..", ".kbbkoooooOkbmk.", ".kbbkoOOOOOkbmk.", ".kbmkoooooOksSk.", ".kuskOOOOOOkkkk.", ".kkkknnnnnnk...."},
-    {"..kkbbbbbbbbkk..", ".kbbkoooooOkbmk.", ".kbbkoOOOOOkbmk.", ".kuskoooooOkbmk.", ".kkkkOOOOOOksSk.", "....knnnnnnkkkk."},
-    {"..kkbbbbbbbbkk..", ".kbbkoooooOkbbk.", ".kbmkoOOOOOkmbk.", ".kbmkoooooOkmbk.", "..kkkOOOOOOkkk..", "....knnnnnnk...."},
-    {"..kkbbbbbbbbkk..", ".kbbkoooooOkbbk.", ".kbmkoOOOOOkmbk.", ".kbmkoooooOkmbk.", "..kkkOOOOOOkkk..", "....knnnnnnk...."},
-    {"..kkbbbbbbbbkk..", ".kbbbbbbbbbbbmk.", "kuskbbbbbbbbkSuk", "kkkkbbbbbbbbkkkk", "...kBBBBBBBBk...", "...kknnnnnnkk..."},
+    {".kkbbbbbbbbbbkk.", "kbbbkoooooOkbbmk", "kbbbkoOOOOOkbbmk", "kbmbkoooooOkbmmk", "kuskkOOOOOOkksSk", "kkkkknnnnnnkkkkk"},
+    {".kkbbbbbbbbbbkk.", "kbbbkoooooOkbbmk", "kbbbkoOOOOOkbbmk", "kbmbkoooooOksSmk", "kuskkOOOOOOkkkkk", "kkkkknnnnnnk...."},
+    {".kkbbbbbbbbbbkk.", "kbbbkoooooOkbbmk", "kbbbkoOOOOOkbbmk", "kuSbkoooooOkbmmk", "kkkkkOOOOOOkksSk", "....knnnnnnkkkkk"},
+    {".kkbbbbbbbbbbkk.", "kbbbkoooooOkbbbk", "kbmbkoOOOOOkbmbk", "kbmbkoooooOkbmbk", ".kkkkOOOOOOkkkk.", "....knnnnnnk...."},
+    {".kkbbbbbbbbbbkk.", "kbbbkoooooOkbbbk", "kbmbkoOOOOOkbmbk", "kbmbkoooooOkbmbk", ".kkkkOOOOOOkkkk.", "....knnnnnnk...."},
+    {".kkbbbbbbbbbbkk.", "kbbbbbbbbbbbbbmk", "kuskbbbbbbbbkSuk", "kkkkbbbbbbbbkkkk", "...kBBBBBBBBk...", "...kknnnnnnkk..."},
   },
 };
-// legs, 4 rows (drawn at row 20): [view][leg state]
+// legs, 4 rows (drawn at row 20): [view][leg state]; short legs on big dark boots
 enum { L_STAND, L_STEP_A, L_STEP_B, L_RUN_A, L_RUN_B, L_CROUCH, L_COUNT };
 static const char* const LEGS[3][L_COUNT][4] = {
   { // front
-    {"....knnnnnnk....", "....knpkknpk....", "....kxxkkxxk....", "....kkkkkkkk...."},
-    {"....knnnnnnk....", "....knpkkxxk....", "....kxxkkkkk....", "....kkkk........"},
-    {"....knnnnnnk....", "....kxxkknpk....", "....kkkkkxxk....", "........kkkk...."},
-    {"....knnnnnnk....", "...knnpkkxxk....", "...kxxkkkkk.....", "...kkkk........."},
-    {"....knnnnnnk....", "....kxxkknnpk...", ".....kkkkkxxk...", ".........kkkk..."},
-    {"................", "................", "...knnnnnnnnk...", "...kxxkkkkxxk..."},
+    {"....knnnnnnk....", "....knnkknnk....", "...kxxxkkxxxk...", "...kkkkkkkkkk..."},
+    {"....knnnnnnk....", "....knnkkxxxk...", "...kxxxkkkkk....", "...kkkkk........"},
+    {"....knnnnnnk....", "...kxxxkknnk....", "....kkkkkxxxk...", "........kkkkk..."},
+    {"....knnnnnnk....", "...knnpkkxxxk...", "..kxxxkkkkk.....", "..kkkkk........."},
+    {"....knnnnnnk....", "...kxxxkknpnk...", ".....kkkkkxxxk..", ".........kkkkk.."},
+    {"................", "................", "...knnnnnnnnk...", "..kxxxkkkkxxxk.."},
   },
   { // side
-    {"....knnnnnnk....", "....knpkknpk....", "....kxxkkxxxk...", "....kkkkkkkkk..."},
-    {"....knnnnnnk....", "...kpppk.knnnk..", "..kxxxk...kxxxk.", "..kkkkk...kkkkk."},
-    {"....knnnnnnk....", "...knnnk.kpppk..", "..kxxxk...kxxxk.", "..kkkkk...kkkkk."},
+    {"....knnnnnnk....", "....knnkknnk....", "...kxxxkkxxxxk..", "...kkkkkkkkkkk.."},
+    {"....knnnnnnk....", "...kpppk.knnnk..", "..kxxxk...kxxxxk", "..kkkkk...kkkkkk"},
+    {"....knnnnnnk....", "...knnnk.kpppk..", "..kxxxk...kxxxxk", "..kkkkk...kkkkkk"},
     {"...knnnnnnnk....", "..kpppk..knnnk..", ".kxxxk.....kxxxk", ".kkkk.......kkkk"},
     {"....knnnnnnnk...", "...knnnk..kpppk.", "..kxxxk....kxxxk", "..kkkk......kkkk"},
-    {"................", "................", "....knnnnnnnk...", "...kxxxkkkxxxk.."},
+    {"................", "................", "....knnnnnnnk...", "..kxxxxkkkxxxxk."},
   },
   { // back
-    {"....knnnnnnk....", "....kpnkkpnk....", "....kxxkkxxk....", "....kkkkkkkk...."},
-    {"....knnnnnnk....", "....kpnkkxxk....", "....kxxkkkkk....", "....kkkk........"},
-    {"....knnnnnnk....", "....kxxkkpnk....", "....kkkkkxxk....", "........kkkk...."},
-    {"....knnnnnnk....", "...kpnnkkxxk....", "...kxxkkkkk.....", "...kkkk........."},
-    {"....knnnnnnk....", "....kxxkkpnnk...", ".....kkkkkxxk...", ".........kkkk..."},
-    {"................", "................", "...knnnnnnnnk...", "...kxxkkkkxxk..."},
+    {"....knnnnnnk....", "....kpnkkpnk....", "...kxxxkkxxxk...", "...kkkkkkkkkk..."},
+    {"....knnnnnnk....", "....kpnkkxxxk...", "...kxxxkkkkk....", "...kkkkk........"},
+    {"....knnnnnnk....", "...kxxxkkpnk....", "....kkkkkxxxk...", "........kkkkk..."},
+    {"....knnnnnnk....", "...kpnnkkxxxk...", "..kxxxkkkkk.....", "..kkkkk........."},
+    {"....knnnnnnk....", "...kxxxkkpnnk...", ".....kkkkkxxxk..", ".........kkkkk.."},
+    {"................", "................", "...knnnnnnnnk...", "..kxxxkkkkxxxk.."},
   },
 };
 
@@ -141,9 +144,10 @@ static Sprite parseHead(const char* const* rows, int view, int style) {
     px H = pal_char('h'), J = pal_char('j'), L = pal_char('H'), k = pal_char('k');
     if (style == 1) {   // cap: crown in hair colours, brim across the forehead
         if (view == 0) {
-            for (int x = 1; x < 15; x++) spr_set(h, x, 7, J);
-            spr_set(h, 0, 7, k); spr_set(h, 15, 7, k);
-            spr_set(h, 7, 3, pal_char('y')); spr_set(h, 8, 3, pal_char('y'));
+            for (int x = 2; x < 16; x++) spr_set(h, x, 7, J);                 // brim juts out to the right (Try 2)
+            for (int x = 3; x < 15; x++) spr_set(h, x, 8, spr_get(h, x, 8) == pal_char('s') ? pal_char('S') : spr_get(h, x, 8));   // shadow under the brim
+            spr_set(h, 1, 7, k); spr_set(h, 15, 6, k); for (int x = 13; x < 16; x++) spr_set(h, x, 6, x == 15 ? k : J);
+            spr_set(h, 4, 3, L); spr_set(h, 5, 3, L); spr_set(h, 4, 4, L);   // crown highlight
         }
         if (view == 1) { for (int x = 9; x < 15; x++) spr_set(h, x, 7, J); spr_set(h, 15, 7, k); spr_set(h, 15, 8, KEYC); for (int x = 9; x < 14; x++) spr_set(h, x, 6, H); }
         if (view == 2) for (int x = 2; x < 14; x++) spr_set(h, x, 9, J);
@@ -174,8 +178,9 @@ static void zombify(Sprite& s, const CharPal& p, int view, int drop, uint32_t se
     Rng r(seed);
     px blood = rgb(168, 26, 26), dried = rgb(104, 18, 20), mouth = rgb(70, 8, 10);
     if (view == 0) {
-        for (int y = 11; y <= 12; y++) for (int x = 6; x <= 9; x++) spr_set(s, x, y + drop, (x == 6 || x == 9) ? blood : mouth);
-        for (int y = 3; y <= 6; y++) for (int x = 2; x <= 4 - (y > 4); x++) if (spr_get(s, x, y + drop) != pal_char('k')) spr_set(s, x, y + drop, ((x + y) & 1) ? blood : dried);   // smear on the scalp
+        bool slit = (seed / 77) % 4 == 1;   // one variant has a black slit mouth instead of a bloody one (Try 2)
+        for (int y = 11; y <= 12; y++) for (int x = 6; x <= 9; x++) spr_set(s, x, y + drop, slit ? (y == 12 ? rgb(24, 14, 14) : p.skinS) : ((x == 6 || x == 9) ? blood : mouth));
+        for (int y = 3; y <= 6; y++) for (int x = 2; x <= 4 - (y > 4); x++) if (spr_get(s, x, y + drop) != pal_char('k')) spr_set(s, x, y + drop, (x == 2 || y == 3) ? dried : blood);   // solid smear on the scalp
     }
     if (view == 1) { spr_set(s, 9, 11 + drop, mouth); spr_set(s, 10, 11 + drop, mouth); spr_set(s, 9, 12 + drop, blood); spr_set(s, 10, 12 + drop, blood); spr_set(s, 10, 13 + drop, dried); }
     px shirt = p.shirt, shirtD = gfx_scale(p.shirt, 170), shirtL = gfx_mix(p.shirt, rgb(255, 255, 255), 60);
@@ -184,14 +189,19 @@ static void zombify(Sprite& s, const CharPal& p, int view, int drop, uint32_t se
         if (v == gfx_mix(p.hair, rgb(255, 255, 255), 70)) v = p.skin;                      // balding: pale scalp, a few dark strands
         else if (v == p.hair) v = r.chance(0.07f) ? p.hair : gfx_mix(p.skin, p.skinS, 128);
         else if (v == gfx_scale(p.hair, 165)) v = r.chance(0.15f) ? p.hair : p.skinS;
-        else if (v == shirt || v == shirtD || v == shirtL) { if (r.chance(0.10f)) v = p.skinS; else if (r.chance(0.18f)) v = r.chance(0.6f) ? blood : dried; }
-        else if (v == p.pants && r.chance(0.08f)) v = dried;
+        else if (v == shirt || v == shirtD || v == shirtL) { if (r.chance(0.05f)) v = p.skinS; else if (r.chance(0.03f)) v = dried; }   // a few tears
+        else if (v == p.pants && r.chance(0.03f)) v = dried;
     }
     if (view == 0) {
 
         spr_set(s, 10, 6 + drop, blood); spr_set(s, 10, 7 + drop, dried); spr_set(s, 11, 7 + drop, blood);   // scalp gash
     }
     if (view == 1) for (int y = 14; y <= 17; y++) if (spr_get(s, 10, y + drop) != KEYC) spr_set(s, 10, y + drop, blood);
+    for (int k = 0; k < 3; k++) {   // long blood streaks soaking down the clothes (Try 2), not speckle
+        int sx = 4 + (int)(hash32(seed * 3 + k * 11) % 8), len = 3 + (int)(hash32(seed + k * 7) % 4);
+        for (int y = 0; y < len; y++) { int yy = 14 + drop + y; px c = spr_get(s, sx, yy); if (c != KEYC && c != pal_char('k')) spr_set(s, sx, yy, y < len - 1 ? blood : dried); }
+        px c2 = spr_get(s, sx + 1, 14 + drop); if (c2 != KEYC && c2 != pal_char('k')) spr_set(s, sx + 1, 14 + drop, dried);
+    }
 }
 
 static void buildCharacters() {
@@ -222,7 +232,7 @@ static void buildCharacters() {
             Sprite* out = z ? zombPose[v][d] : survPose[v][d];
             for (int p = 0; p < P_COUNT; p++) {
                 Sprite c = recolorChar(raw[p], cp, z != 0);
-                if (!z && cp.style == 1 && view != 2 && p != P_DEAD && p != P_LEAN_BACK && p != P_LEAN_FWD && p != P_HURT && p != P_FALL && p != P_RUN_A && p != P_RUN_B && p != P_REACH) spr_set(c, view == 0 ? 10 : 11, 15 + drop[p], pal_char('y'));   // chest badge
+                if (!z && v == 0 && cp.style == 1 && view != 2 && p != P_DEAD && p != P_LEAN_BACK && p != P_LEAN_FWD && p != P_HURT && p != P_FALL && p != P_RUN_A && p != P_RUN_B && p != P_REACH) spr_set(c, view == 0 ? 10 : 11, 15 + drop[p], pal_char('y'));   // chest badge
                 if (z) zombify(c, cp, view, drop[p], 1234 + v * 77 + d * 7);
                 freeS(raw[p]);
                 if (p == P_HURT) for (int i = 0; i < CW * CH; i++) if (c.d[i] != KEYC) c.d[i] = gfx_mix(c.d[i], pal::cream, 90);
@@ -245,39 +255,42 @@ const Sprite& art_char(bool zombie, int variant, int dir, Pose p, bool& flip) {
 }
 
 // ---------------------------------------------------------------- portraits
-ROWS(PORTRAIT,   // 24x24 bust, same face language as the 16x24 sprites (Try 2 portraits)
-"........................", "........kkkkkkkk........", "......kkHHHHhhhhkk......", ".....kHHHhhhhhhhhhk.....",
-"....kHHhhhhhhhhhhhhk....", "....kHhhhhhhhhhhhhjk....", "...kHhhhhhhhhhhhhhjjk...", "...khhhjhhhhhjhhhhjjk...",
-"...kjhshhhsshhshhhjjk...", "...kjhsssssssssssshjk...", "...kjhsjjsssssjjsshjk...", "...kjhswessssswesshjk...",
-"...kjhseessssseesshjk...", "...kjsseessssseessSjk...", "...kjsisssssSsssisSjk...", "....kSsssssSSsssssSk....",
-".....kSssssssssssSk.....", "......kkSSSSSSSSkk......", ".........kssssk.........", "....kkbbbMbsssbbbbkk....",
-"..kkbbMMbbbbmbbbbbmbkk..", ".kbbMbbbbbbbmbbbbbbbmbk.", ".kbMbbbbbbbbmbbbbbbbbmk.", ".kbbbbbbbbbbmbbbbbbbbbk.");
+ROWS(PORTRAIT,   // 24x24 three-quarter bust facing right (Try 2 portraits): hair mass behind, low brows, shaded jaw, jacket + pack straps
+"........................", "........kkkkkkkk........", "......kkhhhhhhhhkk......", ".....khhHHhhhhhhhhk.....",
+"....khHHhhhhhhhhhhhk....", "....khhhhhhhhhhhhhhjk...", "...khhhhhhhhhhhhhhhjk...", "...khhhjhhhhhjhhhhhjjk..",
+"...khhhhhshhsshhsshhjk..", "...khhhhjssjjsssssjjSk..", "...khhhhSsseessssseeSk..", "...khhhhSsseessssseeSk..",
+"...khhhjSsseessSsseeSk..", "....kjjSsssssssSsssSk...", "....kSsssssssiisssSk....", ".....kSsssssssssssSk....",
+"......kSssssssssssk.....", ".......kkSSSSSSSkk......", ".........kssssssk.......", "....kkOObbbMbsbbbOOkk...",
+"..kkbbOObbMMbbbbbOObbkk.", ".kbbbbOObbbbbmbbbOObbbk.", ".kbMbbOObbbbbmbbbOObbmk.", ".kbbbbOObbbbbmbbbOObbbk.");
 
 static void buildPortraits() {
     for (int v = 0; v < PORTRAITS; v++) {
         const CharPal& p = SURV_PAL[v];
         Sprite s = PARSE(PORTRAIT);
-        px H = pal_char('h'), L = pal_char('H'), J = pal_char('j'), k = pal_char('k');
-        if (p.style == 1) {   // cap: crown, brim jutting out to the right, red emblem
-            for (int y = 1; y <= 8; y++) for (int x = 0; x < 24; x++) { px c = spr_get(s, x, y); if (c == pal_char('s')) spr_set(s, x, y, H); }
-            for (int x = 4; x <= 21; x++) spr_set(s, x, 9, J);
-            spr_set(s, 3, 9, k); spr_set(s, 22, 9, k); spr_set(s, 21, 10, k); spr_set(s, 22, 10, k);   // brim edge + underside
-            for (int y = 4; y <= 5; y++) for (int x = 14; x <= 15; x++) spr_set(s, x, y, pal_char('r'));
-            spr_set(s, 14, 4, rgb(240, 200, 190));
-        } else if (p.style == 2) {   // long hair falling past the jaw onto the shoulders
-            for (int y = 9; y <= 19; y++) {
-                spr_set(s, 1, y, k); spr_set(s, 2, y, L); spr_set(s, 3, y, H); spr_set(s, 4, y, J);
-                spr_set(s, 22, y, k); spr_set(s, 21, y, J); spr_set(s, 20, y, H); spr_set(s, 19, y, J);
-            }
-            spr_set(s, 2, 20, k); spr_set(s, 3, 20, k); spr_set(s, 21, 20, k); spr_set(s, 20, 20, k);
+        px H = pal_char('h'), L = pal_char('H'), J = pal_char('j'), k = pal_char('k'), S = pal_char('S');
+        if (p.style == 1) {   // cap pulled low, brim jutting out to the right over the eyes
+            for (int y = 1; y <= 7; y++) for (int x = 0; x < 24; x++) if (spr_get(s, x, y) == pal_char('s')) spr_set(s, x, y, H);
+            for (int x = 8; x <= 22; x++) spr_set(s, x, 8, L);                  // lit top of the brim
+            for (int x = 9; x <= 23; x++) spr_set(s, x, 9, J);                  // dark underside, jutting past the head
+            spr_set(s, 7, 8, k); spr_set(s, 23, 8, k); spr_set(s, 21, 7, k); spr_set(s, 22, 7, k); spr_set(s, 8, 9, k);
+            for (int x = 9; x <= 19; x++) if (spr_get(s, x, 10) == pal_char('s')) spr_set(s, x, 10, S);   // shadow under the brim
+            spr_set(s, 6, 3, L); spr_set(s, 7, 3, L); spr_set(s, 6, 4, L);
+            if (v == 0 || v == 3) { spr_rect(s, 11, 4, 2, 2, rgb(196, 50, 44)); spr_set(s, 11, 4, rgb(240, 190, 180)); }   // cap emblem
+        } else if (p.style == 2) {   // long hair tied at the side, strand framing the face
+            for (int y = 9; y <= 18; y++) { spr_set(s, 2, y, k); spr_set(s, 3, y, J); spr_set(s, 4, y, H); spr_set(s, 5, y, L); }
+            spr_set(s, 3, 19, k); spr_set(s, 4, 19, k); spr_set(s, 5, 19, k);
+            spr_circle(s, 3, 10, 2, H); spr_set(s, 2, 9, L); spr_set(s, 0, 10, k); spr_set(s, 1, 8, k); spr_set(s, 1, 12, k);
+            for (int y = 9; y <= 13; y++) spr_set(s, 20, y, J);
         }
         Sprite col = recolorChar(s, p, false);
         freeS(s);
-        // backdrop: dark slate gradient like the Try 2 portrait frames
+        // backdrop: dark slate with a light rounded frame (Try 2 portrait cards)
         Sprite out = spr_new(24, 24);
         for (int y = 0; y < 24; y++) for (int x = 0; x < 24; x++) {
             px v2 = spr_get(col, x, y);
-            out.d[y * 24 + x] = v2 != KEYC ? v2 : gfx_mix(rgb(58, 60, 76), rgb(30, 30, 40), y * 10);
+            bool edge = x == 0 || y == 0 || x == 23 || y == 23, corner = (x == 0 || x == 23) && (y == 0 || y == 23);
+            px bg = gfx_mix(rgb(62, 64, 82), rgb(36, 36, 48), y * 10);
+            out.d[y * 24 + x] = corner ? rgb(30, 30, 38) : (edge ? rgb(120, 120, 136) : (v2 != KEYC ? v2 : bg));
         }
         freeS(col);
         g_portrait[v] = out;
@@ -494,20 +507,33 @@ static void buildProps() {
         for (int r = 0; r < 3; r++) for (int b = 0; b < 3; b++) if (hash32(r * 3 + b) % 4) spr_rect(s, 2 + b * 4 + (r & 1), 2 + r * 4, 3, 3, boxes[(r + b) & 3]);
         g_spr[S_SHELF] = s;
     }
-    {   // police car (top-down, 32x16): white body, navy doors, light bar
-        Sprite s = spr_new(32, 18);
-        spr_rect(s, 1, 2, 30, 14, pal_char('k'));
-        spr_rect(s, 2, 3, 28, 12, rgb(200, 200, 196));
-        spr_rect(s, 10, 3, 12, 12, rgb(42, 58, 90));
-        spr_rect(s, 7, 4, 3, 10, rgb(60, 84, 100)); spr_rect(s, 22, 4, 3, 10, rgb(60, 84, 100));  // windshields
-        spr_rect(s, 14, 5, 4, 3, rgb(176, 48, 48)); spr_rect(s, 14, 10, 4, 3, rgb(60, 90, 200));  // light bar
-        spr_rect(s, 3, 1, 4, 2, pal_char('k')); spr_rect(s, 25, 1, 4, 2, pal_char('k'));
-        spr_rect(s, 3, 15, 4, 2, pal_char('k')); spr_rect(s, 25, 15, 4, 2, pal_char('k'));
-        spr_set(s, 30, 5, rgb(230, 220, 160)); spr_set(s, 30, 12, rgb(230, 220, 160));
+    {   // Try 2 police car (40x28, 3/4 front view): black body, white door panel, light bar, chunky wheels
+        Sprite in = spr_new(38, 26);
+        px body = rgb(30, 32, 40), bodyL = rgb(58, 62, 74), white = rgb(226, 226, 220), whiteD = rgb(178, 178, 174), glass = rgb(70, 96, 118), glassL = rgb(130, 160, 180);
+        // lower body
+        for (int y = 11; y < 22; y++) for (int x = 0; x < 38; x++) spr_set(in, x, y, y == 11 ? bodyL : body);
+        // white door panels + stripe
+        spr_rect(in, 9, 12, 20, 8, white); spr_rect(in, 9, 18, 20, 2, whiteD); vline(in, 19, 12, 19, rgb(120, 120, 120));
+        spr_rect(in, 11, 14, 6, 1, rgb(40, 60, 110)); spr_rect(in, 21, 14, 6, 1, rgb(40, 60, 110));   // POLICE lettering hint
+        // cabin: roof + windows (narrower, set back)
+        for (int y = 4; y < 11; y++) { int in0 = (11 - y) / 2; for (int x = 6 + in0; x < 32 - in0; x++) spr_set(in, x, y, y < 6 ? body : glass); }
+        for (int y = 6; y < 11; y++) spr_set(in, 19, y, body);
+        for (int y = 6; y < 9; y++) { spr_set(in, 10 + y - 6, y, glassL); spr_set(in, 22 + y - 6, y, glassL); }
+        // light bar
+        spr_rect(in, 13, 1, 6, 3, rgb(210, 40, 36)); spr_rect(in, 19, 1, 6, 3, rgb(44, 80, 220)); spr_set(in, 14, 1, rgb(255, 140, 130)); spr_set(in, 20, 1, rgb(140, 170, 255));
+        // bumpers, headlights, grille
+        spr_rect(in, 34, 13, 4, 3, rgb(250, 240, 190)); spr_rect(in, 0, 13, 3, 3, rgb(200, 40, 36));
+        hline(in, 0, 37, 21, rgb(90, 92, 100));
+        // wheels
+        for (int k = 0; k < 2; k++) { int wx = k ? 28 : 3; spr_rect(in, wx, 20, 7, 6, rgb(16, 16, 18)); spr_rect(in, wx + 2, 22, 3, 2, rgb(110, 110, 116)); }
+        Sprite s = spr_new(40, 28);
+        for (int y = 0; y < in.h; y++) for (int x = 0; x < in.w; x++) { px v = spr_get(in, x, y); if (v != KEYC) spr_set(s, x + 1, y + 1, v); }
+        free(in.d);
+        outlineAll(s);
         g_spr[S_CAR] = s;
-        Sprite w = spr_copy(s);  // wrecked civilian car: rusty
-        for (int i = 0; i < w.w * w.h; i++) if (w.d[i] != KEYC && w.d[i] != pal_char('k')) w.d[i] = gfx_mix(w.d[i], rgb(110, 70, 50), 150);
-        spr_rect(w, 14, 5, 4, 8, rgb(90, 60, 44));
+        Sprite w = spr_copy(s);  // wrecked civilian car: rusty, smashed bar, no lettering
+        for (int i = 0; i < w.w * w.h; i++) if (w.d[i] != KEYC && w.d[i] != pal_char('k')) w.d[i] = gfx_mix(w.d[i], rgb(122, 74, 50), 160);
+        spr_rect(w, 14, 2, 12, 3, rgb(40, 30, 26)); spr_rect(w, 22, 7, 6, 3, rgb(34, 28, 24));
         g_spr[S_WRECK] = w;
     }
     for (int t = 0; t < 2; t++) {   // trees: layered canopy (32x32)
@@ -572,10 +598,19 @@ static void buildProps() {
         spr_rect(s, 7, 3, 2, 12, pal_char('k')); spr_rect(s, 5, 1, 6, 3, pal_char('k')); spr_rect(s, 6, 2, 4, 1, rgb(240, 220, 150));
         spr_rect(s, 5, 14, 6, 2, pal_char('k'));
         g_spr[S_LAMP] = s; }
-    for (int b = 0; b < 3; b++) {  // blood decals
-        Sprite s = spr_new(16, 16); Rng r(500 + b);
-        for (int i = 0; i < 5 + b * 2; i++) spr_circle(s, 5 + r.range(6), 5 + r.range(6), 1 + r.range(2 + b), i & 1 ? rgb(100, 18, 18) : rgb(80, 14, 16));
-        for (int i = 0; i < 6; i++) spr_set(s, r.range(16), r.range(16), rgb(110, 22, 20));
+    for (int b = 0; b < 3; b++) {  // blood decals: Try 2 splat with a central pool, radiating streaks, droplets
+        Sprite s = spr_new(32, 24); Rng r(500 + b);
+        px dk = rgb(92, 14, 16), md = rgb(124, 22, 22), lt = rgb(150, 30, 28);
+        for (int i = 0; i < 4 + b; i++) spr_circle(s, 13 + r.range(6), 10 + r.range(4), 2 + r.range(2 + b), i & 1 ? md : dk);
+        for (int k = 0; k < 7 + b * 2; k++) {
+            float a = r.range(628) / 100.0f; int len = 5 + r.range(7 + b * 2);
+            for (int t = 0; t < len; t++) {
+                int x = 16 + (int)(cosf(a) * t), y = 12 + (int)(sinf(a) * t * 0.6f);
+                spr_set(s, x, y, t < len / 2 ? md : dk); if (t < 3) spr_set(s, x, y + 1, md);
+            }
+            spr_circle(s, 16 + (int)(cosf(a) * (len + 2)), 12 + (int)(sinf(a) * (len + 2) * 0.6f), r.range(2), dk);
+        }
+        spr_set(s, 15, 10, lt); spr_set(s, 16, 10, lt); spr_set(s, 14, 11, lt);   // wet highlight
         g_spr[S_BLOOD0 + b] = s;
     }
     {   Sprite s = spr_new(16, 16);  // dropped backpack

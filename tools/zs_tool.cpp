@@ -62,13 +62,15 @@ static void duel(const char* path) {
     G.squad[0] = 0; G.squad[1] = -1; G.squad[2] = -1; G.st.surv[0].onExpedition = true;
     level_leave(); level_enter(MAP_POLICE, 0); ui_open(PN_HUD); step(10);
     Unit& u = G.u[G.ctrl];
+    u.x = u.px = 24 * 16 + 8.0f; u.y = u.py = 34 * 16 + 4.0f; G.clock = 21 * 60 + 30;   // station entrance at night (Try 2 combat panel)
+    G.camX = u.x - view_w() / 2; G.camY = u.y - view_h() / 2; step(30);
     G.nz = 0;
     for (int k = 0; k < 2; k++) {
         Zombie& z = G.z[G.nz++]; memset(&z, 0, sizeof z);
-        z.x = z.px = u.x + 70 + k * 6; z.y = z.py = u.y - 14 + k * 30; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 0.01f; z.variant = (uint8_t)k; z.hx = -1;
+        z.x = z.px = u.x + 64 + k * 10; z.y = z.py = u.y - 20 + k * 34; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 0.01f; z.variant = (uint8_t)k; z.hx = -1;
         z.anim = Animator(); z.anim.play(AnimState::ZWalk, true);
     }
-    u.fx = 1; u.fy = 0; u.dir = 0;
+    u.fx = 1; u.fy = 0; u.dir = 0; step(25);   // let the flashlight beam swing round first
     Survivor& s = G.st.surv[u.sv]; if (s.equip >= 0) { s.pack.it[s.equip].mag = 12; s.pack.it[s.equip].dur = 300; }
     Input y; y.down = BTN_Y; y.held = BTN_Y; step(1, y);
     gfx_writePNG(path, topB, TOP_W, TOP_H);
@@ -181,7 +183,7 @@ static void shots(const char* dir) {
         z.x = z.px = u.x + 30 + k * 12; z.y = z.py = u.y + 10 - k * 8; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 1; z.variant = (uint8_t)k; z.hx = -1;
         z.anim = Animator(); z.anim.play(AnimState::ZWalk, true);
     }
-    u.fx = 1; u.fy = 0; u.dir = 0;
+    u.fx = 1; u.fy = 0; u.dir = 0; step(25);   // let the flashlight beam swing round first
     Survivor& s = G.st.surv[u.sv]; if (s.equip >= 0) { s.pack.it[s.equip].mag = 12; s.pack.it[s.equip].dur = 300; }
     press(BTN_Y); step(2); shot(dir, "15_combat_muzzle");
     for (int i = 0; i < 4; i++) { press(BTN_Y); step(9); }

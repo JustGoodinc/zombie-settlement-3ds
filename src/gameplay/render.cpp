@@ -153,12 +153,12 @@ static void drawChar(Canvas& c, bool zombie, int variant, float x, float y, uint
             int fxd = orient == 0 ? 1 : orient == 2 ? -1 : 0, fyd = orient == 1 ? 1 : orient == 3 ? -1 : 0;
             mx += fxd * 2; my += fyd * 2;   // flash starts past the barrel tip
             px core = rgb(255, 250, 220), mid = rgb(255, 214, 90), outer = rgb(240, 140, 40);
-            for (int k = 1; k <= 9; k++) { px col = k < 4 ? core : (k < 7 ? mid : outer); gfx_pset(c, mx + fxd * k, my + fyd * k, col); if (k < 6) { gfx_pset(c, mx + fxd * k + fyd, my + fyd * k + fxd, k < 3 ? core : mid); gfx_pset(c, mx + fxd * k - fyd, my + fyd * k - fxd, k < 3 ? core : mid); } }   // forward cone
-            for (int k = 2; k <= 4; k++) {
+            for (int k = 1; k <= 12; k++) { px col = k < 5 ? core : (k < 9 ? mid : outer); gfx_pset(c, mx + fxd * k, my + fyd * k, col); if (k < 8) { gfx_pset(c, mx + fxd * k + fyd, my + fyd * k + fxd, k < 4 ? core : mid); gfx_pset(c, mx + fxd * k - fyd, my + fyd * k - fxd, k < 4 ? core : mid); } }   // forward cone
+            for (int k = 2; k <= 6; k++) {
                 gfx_pset(c, mx + fyd * k, my + fxd * k, k == 1 ? mid : outer); gfx_pset(c, mx - fyd * k, my - fxd * k, k == 1 ? mid : outer);   // side rays
                 gfx_pset(c, mx + (fxd + fyd) * k, my + (fyd + fxd) * k, outer); gfx_pset(c, mx + (fxd - fyd) * k, my + (fyd - fxd) * k, outer);   // diagonals
             }
-            gfx_fill(c, mx - 1, my - 2, 3, 5, mid); gfx_fill(c, mx - 2, my - 1, 5, 3, mid); gfx_fill(c, mx - 1, my - 1, 3, 3, core);
+            gfx_fill(c, mx - 2, my - 3, 5, 7, mid); gfx_fill(c, mx - 3, my - 2, 7, 5, mid); gfx_fill(c, mx - 2, my - 2, 5, 5, core); gfx_fillA(c, mx - 6, my - 5, 13, 11, rgb(255, 220, 120), 90);
         }
     };
     if (behind) weapon();
@@ -211,9 +211,57 @@ void render_world(Canvas& c, float alpha) {
         if (solidWall(tx - 1, ty)) { gfx_shade(c, bx, by, 2, 16, 170); gfx_shade(c, bx + 2, by, 2, 16, 215); }
         if (solidWall(tx + 1, ty)) gfx_shade(c, bx + 14, by, 2, 16, 200);
     }
+    // exterior facades (Try 2): outer walls facing the camera stand 2.5 tiles tall in red brick with a cornice,
+    // warm windows and glass double doors. Only while the player is outside, so interiors stay readable.
+    {
+        static Sprite brick[4], win, door; static bool built = false;
+        if (!built) {
+            built = true;
+            for (int v = 0; v < 5; v++) {
+                Sprite s = spr_new(16, 40);
+                for (int y = 0; y < 40; y++) for (int x = 0; x < 16; x++) {
+                    px c2;
+                    if (y < 4) c2 = y == 0 ? rgb(120, 100, 92) : rgb(64, 48, 44);                       // cornice
+                    else if (y >= 36) c2 = y == 36 ? rgb(140, 138, 132) : rgb(104, 102, 98);             // concrete base
+                    else {
+                        int row = (y - 4) / 4, bx2 = (x + (row & 1) * 4) % 8;
+                        bool mortar = ((y - 4) % 4 == 3) || bx2 == 7;
+                        uint32_t hh = hash32(v * 977 + row * 31 + (x + (row & 1) * 4) / 8);
+                        c2 = mortar ? rgb(74, 54, 48) : ((hh % 3) == 0 ? rgb(112, 54, 42) : ((hh % 3) == 1 ? rgb(128, 64, 48) : rgb(120, 58, 44)));
+                        if (!mortar && (hash32(v * 31 + x * 7 + y * 13) % 11) == 0) c2 = gfx_scale(c2, 220);
+                    }
+                    spr_set(s, x, y, c2);
+                }
+                if (v < 4) brick[v] = s;
+                else {   // window: dark frame, warm lit panes, cross bars, stone sill
+                    win = s;
+                    spr_rect(win, 2, 11, 12, 16, rgb(40, 32, 30)); spr_rect(win, 3, 12, 10, 14, rgb(214, 156, 74));
+                    spr_rect(win, 3, 12, 10, 3, rgb(240, 196, 110)); spr_rect(win, 7, 12, 2, 14, rgb(40, 32, 30)); spr_rect(win, 3, 18, 10, 1, rgb(40, 32, 30));
+                    spr_rect(win, 1, 27, 14, 2, rgb(150, 146, 138));
+                }
+            }
+            door = spr_copy(brick[1]);   // one leaf of the glass double door
+            spr_rect(door, 0, 8, 16, 32, rgb(34, 34, 40)); spr_rect(door, 2, 10, 13, 26, rgb(52, 64, 82));
+            spr_rect(door, 3, 11, 4, 12, rgb(84, 104, 124)); spr_rect(door, 2, 23, 13, 1, rgb(34, 34, 40));
+            spr_rect(door, 12, 24, 2, 3, rgb(232, 192, 64));
+        }
+        const Unit& pu = G.u[G.ctrl];
+        int ptx = (int)(pu.x / 16), pty = (int)(pu.y / 16);
+        bool outside = G.nu > 0 && m.in(ptx, pty) && !(m.flags[m.idx(ptx, pty)] & F_INDOOR);
+        if (outside && G.scene == SC_EXPEDITION)
+            for (int ty = ty0; ty <= ty1 + 3; ty++) for (int tx = tx0; tx <= tx1; tx++) {
+                if (!m.in(tx, ty) || !m.in(tx, ty + 1) || !m.in(tx, ty - 1)) continue;
+                int i = m.idx(tx, ty); uint8_t t = m.t[i];
+                if (t != T_WALL && t != T_DOOR) continue;
+                if ((m.flags[m.idx(tx, ty + 1)] & F_INDOOR) || !(m.flags[m.idx(tx, ty - 1)] & F_INDOOR)) continue;
+                const Sprite* s = &brick[(tx * 7 + ty) & 3];
+                if (t == T_DOOR && m.barAt[i] >= 0) s = m.bar[m.barAt[i]].kind == BK_WINDOW ? &win : &door;
+                gfx_blit(c, *s, tx * 16 - camX, ty * 16 + 16 - 40 - camY);
+            }
+    }
     // police station signage above the front doors (Try 2 look)
     if (m.id == MAP_POLICE) {
-        int sx = 19 * 16 + 14 - camX, sy = 32 * 16 + 3 - camY;   // facade wall left of the double doors
+        int sx = 19 * 16 + 14 - camX, sy = 32 * 16 - 20 - camY;   // on the brick facade, left of the double doors
         gfx_fill(c, sx - 1, sy - 1, 74, 13, pal::ink);
         gfx_fill(c, sx, sy, 72, 11, rgb(34, 46, 84)); gfx_fill(c, sx, sy, 72, 1, rgb(70, 90, 140));
         gfx_text(c, sx + 9, sy + 2, "POLICE", pal::cream, 1, true); gfx_text(c, sx + 10, sy + 2, "POLICE", pal::cream, 1, false);
@@ -222,7 +270,7 @@ void render_world(Canvas& c, float alpha) {
         gfx_fill(c, sx + 76, sy + 2, 4, 4, on ? rgb(60, 90, 240) : rgb(30, 40, 90));
     }
     // decals (blood) and corpses lie under everything
-    for (int k = 0; k < G.ndecal; k++) gfx_blit(c, g_spr[S_BLOOD0 + G.decal[k].kind % 3], (int)G.decal[k].x - camX, (int)G.decal[k].y - camY);
+    for (int k = 0; k < G.ndecal; k++) gfx_blit(c, g_spr[S_BLOOD0 + G.decal[k].kind % 3], (int)G.decal[k].x - camX - 8, (int)G.decal[k].y - camY - 4);   // 32x24 splats
     for (int k = 0; k < G.nz; k++) {
         Zombie& z = G.z[k];
         if (z.state != ZS_DEAD || z.anim.state != AnimState::Dead) continue;
@@ -246,8 +294,8 @@ void render_world(Canvas& c, float alpha) {
         switch (p.type) {
         case PR_TREE: gfx_fillA(c, x - 6, y + 6, 32, 12, rgb(0, 0, 0), 90); gfx_fillA(c, x - 2, y + 4, 24, 16, rgb(0, 0, 0), 50); break;
         case PR_PLOT: if (G.st.bLevel[p.special]) { const Sprite& bs = g_bldWorld[p.special][G.st.bLevel[p.special] > 3 ? 3 : G.st.bLevel[p.special]]; shadow(bs, x + 24 - bs.w / 2, y + 48 - bs.h, 4, 3, 150); } break;
-        case PR_CAR: shadow(g_spr[S_CAR], x, y, 2, 3, 140); break;
-        case PR_WRECK: shadow(g_spr[S_WRECK], x, y, 2, 3, 140); break;
+        case PR_CAR: shadow(g_spr[S_CAR], x - 4, y - 12, 2, 3, 140); break;
+        case PR_WRECK: shadow(g_spr[S_WRECK], x - 4, y - 12, 2, 3, 140); break;
         case PR_TENT: shadow(g_spr[S_TENT], x - 7, y - 24, 3, 3, 150); break;
         case PR_CHAIR: case PR_CONE: case PR_GENERATOR: break;
         default: if (p.type <= PR_LOGS && p.type != PR_PLOT) {
@@ -292,8 +340,8 @@ void render_world(Canvas& c, float alpha) {
             case PR_DECOR_CRATE: gfx_blit(c, g_spr[S_CRATE], x, y); break;
             case PR_MEDCAB: gfx_blit(c, g_spr[S_MEDCAB], x, y); break;
             case PR_SHELF: gfx_blit(c, g_spr[S_SHELF], x, y); break;
-            case PR_CAR: gfx_blit(c, g_spr[S_CAR], x, y - 2); break;
-            case PR_WRECK: gfx_blit(c, g_spr[S_WRECK], x, y - 2); break;
+            case PR_CAR: gfx_blit(c, g_spr[S_CAR], x - 4, y - 12); break;
+            case PR_WRECK: gfx_blit(c, g_spr[S_WRECK], x - 4, y - 12); break;
             case PR_TREE: {
                 // gentle sway: canopy offset by a slow sine, trunk static
                 int sway = (int)(sinf(G.uiTime * 0.9f + p.tx * 0.7f) * 1.2f);
@@ -414,7 +462,8 @@ void render_world(Canvas& c, float alpha) {
     for (auto& p : G.proj) if (p.active) {
         int x = (int)p.x - camX, y = (int)p.y - camY;
         float l = sqrtf(p.vx * p.vx + p.vy * p.vy) + 1e-3f;
-        gfx_line(c, x, y, x - (int)(p.vx / l * 5), y - (int)(p.vy / l * 5), rgb(250, 230, 150));
+        gfx_line(c, x, y, x - (int)(p.vx / l * 16), y - (int)(p.vy / l * 16), rgb(230, 170, 60));   // long tracer, hot head
+        gfx_line(c, x, y, x - (int)(p.vx / l * 7), y - (int)(p.vy / l * 7), rgb(255, 240, 170));
     }
     for (auto& p : G.part) {
         if (p.life <= 0) continue;
@@ -441,6 +490,7 @@ void render_world(Canvas& c, float alpha) {
             int nx = tx + (ox ? 1 : -1), ny = ty + (oy ? 1 : -1);
             int Lx = m.in(nx, ty) ? G.light[m.idx(nx, ty)] : L, Ly = m.in(tx, ny) ? G.light[m.idx(tx, ny)] : L;
             int v = (L * 2 + Lx + Ly) / 4;
+            if (G.scene == SC_EXPEDITION && !(m.flags[m.idx(tx, ty)] & F_INDOOR) && v < 150) v = 150 - (150 - v) / 3;   // render-only moonlight floor: night stays readable (gameplay still uses the true light map)
             int x0 = tx * 16 + ox * 8 - camX, y0 = ty * 16 + oy * 8 - camY;
             // vignette: darken toward the screen edges (folded into the same pass)
             int VW = view_w(), VH = view_h(); float vx = (x0 + 4 - VW / 2) / (float)(VW / 2), vy = (y0 + 4 - VH / 2) / (float)(VH / 2);
@@ -497,6 +547,18 @@ void render_world(Canvas& c, float alpha) {
             }
         }
     }
+    if (m.id == MAP_POLICE && day < 0.97f) {   // the lit POLICE sign stays bright after dark (Try 2)
+        int sx = 19 * 16 + 14 - camX, sy = 32 * 16 - 20 - camY;
+        if (sx > -90 && sx < c.w + 10 && sy > -20 && sy < c.h + 10) {
+            gfx_fill(c, sx - 1, sy - 1, 74, 13, pal::ink);
+            gfx_fill(c, sx, sy, 72, 11, rgb(30, 40, 74)); gfx_fill(c, sx, sy, 72, 1, rgb(80, 100, 150));
+            gfx_text(c, sx + 10, sy + 2, "POLICE", rgb(250, 250, 244), 1, false);
+            gfx_fillA(c, sx - 4, sy + 12, 80, 6, rgb(200, 210, 255), 40);   // spill light on the wall
+            bool on = ((int)(G.uiTime * 3)) & 1;
+            gfx_fill(c, sx - 8, sy + 2, 4, 4, on ? rgb(255, 70, 60) : rgb(90, 30, 30));
+            gfx_fill(c, sx + 76, sy + 2, 4, 4, on ? rgb(70, 110, 255) : rgb(30, 40, 90));
+        }
+    }
     if (G.scene == SC_SETTLEMENT && day < 0.95f) {
         // windows stay lit through the dark: re-light the panes and bloom a warm halo
         float dk = fminf(1.0f, (1.0f - day) / 0.45f);
@@ -526,10 +588,10 @@ void render_world(Canvas& c, float alpha) {
         const Sprite* s = &g_spr[S_DESK];
         switch (p.type) { case PR_FILING: s = &g_spr[S_FILING]; break; case PR_LOCKER: s = &g_spr[S_LOCKER]; break; case PR_CRATE: s = &g_spr[S_CRATE]; break;
             case PR_MEDCAB: s = &g_spr[S_MEDCAB]; break; case PR_SHELF: s = &g_spr[S_SHELF]; break; case PR_CAR: s = &g_spr[S_CAR]; break; case PR_WRECK: s = &g_spr[S_WRECK]; break; }
-        int oy = (p.type == PR_CAR || p.type == PR_WRECK) ? -2 : 0;
+        int oy = (p.type == PR_CAR || p.type == PR_WRECK) ? -12 : 0, ox = (p.type == PR_CAR || p.type == PR_WRECK) ? -4 : 0;
         px col = searching ? pal::gold : (searched ? pal::grey : pal::lime);
-        gfx_outline(c, *s, p.tx * 16 - camX, p.ty * 16 - camY + oy, col);
-        if (!searched && !searching) gfx_outline(c, *s, p.tx * 16 - camX, p.ty * 16 - camY + oy - 0, (G.tick / 8) & 1 ? pal::lime : rgb(110, 170, 40));
+        gfx_outline(c, *s, p.tx * 16 - camX + ox, p.ty * 16 - camY + oy, col);
+        if (!searched && !searching) gfx_outline(c, *s, p.tx * 16 - camX + ox, p.ty * 16 - camY + oy, (G.tick / 8) & 1 ? pal::lime : rgb(110, 170, 40));
     }
 }
 
@@ -556,13 +618,13 @@ static void hud(Canvas& c) {
     const Unit& u = G.u[G.ctrl];
     if (u.sv < 0) return;
     const Survivor& s = G.st.surv[u.sv];
-    // survivor plate (top-left)
-    gfx_fillA(c, 3, 3, 118, 30, pal::ink, 190); gfx_rect(c, 3, 3, 118, 30, pal::border);
-    gfx_blit(c, g_portrait[s.variant % PORTRAITS], 6, 6);
-    gfx_text(c, 34, 6, s.name, pal::cream);
-    ui_bar(c, 34, 16, 82, 6, s.hp / s.maxHp, s.hp < 35 ? pal::red : pal::green);
-    ui_bar(c, 34, 24, 82, 5, u.stam / 100, pal::cyan);
-    if (s.infection && s.infKnown) gfx_blit(c, g_spr[S_ICON_BIO], 110, 5);
+    // survivor plate (top-left, Try 2): framed portrait + two thick bars (health green, stamina yellow)
+    gfx_fillA(c, 3, 3, 110, 32, pal::ink, 200); gfx_rect(c, 3, 3, 110, 32, pal::border);
+    gfx_fill(c, 5, 5, 28, 28, rgb(20, 20, 26)); gfx_rect(c, 5, 5, 28, 28, rgb(96, 92, 100));
+    gfx_blit(c, g_portrait[s.variant % PORTRAITS], 7, 7);
+    gfx_fill(c, 36, 8, 74, 10, pal::ink); ui_bar(c, 37, 9, 72, 8, s.hp / s.maxHp, s.hp < 35 ? pal::red : rgb(96, 200, 64));
+    gfx_fill(c, 36, 21, 74, 9, pal::ink); ui_bar(c, 37, 22, 72, 7, u.stam / 100, rgb(226, 206, 60));
+    if (s.infection && s.infKnown) gfx_blit(c, g_spr[S_ICON_BIO], 100, 24);
     // squad mini bars
     int yy = 37;
     for (int i = 0; i < G.nu; i++) {
@@ -585,16 +647,23 @@ static void hud(Canvas& c) {
     gfx_fillA(c, 200 - w / 2, 3, w, 13, pal::ink, 190); gfx_rect(c, 200 - w / 2, 3, w, 13, pal::border);
     gfx_textC(c, 200, 6, up, pal::cream);
     // weapon + ammo (top-right)
-    gfx_fillA(c, 300, 3, 97, 22, pal::ink, 190); gfx_rect(c, 300, 3, 97, 22, pal::border);
+    // Try 2: a light weapon silhouette and big bold ammo digits, on a soft dark backing
+    gfx_fillA(c, 290, 3, 107, 22, pal::ink, 150);
     if (s.equip >= 0 && s.equip < s.pack.n) {
         const Item& it = s.pack.it[s.equip]; const ItemDef& d = idef(it.id);
         const Sprite& ic = g_item[it.id];
-        gfx_blit(c, ic, 304, 4 + (8 - ic.h / 2 > 0 ? 8 - ic.h / 2 : 0));
+        int sc = ic.w <= 16 ? 2 : 1, iw = ic.w * sc, ih = ic.h * sc, ix = 294, iy = 14 - ih / 2;
+        for (int y = 0; y < ih; y++) for (int x = 0; x < iw; x++) {   // silhouette: icon brightened toward light grey
+            px v = ic.d[(y / sc) * ic.w + x / sc]; if (v == KEYC) continue;
+            gfx_pset(c, ix + x, iy + y, v == pal_char('k') ? rgb(20, 20, 24) : gfx_mix(v, rgb(226, 226, 232), 150));
+        }
         char b[24];
         if (d.cat == IC_FIREARM) snprintf(b, sizeof b, "%d/%d", it.mag, s.pack.countOf(d.wpn.ammo));
         else snprintf(b, sizeof b, d.wpn.dur ? "%d%%" : "--", d.wpn.dur ? it.dur * 100 / d.wpn.dur : 0);
-        gfx_text(c, 394 - gfx_textW(b, 1), 8, b, it.dur == 0 && d.wpn.dur ? pal::red : pal::cream);
-        if (d.cat == IC_FIREARM && it.mag == 0) gfx_text(c, 345, 16, "RELOAD X", pal::red);
+        px col = (it.dur == 0 && d.wpn.dur) || (d.cat == IC_FIREARM && it.mag == 0) ? pal::red : rgb(250, 248, 240);
+        int tw = gfx_textW(b, 2);
+        gfx_text(c, 394 - tw + 1, 7, b, pal::ink, 2); gfx_text(c, 394 - tw, 6, b, col, 2);
+        if (d.cat == IC_FIREARM && it.mag == 0) gfx_text(c, 345, 26, "RELOAD X", pal::red);
     } else gfx_text(c, 306, 9, "Unarmed", pal::dim);
     // clock
     char cl[32]; snprintf(cl, sizeof cl, "Day %u %s", G.day, clock_str());
