@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.1 — roomier settlement, bigger loot screen
+- Settlement compound is wider and taller, with at least four tiles of open ground between buildings.
+- Container / stash screen: the "Pick loot above" text box is gone; the backpack grid now uses the full space below the loot slots at the same 24 px cells as the backpack screen. The selected item's name shows on the line above the grid.
+
 ## v0.2.0 — Staying Alive: Try 2 redesign
 - Compared against the mockup panel by panel (settlement, combat, characters, portraits) and iterated: Try 2 compound layout framed fence to fence, grey picket fence, warm dirt yard, big army tent, stone fire pit, iron lamp posts, warm evening light pools, settlers gathering at the fire; red-brick police station facade with glass doors and a lit POLICE sign, 3/4 police car, bold HUD (framed portrait, thick bars, big ammo digits), big blood splats, long tracers, readable nights (render only; stealth unchanged); 3/4 portraits with cap brims and pack straps; cleaner zombies with blood streaks.
 - The game is now called **Staying Alive** (title screen, window, 3DS banner/HOME menu name, release file names). Saves stay where they were, and the 3DS title ID is unchanged so the CIA installs over the old one.
