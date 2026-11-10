@@ -322,6 +322,7 @@ static void icons(const char* dir) {
 }
 
 #include "handoff.inc"
+#include "playtest.inc"
 
 int main(int argc, char** argv) {
     game_init();
@@ -335,6 +336,8 @@ int main(int argc, char** argv) {
     else if (argc >= 3 && !strcmp(argv[1], "--lineup")) lineup(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--duel")) duel(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--base")) base(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "--playtest")) playtest(argv[2], argc >= 4 ? atoi(argv[3]) : 30);
+    else if (argc >= 3 && !strcmp(argv[1], "--mapshots")) mapShots(argv[2]);
     else { printf("usage: zs_tool --gallery DIR | --shots DIR | --bench | --icons DIR\n"); return 1; }
     return 0;
 }

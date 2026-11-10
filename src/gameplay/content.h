@@ -55,7 +55,7 @@ struct BuildingDef {
 };
 extern const BuildingDef BUILDINGS[B_COUNT];
 
-enum { LOC_COUNT = 7 };
+enum { LOC_COUNT = 5 };   // launch locations; saves keep 7 slots (see save.cpp)
 struct LocationDef {
     const char* name;
     const char* loot;

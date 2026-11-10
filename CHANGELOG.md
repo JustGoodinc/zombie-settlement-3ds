@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — five launch maps, playtested
+- Five expedition maps at launch: **Police Station**, **Hospital** (wards, surgery, a keycard-locked pharmacy, ER, lobby and ambulance bay), **Supermarket** (loading dock, stockroom, aisles, checkouts, car park), **Train Yard** (harbour quay with shipping containers, three rail lines with boxcars, rail depot warehouse and yard office) and **Neighborhood** (five furnished homes with beds, sofas, fridges and kitchens, fenced yards, a street of parked cars, an abandoned backyard camp, and someone locked in a bedroom with the key in a neighbour's desk). Scrapyard and Woods are retired; old saves still load.
+- Each place stocks what it should: supermarket shelves hold food, hospital shelves medicine, home desks and pantries household supplies, freight containers materials, fuel and tools. Most supermarket and depot shelves are picked over, so the stores look full without hundreds of searches.
+- New art: rail track, harbour water, shipping containers in four paints, boxcars, beds, sofas, fridges, and HOSPITAL / MARKET / RAIL DEPOT signs.
+- Sprint: running out of stamina while holding B now keeps you walking until you let go, instead of stuttering between sprint and walk.
+- Movement slides around door frames and furniture corners instead of catching on them.
+- Double doors open and close together.
+- The interaction prompt prefers what you're facing, so walking into a door and pressing A opens it even with a shelf beside it.
+- A trapped survivor in reach always gets the Rescue prompt (a crate or the doorway you're standing in no longer hides it).
+- Holding-cell doors can't be smashed by zombies, so the prisoner survives until you bring the key (before, zombies broke in within about 45 seconds). Rescued survivors also start each expedition at full health.
+- Companions only walk straight at you when the path is actually clear, and otherwise follow the route around furniture and windows.
+- Arrival points no longer have a zombie waiting one step away.
+- Searching large props (containers, boxcars) works from any side.
+- `zs_tool --playtest DIR [runs]` plays every map through the real game input (all containers, keys, doors, rescue, extraction; solo by day, squad with zombies, and at night) and reports stuck spots, wall scraping, companion lag and 1-tile pinch points with heatmaps. `zs_tool --mapshots DIR` renders overviews and in-game shots of each map. A new test checks every map stays within engine limits with every container reachable.
+
 ## v0.2.2 — faster settlement, C material menus
 - The settlement renders 56% faster (0.64 -> 0.28 ms/frame on the PC benchmark; the police station 0.27 -> 0.19), aimed at a steady 30 fps on 3DS: no integer divisions in the sprite blitter (the 3DS CPU has no hardware divide), a packed one-multiply 565 blend for lighting and overlays, the settlement colour grade through a lookup table, static lights baked per tile, the player's line of sight cached per tile, and light pools from cached falloff masks. Visual output is unchanged.
 - `zs_tool --bench-base` benchmarks the settlement (day / dusk / night) with a per-stage breakdown.

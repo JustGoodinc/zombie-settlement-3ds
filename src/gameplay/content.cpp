@@ -1,4 +1,5 @@
 #include "content.h"
+#include "../world/world.h"
 
 #define NOW {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0}
 //                         dmg acc pel  cd  mag ammo           dur noise rng cone st reach auto shake reload
@@ -30,7 +31,7 @@ const ItemDef ITEMS[IT_COUNT] = {
     {"Planks", "Lumber for construction.", IC_MATERIAL, 3, 1, 2, NOW, RES_MAT, 5, 0},
     {"Toolbox", "Tools and fittings.", IC_MATERIAL, 2, 1, 1, NOW, RES_MAT, 6, 0},
     {"Fuel Can", "Fuel for generators and vehicles.", IC_FUEL, 2, 2, 1, NOW, RES_FUEL, 5, 0},
-    {"Station Keycard", "Opens the station's secure rooms.", IC_KEY, 1, 1, 1, NOW, 0, 0, 0},
+    {"Keycard", "Opens a locked door somewhere in this building.", IC_KEY, 1, 1, 1, NOW, 0, 0, 0},
     {"Cell Key", "Opens the holding cells.", IC_KEY, 1, 1, 1, NOW, 0, 0, 0},
     {"Medium Backpack", "Use to upgrade to an 8x5 bag.", IC_BACKPACK, 2, 2, 1, NOW, 0, 0, 0},
     {"Large Backpack", "Use to upgrade to a 10x6 bag.", IC_BACKPACK, 2, 2, 1, NOW, 0, 0, 0},
@@ -61,13 +62,11 @@ const BuildingDef BUILDINGS[B_COUNT] = {
 };
 
 const LocationDef LOCATIONS[LOC_COUNT] = {
-    {"Police Station", "Weapons, Ammo, Medicine", "Medium", 0},
-    {"Hospital", "Medicine, Equipment", "High", -1},
-    {"Grocery Store", "Food, Fuel", "Low", -1},
-    {"Train Yard", "Materials, Fuel", "Medium", -1},
-    {"Scrapyard", "Materials, Tools", "Low", -1},
-    {"Woods", "Food, Planks", "Low", -1},
-    {"Residential", "Mixed supplies", "Medium", -1},
+    {"Police Station", "Weapons, Ammo, Medicine", "Medium", MAP_POLICE},
+    {"Hospital", "Medicine, Equipment", "High", MAP_HOSPITAL},
+    {"Supermarket", "Food, Fuel", "Medium", MAP_MARKET},
+    {"Train Yard", "Materials, Fuel, Tools (rail + docks)", "Medium", MAP_YARD},
+    {"Neighborhood", "Mixed supplies, Food", "Low", MAP_HOMES},
 };
 
 const char* SKILL_NAMES[SK_COUNT] = {"Shooting", "Melee", "Medical", "Mechanical", "Farming", "Guarding"};

@@ -5,7 +5,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-enum { SAVE_VERSION = 1, SAVE_CAP = 512 * 1024 };
+enum { SAVE_VERSION = 1, SAVE_CAP = 512 * 1024, SAVE_LOCS = 7 };
+static const int LOC_SLOT[LOC_COUNT] = {0, 1, 2, 3, 6};   // Police, Hospital, Supermarket (was Grocery), Train Yard, Neighborhood (was Residential)
 static char g_dir[192] = "saves/";
 void save_setDir(const char* d) { snprintf(g_dir, sizeof g_dir, "%s", d); }
 const char* save_dir() { return g_dir; }
@@ -74,8 +75,11 @@ int save_serialize(uint8_t* buf, int cap) {
     w.u8((uint8_t)st.njournal); w.u8((uint8_t)st.unread);
     for (int i = 0; i < st.njournal; i++) { w.u16(st.journal[i].day); w.u8(st.journal[i].kind); w.str(st.journal[i].text, sizeof st.journal[i].text); }
     w.u8(st.visitorPresent); w.u8(st.visitorScreened); wSurv(w, st.visitor); w.u32(st.nextId);
-    for (int l = 0; l < LOC_COUNT; l++) {
-        const LocState& L = G.loc[l];
+    // the save format keeps the original 7 location slots; the launch locations map onto slots 0-3 and 6
+    static LocState blank;
+    for (int slot = 0; slot < SAVE_LOCS; slot++) {
+        int l = -1; for (int k = 0; k < LOC_COUNT; k++) if (LOC_SLOT[k] == slot) l = k;
+        const LocState& L = l >= 0 ? G.loc[l] : blank;
         w.u8(L.visited); w.u8(L.gen); w.f32(L.cooldown); w.u8(L.rescued);
         for (int c = 0; c < MAX_CONT; c++) { w.u8(L.generated[c]); if (L.generated[c]) wCont(w, L.cont[c]); }
         for (int k = 0; k < 3; k++) w.u32(L.deadMask[k]);
@@ -102,8 +106,10 @@ bool save_deserialize(const uint8_t* buf, int len, char* err, int errLen) {
     st.njournal = (int)r.u8(); st.unread = (int)r.u8(); if (st.njournal > MAX_JOURNAL) { snprintf(err, errLen, "Corrupt journal"); return false; }
     for (int i = 0; i < st.njournal; i++) { st.journal[i].day = (uint16_t)r.u16(); st.journal[i].kind = (uint8_t)r.u8(); r.raw(st.journal[i].text, sizeof st.journal[i].text); st.journal[i].text[sizeof st.journal[i].text - 1] = 0; }
     st.visitorPresent = r.u8() != 0; st.visitorScreened = r.u8() != 0; rSurv(r, st.visitor); st.nextId = r.u32();
-    for (int l = 0; l < LOC_COUNT; l++) {
-        LocState& L = tmp.loc[l]; memset(&L, 0, sizeof L);
+    for (int slot = 0; slot < SAVE_LOCS; slot++) {
+        int l = -1; for (int k = 0; k < LOC_COUNT; k++) if (LOC_SLOT[k] == slot) l = k;
+        static LocState discard;   // retired locations (Scrapyard, Woods) are read and dropped
+        LocState& L = l >= 0 ? tmp.loc[l] : discard; memset(&L, 0, sizeof L);
         L.visited = r.u8() != 0; L.gen = (uint8_t)r.u8(); L.cooldown = r.f32(); L.rescued = r.u8() != 0;
         for (int c = 0; c < MAX_CONT; c++) { L.generated[c] = r.u8() != 0; L.cont[c].cap = 8; if (L.generated[c]) rCont(r, L.cont[c]); }
         for (int k = 0; k < 3; k++) L.deadMask[k] = r.u32();

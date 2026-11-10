@@ -332,7 +332,9 @@ static void unit_init(Unit& u, int sv, float x, float y) {
     u.dir = 2; u.anim = Animator();
 }
 
+static float g_escortHp[MAX_UNITS];   // trapped survivors have no Survivor record yet; full health on every level entry
 void level_enter(int mapId, int loc) {
+    for (int i = 0; i < MAX_UNITS; i++) g_escortHp[i] = 60;
     map_load(G.map, mapId);
     G.curLoc = loc; G.nz = 0; G.nu = 0; G.ctrl = 0; G.ndecal = 0; G.inLevel = true;
     memset(G.proj, 0, sizeof G.proj); memset(G.part, 0, sizeof G.part); memset(G.ft, 0, sizeof G.ft);
@@ -390,7 +392,7 @@ void level_enter(int mapId, int loc) {
         for (int i = 0; i < G.map.nprop; i++) {
             Prop& p = G.map.prop[i];
             if (p.type == PR_PLOT) p.solid = G.st.bLevel[p.special] > 0;
-            if (p.type == PR_PLOT) for (int j = 0; j < 3; j++) for (int k = 0; k < 3; k++) G.map.propAt[G.map.idx(p.tx + k, p.ty + j)] = (int8_t)i;
+            if (p.type == PR_PLOT) for (int j = 0; j < 3; j++) for (int k = 0; k < 3; k++) G.map.propAt[G.map.idx(p.tx + k, p.ty + j)] = (int16_t)i;
         }
         for (int i = 0; i < G.map.nbar; i++) if (G.map.bar[i].kind == BK_GATE) G.map.bar[i].state = BS_CLOSED;
         map_refresh(G.map);
@@ -424,16 +426,24 @@ static Interact find_interact(const Unit& u) {
     Interact best; float bd = 1e9f;
     auto consider = [&](int kind, int idx, float x, float y, float range, const char* label) {
         float d = len2(x - u.x, y - u.y);
-        if (d <= range && d < bd) { bd = d; best.kind = kind; best.idx = idx; best.label = label; best.x = x; best.y = y; }
+        if (d > range) return;
+        // what you're facing wins over what's merely beside you (a door you walk into beats the shelf next to it)
+        float score = d;
+        if (d > 1 && ((x - u.x) * u.fx + (y - u.y) * u.fy) / d > 0.6f) score *= 0.6f;
+        if (score < bd) { bd = score; best.kind = kind; best.idx = idx; best.label = label; best.x = x; best.y = y; }
     };
     for (int i = 0; i < G.map.nprop; i++) {
         const Prop& p = G.map.prop[i];
         float cx = p.tx * 16 + p.tw * 8.0f, cy = p.ty * 16 + p.th * 8.0f;
         if (p.container >= 0 && G.curLoc >= 0) {
             bool searched = G.loc[G.curLoc].generated[p.container];
-            int tx = p.tx, ty = p.ty;
+            // reach is measured to the nearest tile of the footprint (same as the centre for 1x1 props),
+            // so long shipping containers and boxcars can be searched from any side
+            float nx = fminf(fmaxf(u.x, p.tx * 16 + 8.0f), (p.tx + p.tw) * 16 - 8.0f), ny = fminf(fmaxf(u.y, p.ty * 16 + 8.0f), (p.ty + p.th) * 16 - 8.0f);
+            int tx = (int)(nx / 16), ty = (int)(ny / 16);
             if (G.light[G.map.idx(tx, ty)] < 40 && !searched) continue;  // unseen in the dark
-            consider(searched ? IK_OPEN_CONT : IK_SEARCH, i, cx, cy, 22, searched ? "Open" : "Search");
+            consider(searched ? IK_OPEN_CONT : IK_SEARCH, i, nx, ny, 22, searched ? "Open" : "Search");
+            (void)cx; (void)cy;
         }
         if (G.scene == SC_SETTLEMENT) {
             if (p.type == PR_PLOT) consider(IK_PLOT, i, cx, cy + 12, 36, BUILDINGS[p.special].name);
@@ -446,11 +456,16 @@ static Interact find_interact(const Unit& u) {
     for (int i = 0; i < G.map.nbar; i++) {
         const Barrier& b = G.map.bar[i];
         if (b.kind == BK_WINDOW || b.state == BS_BROKEN) continue;
+        // standing in an open doorway: it can't be shut on you, so don't let it hide what's beyond (e.g. Rescue)
+        if (b.state == BS_OPEN && fabsf(u.x - (b.x * 16 + 8.0f)) < 11 && fabsf(u.y - (b.y * 16 + 8.0f)) < 11) continue;
         const char* l = b.state == BS_OPEN ? "Close & Lock" : (b.state == BS_LOCKED ? (b.kind == BK_CELLDOOR ? "Unlock Cell" : "Unlock") : "Open");
         if (b.kind == BK_GATE) l = b.state == BS_OPEN ? "Close Gate" : "Open Gate";
         consider(IK_DOOR, i, b.x * 16 + 8.0f, b.y * 16 + 8.0f, 20, l);
     }
-    for (int i = 0; i < G.nu; i++) if (G.u[i].escort && G.u[i].alive && G.u[i].order == ORD_HOLD) consider(IK_RESCUE, i, G.u[i].x, G.u[i].y, 20, "Rescue");
+    // a trapped survivor in reach always wins over furniture and doors beside them (it's the objective)
+    for (int i = 0; i < G.nu; i++) if (G.u[i].escort && G.u[i].alive && G.u[i].order == ORD_HOLD && len2(G.u[i].x - u.x, G.u[i].y - u.y) <= 26) {
+        best.kind = IK_RESCUE; best.idx = i; best.label = "Rescue"; best.x = G.u[i].x; best.y = G.u[i].y; bd = 0;
+    }
     if (G.scene == SC_SETTLEMENT && G.st.visitorPresent) consider(IK_VISITOR, 0, G.map.exitX * 16 + 8.0f, (G.map.exitY + 1) * 16 + 8.0f, 40, "Talk to stranger");
     int tx = (int)(u.x / 16), ty = (int)(u.y / 16);
     if (G.map.in(tx, ty) && G.map.t[G.map.idx(tx, ty)] == T_EXTRACT) { best.kind = IK_EXTRACT; best.label = "Extract"; best.x = u.x; best.y = u.y; }
@@ -472,6 +487,23 @@ static void do_interact(Unit& u, const Interact& it) {
     case IK_BAG: ui_container(-1, it.idx); break;
     case IK_DOOR: {
         Barrier& b = G.map.bar[it.idx];
+        // double doors swing together: the leaf beside this one (same kind, same state) follows it
+        auto twin = [&](uint8_t from, uint8_t to) {
+            static const int D[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+            for (auto& d : D) {
+                int nx = b.x + d[0], ny = b.y + d[1]; if (!G.map.in(nx, ny)) continue;
+                int bi = G.map.barAt[G.map.idx(nx, ny)]; if (bi < 0) continue;
+                Barrier& o = G.map.bar[bi];
+                if (o.kind != b.kind || o.state != from) continue;
+                if (to == BS_CLOSED) {   // same rule as below: never shut it on someone
+                    float cx = o.x * 16 + 8.0f, cy = o.y * 16 + 8.0f; bool occ = false;
+                    for (int i = 0; i < G.nu; i++) if (G.u[i].alive && fabsf(G.u[i].x - cx) < 11 && fabsf(G.u[i].y - cy) < 11) occ = true;
+                    for (int i = 0; i < G.nz; i++) if (G.z[i].state != ZS_DEAD && fabsf(G.z[i].x - cx) < 11 && fabsf(G.z[i].y - cy) < 11) occ = true;
+                    if (occ) continue;
+                }
+                o.state = to;
+            }
+        };
         if (b.state == BS_LOCKED) {
             int key = b.kind == BK_CELLDOOR ? IT_CELLKEY : IT_KEYCARD;
             if (s.pack.countOf(key) > 0) { b.state = BS_OPEN; game_toast("Unlocked with the %s.", idef(key).name); audio_playAt(SFX_DOOR, u.x, u.y); }
@@ -482,8 +514,8 @@ static void do_interact(Unit& u, const Interact& it) {
             for (int i = 0; i < G.nu; i++) if (G.u[i].alive && fabsf(G.u[i].x - cx) < 11 && fabsf(G.u[i].y - cy) < 11) occ = true;
             for (int i = 0; i < G.nz; i++) if (G.z[i].state != ZS_DEAD && fabsf(G.z[i].x - cx) < 11 && fabsf(G.z[i].y - cy) < 11) occ = true;
             if (occ) { game_toast("Something is in the way."); break; }
-            b.state = BS_CLOSED; audio_playAt(SFX_DOOR, u.x, u.y, 1, 0.9f);
-        } else { b.state = BS_OPEN; audio_playAt(SFX_DOOR, u.x, u.y); }
+            b.state = BS_CLOSED; twin(BS_OPEN, BS_CLOSED); audio_playAt(SFX_DOOR, u.x, u.y, 1, 0.9f);
+        } else { b.state = BS_OPEN; twin(BS_CLOSED, BS_OPEN); audio_playAt(SFX_DOOR, u.x, u.y); }
         map_refresh(G.map);
         sync_loc_state();
         break;
@@ -609,7 +641,7 @@ static void update_player(Unit& u, float dt) {
     if (g_in.held & BTN_B) u.bHeld += dt;
     bool dodge = false;
     if ((g_in.up & BTN_B) && u.bHeld > 0 && u.bHeld < 0.2f) dodge = true;
-    if (!(g_in.held & BTN_B)) u.bHeld = 0;
+    if (!(g_in.held & BTN_B)) { u.bHeld = 0; u.winded = false; }
     if (g_in.up & BTN_B) u.bHeld = 0;
     if (dodge && u.dodgeT <= 0 && u.stam >= 20) {
         float dx = moving ? ax / mag : u.fx, dy = moving ? ay / mag : u.fy;
@@ -619,7 +651,8 @@ static void update_player(Unit& u, float dt) {
         u.anim.play(AnimState::Dodge, true); G.statDodges++;
         audio_playAt(SFX_STEP, u.x, u.y, 1, 0.7f);
     }
-    u.sprinting = moving && (g_in.held & BTN_B) && u.bHeld >= 0.2f && u.stam > 1 && u.dodgeT <= 0;
+    if (u.sprinting && u.stam <= 1) u.winded = true;   // out of breath: no flicker back into a sprint as stamina trickles in
+    u.sprinting = moving && (g_in.held & BTN_B) && u.bHeld >= 0.2f && u.stam > 1 && u.dodgeT <= 0 && !u.winded;
     float speed = u.sprinting ? 86.0f : 54.0f;
     if (s.hp < 35) speed *= 0.8f;
     if (u.reloadT > 0) speed *= 0.75f;
@@ -663,6 +696,19 @@ static void update_player(Unit& u, float dt) {
     }
 }
 
+// can a body (radius ~5) walk this straight line? sight alone isn't enough: furniture and windows don't block sight
+static bool walkLine(float x0, float y0, float x1, float y1) {
+    float dx = x1 - x0, dy = y1 - y0, l = len2(dx, dy);
+    if (l < 1) return true;
+    float px = -dy / l * 5, py = dx / l * 5;
+    for (float s = 0; s <= l; s += 6) {
+        float x = x0 + dx * s / l, y = y0 + dy * s / l;
+        if (map_blocked(G.map, (int)(x / 16), (int)(y / 16)) || map_blocked(G.map, (int)((x + px) / 16), (int)((y + py) / 16)) ||
+            map_blocked(G.map, (int)((x - px) / 16), (int)((y - py) / 16))) return false;
+    }
+    return true;
+}
+
 static void update_companion(Unit& u, int ui, float dt) {
     Unit& p = G.u[G.ctrl];
     float tx = p.x, ty = p.y, speed = 50;
@@ -673,7 +719,7 @@ static void update_companion(Unit& u, int ui, float dt) {
     bool want = (u.order == ORD_FOLLOW && d > 28) || (u.order == ORD_RETREAT && d > 12);
     if (want && u.dodgeT <= 0) {
         float mx = tx - u.x, my = ty - u.y;
-        if (!map_los(G.map, u.x, u.y, tx, ty) || d > 120) {
+        if (!walkLine(u.x, u.y, tx, ty) || d > 120) {
             int nx, ny;
             if (map_flowStep(G.map, field, (int)(u.x / 16), (int)(u.y / 16), nx, ny)) { mx = nx * 16 + 8 - u.x; my = ny * 16 + 8 - u.y; }
         }
@@ -746,7 +792,7 @@ static void zombie_attack_land(Zombie& z) {
     if (G.set.shake && z.target == G.ctrl) G.shake = fmaxf(G.shake, 2.0f);
     float dx = u.x - z.x, dy = u.y - z.y, l = len2(dx, dy) + 0.01f;
     map_move(G.map, u.x, u.y, dx / l * 4, dy / l * 4, 5);
-    if (u.escort) { static float escortHp[MAX_UNITS] = {60, 60, 60, 60}; escortHp[z.target] -= dmg; if (escortHp[z.target] <= 0) { escortHp[z.target] = 60; unit_die(z.target, "zombie"); } return; }
+    if (u.escort) { g_escortHp[z.target] -= dmg; if (g_escortHp[z.target] <= 0) unit_die(z.target, "zombie"); return; }
     Survivor& s = G.st.surv[u.sv];
     s.hp -= dmg;
     if (s.infection == INF_NONE && G.rng.chance(0.12f)) {
@@ -839,7 +885,8 @@ static void update_zombie(int zi, float dt) {
             Barrier& b = G.map.bar[bi];
             if (b.state != BS_OPEN && b.state != BS_BROKEN && z.atkCd <= 0) {
                 z.atkCd = 1.3f; z.anim.play(AnimState::ZAttack, true);
-                b.hp -= 8; b.shake = 0.25f;
+                if (b.state != BS_LOCKED) b.hp -= 8;   // locked (cell / keycard) doors rattle but hold: whoever is locked in stays safe until you bring the key
+                b.shake = 0.25f;
                 audio_playAt(b.kind == BK_WINDOW ? SFX_GLASS : SFX_BANG, b.x * 16 + 8.0f, b.y * 16 + 8.0f, b.kind == BK_WINDOW ? 0.4f : 0.8f);
                 spawn_particles(b.kind == BK_WINDOW ? PK_GLASS : PK_SPLINTER, b.x * 16 + 8.0f, b.y * 16 + 12.0f, 3, b.kind == BK_WINDOW ? rgb(150, 190, 200) : rgb(112, 80, 50));
                 if (b.hp <= 0) {

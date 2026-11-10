@@ -584,7 +584,7 @@ static const char* objective() {
         if (sec < 25) return "Security is low! Assign guards.";
         return "Use the radio table to plan an expedition.";
     }
-    for (int i = 0; i < G.nu; i++) if (G.u[i].escort && G.u[i].alive) return G.u[i].order == ORD_HOLD ? "Someone is trapped in the holding cells." : "Escort the survivor to the south road.";
+    for (int i = 0; i < G.nu; i++) if (G.u[i].escort && G.u[i].alive) return G.u[i].order == ORD_HOLD ? (G.map.id == MAP_POLICE ? "Someone is trapped in the holding cells." : "Someone is trapped inside. Find them.") : "Escort the survivor to the south road.";
     return "Search for supplies. Extract at the south road.";
 }
 
@@ -1180,7 +1180,7 @@ static void mapThumb(Canvas& c, int x, int y, int w, int h, int loc) {
 static void panelWorldMap(Canvas& c) {
     // left rail: the locations (thumb-pickable); middle: preview + intel; right rail: Deploy / Back
     for (int l = 0; l < LOC_COUNT; l++) {
-        if (rail(c, 0, l, LOC_COUNT, strcmp(LOCATIONS[l].name, "Residential") ? LOCATIONS[l].name : "Homes", sel == l ? UB_SELECTED : 0)) sel = l;
+        if (rail(c, 0, l, LOC_COUNT, LOCATIONS[l].name, sel == l ? UB_SELECTED : 0)) sel = l;
         if (LOCATIONS[l].map < 0) { int h = (RH - (LOC_COUNT - 1) * 4) / LOC_COUNT; gfx_fillA(c, RLX, RTOP + l * (h + 4), RW, h, pal::ink, 90); }
     }
     if (sel >= LOC_COUNT) sel = 0;

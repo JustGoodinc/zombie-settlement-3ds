@@ -5,7 +5,7 @@
 
 enum Tile : uint8_t {
     T_GRASS, T_ASPHALT, T_LINE, T_DIRT, T_TILE, T_WOOD, T_CARPET, T_CONCRETE,
-    T_WALL, T_WINDOW, T_BARS, T_FENCE, T_EXTRACT, T_GARDEN, T_PALISADE, T_DOOR, T_COUNT
+    T_WALL, T_WINDOW, T_BARS, T_FENCE, T_EXTRACT, T_GARDEN, T_PALISADE, T_DOOR, T_RAIL, T_WATER, T_COUNT
 };
 
 enum BarrierKind : uint8_t { BK_DOOR, BK_KEYDOOR, BK_CELLDOOR, BK_WINDOW, BK_GATE };
@@ -22,6 +22,7 @@ enum PropType : uint8_t {
     PR_DESK, PR_FILING, PR_LOCKER, PR_CRATE, PR_MEDCAB, PR_SHELF, PR_CAR, PR_WRECK, PR_TREE, PR_BENCH, PR_COT,
     PR_CHAIR, PR_PLANT, PR_COOLER, PR_FIRE, PR_RADIO, PR_GENERATOR, PR_WORKBENCH, PR_LAMP, PR_DECOR_CRATE,
     PR_TENT, PR_BARREL, PR_SANDBAG, PR_LOGS, PR_TORCH, PR_CONE,
+    PR_SHIPBOX, PR_BOXCAR, PR_BED, PR_SOFA, PR_FRIDGE,
     PR_PLOT, PR_COUNT
 };
 
@@ -35,16 +36,17 @@ struct Prop {
 struct Spawn { char kind; uint8_t x, y; };
 
 struct Map {
-    enum { MAXW = 64, MAXH = 56, MAXBAR = 64, MAXPROP = 160, MAXSPAWN = 64 };
+    enum { MAXW = 64, MAXH = 56, MAXBAR = 64, MAXPROP = 400, MAXSPAWN = 64 };
     int w = 0, h = 0, id = 0;
     uint8_t t[MAXW * MAXH];
     uint8_t flags[MAXW * MAXH];   // F_* bits (recomputed by map_refresh)
     int8_t barAt[MAXW * MAXH];
     Barrier bar[MAXBAR]; int nbar = 0;
     Prop prop[MAXPROP]; int nprop = 0;
-    int8_t propAt[MAXW * MAXH];
+    int16_t propAt[MAXW * MAXH];   // prop index per tile, -1 = none (16-bit: maps hold more than 127 props)
     Spawn spawn[MAXSPAWN]; int nspawn = 0;
     int ncontainers = 0;
+    int overflow = 0;             // props / doors / spawns dropped for exceeding the MAX* limits (must stay 0)
     int spawnX = 0, spawnY = 0;   // player spawn tile
     int exitX = 0, exitY = 0;     // centre of extraction / gate
 
@@ -53,7 +55,8 @@ struct Map {
 };
 
 enum { F_BLOCK = 1, F_OPAQUE = 2, F_INDOOR = 4, F_BARRIER = 8 };
-enum { MAP_POLICE = 0, MAP_SETTLEMENT = 1, MAP_COUNT = 2 };
+enum { MAX_MAP_CONT = 80 };   // searchable containers per map (= MAX_CONT, the per-location save slots)
+enum { MAP_POLICE = 0, MAP_SETTLEMENT = 1, MAP_HOSPITAL = 2, MAP_MARKET = 3, MAP_HOMES = 4, MAP_YARD = 5, MAP_COUNT = 6 };
 
 void map_load(Map& m, int which);
 void map_refresh(Map& m);

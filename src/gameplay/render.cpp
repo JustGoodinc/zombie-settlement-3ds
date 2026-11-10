@@ -106,6 +106,8 @@ static const Sprite& tileSprite(int tx, int ty) {
     case T_EXTRACT: return g_tile[TA_EXTRACT][v];
     case T_GARDEN: return g_tile[TA_GARDEN][v];
     case T_PALISADE: return g_tile[TA_PALISADE][v];
+    case T_RAIL: return g_tile[TA_RAIL][v];
+    case T_WATER: return g_tile[TA_WATER][(v + (int)(G.uiTime * 1.5f)) & 3];
     case T_WALL: {
         bool below = ty + 1 < m.h && m.t[m.idx(tx, ty + 1)] == T_WALL;
         return below ? g_tile[TA_WALL_TOP][v] : g_tile[TA_WALL_FRONT][v];
@@ -194,7 +196,7 @@ static void drawChar(Canvas& c, bool zombie, int variant, float x, float y, uint
     if (!behind) weapon();
 }
 
-struct DrawItem { int16_t y; uint8_t kind; uint8_t idx; };
+struct DrawItem { int16_t y; uint8_t kind; uint16_t idx; };   // idx: prop index can exceed 255
 enum { DK_PROP, DK_ZOMB, DK_UNIT, DK_NPC, DK_BAG };
 
 // optional stage profiler (zs_tool --bench sets the clock; zero cost otherwise)
@@ -292,6 +294,19 @@ void render_world(Canvas& c, float alpha) {
                 gfx_blit(c, *s, tx * 16 - camX, ty * 16 + 16 - 40 - camY);
             }
     }
+    // storefront signs on the other launch maps, on the facade beside the main doors
+    static const struct { int map, tx, ty; const char* text; px bg, rim, ink; bool cross; } SIGNS[] = {
+        {MAP_HOSPITAL, 16, 33, "HOSPITAL", rgb(200, 202, 204), rgb(244, 244, 240), rgb(150, 30, 30), true},
+        {MAP_MARKET, 22, 28, "MARKET", rgb(40, 96, 58), rgb(96, 156, 104), pal::cream, false},
+        {MAP_YARD, 15, 33, "RAIL DEPOT", rgb(104, 66, 38), rgb(160, 110, 66), pal::cream, false},
+    };
+    for (const auto& sg : SIGNS) if (m.id == sg.map) {
+        int w = gfx_textW(sg.text) + 16 + (sg.cross ? 12 : 0), sx = sg.tx * 16 + 6 - camX, sy = sg.ty * 16 - 20 - camY, tx = sx + 8;
+        gfx_fill(c, sx - 1, sy - 1, w + 2, 13, pal::ink);
+        gfx_fill(c, sx, sy, w, 11, sg.bg); gfx_fill(c, sx, sy, w, 1, sg.rim);
+        if (sg.cross) { gfx_fill(c, sx + 6, sy + 4, 7, 3, rgb(196, 40, 36)); gfx_fill(c, sx + 8, sy + 2, 3, 7, rgb(196, 40, 36)); tx += 12; }
+        gfx_text(c, tx, sy + 2, sg.text, sg.ink, 1, true);
+    }
     // police station signage above the front doors (Try 2 look)
     if (m.id == MAP_POLICE) {
         int sx = 19 * 16 + 14 - camX, sy = 32 * 16 - 20 - camY;   // on the brick facade, left of the double doors
@@ -330,6 +345,11 @@ void render_world(Canvas& c, float alpha) {
         case PR_CAR: shadow(g_spr[S_CAR], x - 4, y - 12, 2, 3, 140); break;
         case PR_WRECK: shadow(g_spr[S_WRECK], x - 4, y - 12, 2, 3, 140); break;
         case PR_TENT: shadow(g_spr[S_TENT], x - 7, y - 24, 3, 3, 150); break;
+        case PR_SHIPBOX: shadow(g_spr[S_SHIPBOX0 + (p.tx / 4 + p.ty / 2) % 4], x, y - 8, 4, 4, 140); break;
+        case PR_BOXCAR: shadow(g_spr[S_BOXCAR], x, y - 8, 4, 4, 140); break;
+        case PR_BED: shadow(g_spr[S_BED], x, y, 2, 2, 160); break;
+        case PR_SOFA: shadow(g_spr[S_SOFA], x, y, 2, 2, 160); break;
+        case PR_FRIDGE: shadow(g_spr[S_FRIDGE], x, y - 6, 2, 2, 160); break;
         case PR_CHAIR: case PR_CONE: case PR_GENERATOR: break;
         default: if (p.type <= PR_LOGS && p.type != PR_PLOT) {
             static const int SPR[PR_COUNT] = {S_DESK, S_FILING, S_LOCKER, S_CRATE, S_MEDCAB, S_SHELF, S_CAR, S_WRECK, S_TREE, S_BENCH, S_COT, S_CHAIR, S_PLANT, S_COOLER,
@@ -344,7 +364,7 @@ void render_world(Canvas& c, float alpha) {
     for (int k = 0; k < m.nprop; k++) {
         const Prop& p = m.prop[k];
         if (p.tx + p.tw < tx0 - 2 || p.tx > tx1 + 2 || p.ty + p.th < ty0 - 2 || p.ty > ty1 + 2) continue;
-        items[n++] = DrawItem{(int16_t)((p.ty + p.th) * 16 - 1), DK_PROP, (uint8_t)k};
+        items[n++] = DrawItem{(int16_t)((p.ty + p.th) * 16 - 1), DK_PROP, (uint16_t)k};
     }
     for (int k = 0; k < G.nz; k++) {
         Zombie& z = G.z[k];
@@ -389,6 +409,11 @@ void render_world(Canvas& c, float alpha) {
             case PR_LOGS: gfx_blit(c, g_spr[S_LOGS], x, y); break;
             case PR_TORCH: gfx_blit(c, g_spr[S_TORCH0 + (((int)(G.uiTime * 7) + p.tx) & 1)], x, y - 4); break;
             case PR_CONE: gfx_blit(c, g_spr[S_CONE], x, y); break;
+            case PR_SHIPBOX: gfx_blit(c, g_spr[S_SHIPBOX0 + (p.tx / 4 + p.ty / 2) % 4], x, y - 8); break;
+            case PR_BOXCAR: gfx_blit(c, g_spr[S_BOXCAR], x, y - 8); break;
+            case PR_BED: gfx_blit(c, g_spr[S_BED], x, y); break;
+            case PR_SOFA: gfx_blit(c, g_spr[S_SOFA], x, y); break;
+            case PR_FRIDGE: gfx_blit(c, g_spr[S_FRIDGE], x, y - 6); break;
             case PR_COT: gfx_blit(c, g_spr[S_COT], x, y); break;
             case PR_CHAIR: gfx_blit(c, g_spr[S_CHAIR], x, y); break;
             case PR_PLANT: gfx_blit(c, g_spr[S_PLANT], x, y); break;
@@ -643,8 +668,9 @@ void render_world(Canvas& c, float alpha) {
         bool searching = G.u[G.ctrl].searchProp == g_highlightProp;
         const Sprite* s = &g_spr[S_DESK];
         switch (p.type) { case PR_FILING: s = &g_spr[S_FILING]; break; case PR_LOCKER: s = &g_spr[S_LOCKER]; break; case PR_CRATE: s = &g_spr[S_CRATE]; break;
-            case PR_MEDCAB: s = &g_spr[S_MEDCAB]; break; case PR_SHELF: s = &g_spr[S_SHELF]; break; case PR_CAR: s = &g_spr[S_CAR]; break; case PR_WRECK: s = &g_spr[S_WRECK]; break; }
-        int oy = (p.type == PR_CAR || p.type == PR_WRECK) ? -12 : 0, ox = (p.type == PR_CAR || p.type == PR_WRECK) ? -4 : 0;
+            case PR_MEDCAB: s = &g_spr[S_MEDCAB]; break; case PR_SHELF: s = &g_spr[S_SHELF]; break; case PR_CAR: s = &g_spr[S_CAR]; break; case PR_WRECK: s = &g_spr[S_WRECK]; break;
+            case PR_SHIPBOX: s = &g_spr[S_SHIPBOX0 + (p.tx / 4 + p.ty / 2) % 4]; break; case PR_BOXCAR: s = &g_spr[S_BOXCAR]; break; case PR_FRIDGE: s = &g_spr[S_FRIDGE]; break; }
+        int oy = (p.type == PR_CAR || p.type == PR_WRECK) ? -12 : (p.type == PR_SHIPBOX || p.type == PR_BOXCAR) ? -8 : p.type == PR_FRIDGE ? -6 : 0, ox = (p.type == PR_CAR || p.type == PR_WRECK) ? -4 : 0;
         px col = searching ? pal::gold : (searched ? pal::grey : pal::lime);
         gfx_outline(c, *s, p.tx * 16 - camX + ox, p.ty * 16 - camY + oy, col);
         if (!searched && !searching) gfx_outline(c, *s, p.tx * 16 - camX + ox, p.ty * 16 - camY + oy, (G.tick / 8) & 1 ? pal::lime : rgb(110, 170, 40));

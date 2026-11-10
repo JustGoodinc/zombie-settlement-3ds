@@ -5,28 +5,31 @@
 extern const char* const* MAP_DATA[];
 extern const int MAP_HEIGHT[];
 
-const char* map_name(int which) { return which == MAP_POLICE ? "Police Station" : "Settlement"; }
+const char* map_name(int which) {
+    static const char* N[MAP_COUNT] = {"Police Station", "Settlement", "Hospital", "Supermarket", "Neighborhood", "Rail & Ship Yard"};
+    return which >= 0 && which < MAP_COUNT ? N[which] : "";
+}
 
-static bool isFloor(uint8_t t) { return t == T_GRASS || t == T_ASPHALT || t == T_LINE || t == T_DIRT || t == T_TILE || t == T_WOOD || t == T_CARPET || t == T_CONCRETE || t == T_GARDEN || t == T_EXTRACT; }
+static bool isFloor(uint8_t t) { return t == T_GRASS || t == T_ASPHALT || t == T_LINE || t == T_DIRT || t == T_TILE || t == T_WOOD || t == T_CARPET || t == T_CONCRETE || t == T_GARDEN || t == T_EXTRACT || t == T_RAIL; }
 
 static int tileOf(char c) {
     switch (c) {
     case '"': return T_GRASS; case '=': return T_ASPHALT; case '^': return T_LINE; case ':': return T_DIRT;
     case '.': return T_TILE; case ',': return T_WOOD; case '~': return T_CARPET; case '_': return T_CONCRETE;
     case '#': return T_WALL; case '%': return T_BARS; case 'F': return T_FENCE; case 'E': return T_EXTRACT;
-    case 'g': return T_GARDEN; case 'X': return T_PALISADE;
+    case 'g': return T_GARDEN; case 'X': return T_PALISADE; case 'H': return T_RAIL; case '$': return T_WATER;
     case 'W': case 'D': case 'O': case 'K': case 'C': case 'G': return T_DOOR;
     default: return -1;  // entity: floor resolved from neighbours
     }
 }
 
 static void addProp(Map& m, int type, int x, int y, int tw, int th, bool container, bool solid, int special = 0) {
-    if (m.nprop >= Map::MAXPROP) return;
+    if (m.nprop >= Map::MAXPROP || (container && m.ncontainers >= MAX_MAP_CONT)) { m.overflow++; return; }
     Prop& p = m.prop[m.nprop];
     p.type = (uint8_t)type; p.tx = (uint8_t)x; p.ty = (uint8_t)y; p.tw = (uint8_t)tw; p.th = (uint8_t)th;
     p.container = container ? (int8_t)m.ncontainers++ : (int8_t)-1;
     p.special = (uint8_t)special; p.solid = solid;
-    for (int j = 0; j < th; j++) for (int i = 0; i < tw; i++) if (m.in(x + i, y + j)) m.propAt[m.idx(x + i, y + j)] = (int8_t)m.nprop;
+    for (int j = 0; j < th; j++) for (int i = 0; i < tw; i++) if (m.in(x + i, y + j)) m.propAt[m.idx(x + i, y + j)] = (int16_t)m.nprop;
     m.nprop++;
 }
 
@@ -36,10 +39,10 @@ void map_load(Map& m, int which) {
     for (int j = 0; j < H; j++) { int l = (int)strlen(rows[j]); if (l > W) W = l; }
     if (W > Map::MAXW) W = Map::MAXW;
     if (H > Map::MAXH) H = Map::MAXH;
-    m.w = W; m.h = H; m.id = which; m.nbar = m.nprop = m.nspawn = m.ncontainers = 0;
+    m.w = W; m.h = H; m.id = which; m.nbar = m.nprop = m.nspawn = m.ncontainers = m.overflow = 0;
     memset(m.barAt, -1, sizeof(m.barAt));
     memset(m.propAt, -1, sizeof(m.propAt));
-    uint8_t defFloor = which == MAP_POLICE ? T_TILE : T_DIRT;
+    uint8_t defFloor = which == MAP_SETTLEMENT ? T_DIRT : (which == MAP_HOMES || which == MAP_YARD) ? T_GRASS : T_TILE;
     auto ch = [&](int x, int y) -> char { if (y < 0 || y >= H) return '"'; int l = (int)strlen(rows[y]); return x >= 0 && x < l ? rows[y][x] : '"'; };
     // pass 1: tiles
     for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) {
@@ -59,13 +62,13 @@ void map_load(Map& m, int which) {
     for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) {
         char c = ch(x, y);
         auto bar = [&](int kind, int state, int hp) {
-            if (m.nbar >= Map::MAXBAR) return;
+            if (m.nbar >= Map::MAXBAR) { m.overflow++; return; }
             Barrier& b = m.bar[m.nbar];
             b.x = (uint8_t)x; b.y = (uint8_t)y; b.kind = (uint8_t)kind; b.state = (uint8_t)state; b.hp = b.maxHp = (int16_t)hp;
             b.anim = state == BS_OPEN ? 1.0f : 0.0f; b.shake = 0;
             m.barAt[m.idx(x, y)] = (int8_t)m.nbar++;
         };
-        auto spawn = [&](char k) { if (m.nspawn < Map::MAXSPAWN) m.spawn[m.nspawn++] = Spawn{k, (uint8_t)x, (uint8_t)y}; };
+        auto spawn = [&](char k) { if (m.nspawn < Map::MAXSPAWN) m.spawn[m.nspawn++] = Spawn{k, (uint8_t)x, (uint8_t)y}; else m.overflow++; };
         switch (c) {
         case 'W': bar(BK_WINDOW, BS_CLOSED, 30); break;
         case 'D': bar(BK_DOOR, BS_CLOSED, 80); break;
@@ -74,6 +77,7 @@ void map_load(Map& m, int which) {
         case 'C': bar(BK_CELLDOOR, BS_LOCKED, 200); break;
         case 'G': bar(BK_GATE, BS_CLOSED, 250); break;
         case 's': addProp(m, PR_SHELF, x, y, 1, 1, true, true); break;
+        case 'j': addProp(m, PR_SHELF, x, y, 1, 1, false, true); break;   // picked-over shelf (decor)
         case 'x': addProp(m, PR_CRATE, x, y, 1, 1, true, true); break;
         case 'd': addProp(m, PR_DESK, x, y, 1, 1, true, true); break;
         case 'Q': addProp(m, PR_DESK, x, y, 1, 1, true, true, 1); break;
@@ -101,6 +105,11 @@ void map_load(Map& m, int which) {
         case 'r': addProp(m, PR_RADIO, x, y, 1, 1, false, true); break;
         case '&': addProp(m, PR_WORKBENCH, x, y, 1, 1, false, true); break;
         case 'n': addProp(m, PR_GENERATOR, x, y, 1, 1, false, false); break;
+        case 'N': addProp(m, PR_SHIPBOX, x, y, 4, 2, true, true); break;   // paint colour picked from position in the renderer
+        case 'B': addProp(m, PR_BOXCAR, x, y, 5, 2, true, true); break;
+        case 'h': addProp(m, PR_BED, x, y, 1, 2, false, true); break;
+        case 'a': addProp(m, PR_SOFA, x, y, 2, 1, false, true); break;
+        case 'e': addProp(m, PR_FRIDGE, x, y, 1, 1, true, true); break;
         case '1': case '2': case '3': case '4': case '5': case '6':
             addProp(m, PR_PLOT, x, y, 3, 3, false, false, c - '1'); break;
         case 'Z': case 'z': case 'q': case 'R': case 'V': spawn(c); break;
@@ -112,12 +121,36 @@ void map_load(Map& m, int which) {
     map_refresh(m);
 }
 
+// indoor = floor that can't be reached from the map edge without passing a wall, door or window
+// (doors count as walls whatever their state, so opening one never turns a room into outdoors)
+static void markOutside(const Map& m, uint8_t* out) {
+    static uint16_t q[Map::MAXW * Map::MAXH];
+    int n = m.w * m.h, head = 0, tail = 0;
+    memset(out, 0, n);
+    auto stops = [&](int i) { uint8_t t = m.t[i]; return t == T_WALL || t == T_DOOR || t == T_BARS || t == T_FENCE || t == T_PALISADE; };
+    for (int y = 0; y < m.h; y++) for (int x = 0; x < m.w; x++)
+        if ((x == 0 || y == 0 || x == m.w - 1 || y == m.h - 1) && !stops(m.idx(x, y))) { out[m.idx(x, y)] = 1; q[tail++] = (uint16_t)m.idx(x, y); }
+    while (head < tail) {
+        int c = q[head++], cx = c % m.w, cy = c / m.w;
+        static const int D[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (auto& d : D) {
+            int nx = cx + d[0], ny = cy + d[1];
+            if (!m.in(nx, ny)) continue;
+            int ni = m.idx(nx, ny);
+            if (out[ni] || stops(ni)) continue;
+            out[ni] = 1; q[tail++] = (uint16_t)ni;
+        }
+    }
+}
+
 void map_refresh(Map& m) {
+    static uint8_t outside[Map::MAXW * Map::MAXH];
+    markOutside(m, outside);
     for (int y = 0; y < m.h; y++) for (int x = 0; x < m.w; x++) {
         int i = m.idx(x, y); uint8_t t = m.t[i], f = 0;
         if (t == T_WALL || t == T_PALISADE) f = F_BLOCK | F_OPAQUE;
-        else if (t == T_BARS || t == T_FENCE) f = F_BLOCK;
-        if (t == T_TILE || t == T_WOOD || t == T_CARPET || (t == T_CONCRETE && m.id == MAP_POLICE && y < 32)) f |= F_INDOOR;
+        else if (t == T_BARS || t == T_FENCE || t == T_WATER) f = F_BLOCK;
+        if (m.id != MAP_SETTLEMENT && isFloor(t) && !outside[i]) f |= F_INDOOR;
         if (m.barAt[i] >= 0) {
             const Barrier& b = m.bar[m.barAt[i]];
             f |= F_BARRIER;
@@ -170,9 +203,25 @@ int map_move(const Map& m, float& x, float& y, float dx, float dy, float r) {
     // sub-step so fast movers (dodge) never tunnel through walls
     int steps = (int)((fabsf(dx) + fabsf(dy)) / 4.0f) + 1;
     float sx = dx / steps, sy = dy / steps;
+    int dummy;
     for (int i = 0; i < steps; i++) {
+        // blocked mostly head-on (a door frame, a desk corner): slip sideways around the corner instead of sticking
         if (!circleHits(m, x + sx, y, r, barrier)) x += sx;
+        else if (sx != 0 && fabsf(sy) < fabsf(sx) * 0.5f) {
+            for (int k = 1; k <= 7; k++) {
+                float n = fabsf(sx) < k ? fabsf(sx) : (float)k;
+                if (!circleHits(m, x + sx, y - k, r, dummy) && !circleHits(m, x, y - n, r, dummy)) { y -= n; break; }
+                if (!circleHits(m, x + sx, y + k, r, dummy) && !circleHits(m, x, y + n, r, dummy)) { y += n; break; }
+            }
+        }
         if (!circleHits(m, x, y + sy, r, barrier)) y += sy;
+        else if (sy != 0 && fabsf(sx) < fabsf(sy) * 0.5f) {
+            for (int k = 1; k <= 7; k++) {
+                float n = fabsf(sy) < k ? fabsf(sy) : (float)k;
+                if (!circleHits(m, x - k, y + sy, r, dummy) && !circleHits(m, x - n, y, r, dummy)) { x -= n; break; }
+                if (!circleHits(m, x + k, y + sy, r, dummy) && !circleHits(m, x + n, y, r, dummy)) { x += n; break; }
+            }
+        }
     }
     return barrier;
 }

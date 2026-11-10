@@ -20,6 +20,7 @@ struct Input {
 };
 
 enum { MAX_SURV = 24, MAX_ZOMB = 72, MAX_PROJ = 48, MAX_PART = 192, MAX_FLOAT = 12, MAX_UNITS = 4, MAX_JOURNAL = 40, MAX_BAGS = 8, MAX_CONT = 80 };
+static_assert(MAX_CONT >= MAX_MAP_CONT, "every map container needs a save slot");
 enum { TICK_HZ = 30 };
 constexpr float DT = 1.0f / TICK_HZ;
 
@@ -68,6 +69,7 @@ struct Unit {
     int16_t searchProp;
     uint8_t order, dir, npcVariant;
     bool sprinting, meleePending;
+    bool winded;           // stamina ran out mid-sprint: walk until B is released
     float bHeld;           // how long B has been held (tap = dodge, hold = sprint)
     Animator anim;
 };

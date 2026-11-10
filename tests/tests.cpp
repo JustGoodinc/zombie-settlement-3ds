@@ -37,6 +37,26 @@ static int addZombie(float x, float y, int state) {
     return G.nz++;
 }
 
+// out of stamina with B still held: keep walking (no sprint/walk flicker) until B is let go
+static void testSprintWinded() {
+    SECTION("sprint: running out of stamina while holding B walks steadily until B is released");
+    startExpedition(); G.nz = 0;
+    Unit& u = G.u[G.ctrl];
+    Input in; in.held = BTN_B; in.down = BTN_B;
+    int k = 0;
+    auto stepDir = [&](Input i) { i.ax = (k++ / 60) % 2 ? -1.0f : 1.0f; frames(1, i); };   // pace east-west across the car park
+    for (int f = 0; f < 400 && u.stam > 1; f++) { stepDir(in); in.down = 0; }
+    CHECK(u.stam <= 1);
+    int flips = 0, sprintFrames = 0; bool last = u.sprinting;
+    for (int f = 0; f < 90; f++) { stepDir(in); if (u.sprinting != last) flips++; last = u.sprinting; sprintFrames += u.sprinting; }
+    CHECK(sprintFrames == 0 && flips <= 1);   // stamina refills while walking, but no sprint while B stays held
+    CHECK(u.stam > 20);
+    Input up; up.up = BTN_B; stepDir(up);
+    Input again; again.held = BTN_B; again.down = BTN_B;
+    for (int f = 0; f < 10; f++) { stepDir(again); again.down = 0; }
+    CHECK(u.sprinting);                       // a fresh press sprints again
+}
+
 static void testCombat() {
     SECTION("combat: hit probabilities");
     ShotParams base;
@@ -183,6 +203,43 @@ static void testContainers() {
     Container k; loot_generate(0, 5, PR_DESK, 1, k);
     bool hasCard = false; for (int i = 0; i < k.n; i++) hasCard |= k.it[i].id == IT_KEYCARD;
     CHECK(hasCard);
+}
+
+// every launch location: within engine limits, every container has a reachable open side, no sealed floor
+static void testLaunchMaps() {
+    SECTION("maps: all five launch locations are well formed");
+    CHECK(LOC_COUNT == 5);
+    static uint16_t dist[Map::MAXW * Map::MAXH];
+    for (int l = 0; l < LOC_COUNT; l++) {
+        static Map m; map_load(m, LOCATIONS[l].map);
+        int zs = 0; for (int i = 0; i < m.nspawn; i++) zs += m.spawn[i].kind == 'Z' || m.spawn[i].kind == 'z' || m.spawn[i].kind == 'q';
+        bool limits = m.overflow == 0 && m.ncontainers <= MAX_CONT && zs <= 96 && zs <= MAX_ZOMB && m.w * 2 <= 186 && m.h * 2 <= 110;
+        if (!limits) printf("  %s: overflow %d containers %d zombies %d size %dx%d\n", LOCATIONS[l].name, m.overflow, m.ncontainers, zs, m.w, m.h);
+        CHECK(limits);
+        CHECK(m.t[m.idx(m.exitX, m.exitY)] == T_EXTRACT && m.ncontainers >= 40 && zs >= 10);
+        for (int i = 0; i < m.nbar; i++) if (m.bar[i].kind != BK_WINDOW) m.bar[i].state = BS_OPEN;   // keys are always reachable first (playtest checks the order)
+        map_refresh(m);
+        map_flow(m, m.spawnX, m.spawnY, dist, false);
+        int bad = 0, sealed = 0;
+        for (int i = 0; i < m.nprop; i++) {
+            const Prop& p = m.prop[i]; if (p.container < 0) continue;
+            bool ok = false;
+            for (int x = p.tx; x < p.tx + p.tw; x++) for (int k = 0; k < 2; k++) { int y = k ? p.ty + p.th : p.ty - 1; if (m.in(x, y) && dist[m.idx(x, y)] != 0xFFFF) ok = true; }
+            for (int y = p.ty; y < p.ty + p.th; y++) for (int k = 0; k < 2; k++) { int x = k ? p.tx + p.tw : p.tx - 1; if (m.in(x, y) && dist[m.idx(x, y)] != 0xFFFF) ok = true; }
+            if (!ok) { bad++; printf("  %s: container at %d,%d cannot be reached\n", LOCATIONS[l].name, p.tx, p.ty); }
+        }
+        for (int i = 0; i < m.w * m.h; i++) if (!(m.flags[i] & F_BLOCK) && dist[i] == 0xFFFF) sealed++;
+        if (sealed) {
+            printf("  %s: %d floor tiles sealed off:", LOCATIONS[l].name, sealed);
+            for (int i = 0, k = 0; i < m.w * m.h && k < 12; i++) if (!(m.flags[i] & F_BLOCK) && dist[i] == 0xFFFF) { printf(" (%d,%d)", i % m.w, i / m.w); k++; }
+            printf("\n");
+            if (getenv("MAPDBG")) for (int y = 0; y < 12; y++) {   // P prop, # wall/water, s sealed floor, . reachable
+                for (int x = 0; x < 40; x++) { int i = m.idx(x, y); putchar((m.flags[i] & F_BLOCK) ? (m.propAt[i] >= 0 ? 'P' : '#') : (dist[i] == 0xFFFF ? 's' : '.')); }
+                putchar('\n');
+            }
+        }
+        CHECK(bad == 0 && sealed == 0);
+    }
 }
 
 static void testMapsAndZombies() {
@@ -503,10 +560,12 @@ static void testMenuNav() {
 }
 int main() {
     game_init();
+    testSprintWinded();
     testCombat();
     testInventory();
     testContainers();
     testMapsAndZombies();
+    testLaunchMaps();
     testSettlement();
     testSave();
     testAnimation();

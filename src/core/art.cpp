@@ -1065,6 +1065,77 @@ static void buildHeld() {
     }
 }
 
+// ---------------------------------------------------------------- map expansion art: rail yard, docks, homes
+static void buildYardArt() {
+    px k = pal_char('k');
+    for (int v = 0; v < 4; v++) {
+        uint32_t sd = 977 + v * 131;
+        // rail track running east-west: grey ballast, timber sleepers, two steel rails
+        Sprite r = tileNoise(rgb(96, 92, 86), 20, sd);
+        for (int x = (v & 1) * 2; x < 16; x += 4) for (int y = 2; y < 14; y++) spr_set(r, x, y, y == 2 ? rgb(108, 82, 56) : rgb(84, 62, 42)), spr_set(r, x + 1, y, rgb(70, 52, 36));
+        for (int x = 0; x < 16; x++) {
+            spr_set(r, x, 4, rgb(170, 170, 176)); spr_set(r, x, 5, rgb(96, 96, 104));
+            spr_set(r, x, 10, rgb(170, 170, 176)); spr_set(r, x, 11, rgb(96, 96, 104));
+        }
+        if (v == 3) { spr_set(r, 6, 13, rgb(110, 70, 40)); spr_set(r, 7, 13, rgb(130, 84, 48)); }   // rust flake
+        g_tile[TA_RAIL][v] = r;
+        // harbour water: deep green-blue with short wave glints
+        Sprite w = tileNoise(rgb(30, 58, 70), 10, sd + 1);
+        Rng rr(sd);
+        for (int i = 0; i < 3; i++) { int x = rr.range(12), y = 2 + rr.range(12); for (int j = 0; j < 4; j++) spr_set(w, x + j, y, j == 0 || j == 3 ? rgb(52, 88, 100) : rgb(84, 126, 136)); }
+        g_tile[TA_WATER][v] = w;
+    }
+    // shipping containers (4x2 tiles, 64x40 with the roof face): corrugated sides, door bars, faded paint
+    static const px CC[4] = {rgb(150, 58, 44), rgb(52, 86, 132), rgb(70, 112, 70), rgb(160, 120, 52)};
+    for (int t = 0; t < 5; t++) {
+        bool car = t == 4; int W = car ? 80 : 64, H = 40;
+        px base = car ? rgb(120, 66, 44) : CC[t], hi = gfx_mix(base, rgb(255, 240, 220), 60), lo = gfx_scale(base, 170), roof = gfx_mix(base, rgb(200, 200, 200), 70);
+        Sprite s = spr_new(W, H);
+        int bodyBot = car ? 33 : H;
+        for (int y = 0; y < bodyBot; y++) for (int x = 0; x < W; x++) {
+            px c = y < 10 ? (y == 0 ? hi : roof) : ((x % 4 == 0) ? lo : (x % 4 == 1 ? hi : base));
+            if (y >= 10 && y < 12) c = lo;
+            if (y >= 10 && (hash32(x * 31 + y * 7 + t) % 19) == 0) c = gfx_mix(c, rgb(110, 70, 44), 150);   // rust
+            spr_set(s, x, y, c);
+        }
+        for (int y = 0; y < 10; y++) if (y % 3 == 1) hline(s, 2, W - 3, y, gfx_scale(roof, 225));   // roof ribs
+        if (!car) {   // end doors with locking bars on the right
+            for (int y = 12; y < H - 2; y++) { spr_set(s, W - 14, y, lo); spr_set(s, W - 7, y, lo); spr_set(s, W - 11, y, rgb(60, 60, 64)); spr_set(s, W - 4, y, rgb(60, 60, 64)); }
+            spr_rect(s, 6, 16, 14, 5, gfx_mix(base, rgb(240, 236, 220), 120));   // faded stencil panel
+        } else {      // boxcar: sliding door, undercarriage and wheels on the rails
+            spr_rect(s, 30, 13, 20, 19, gfx_scale(base, 200)); vline(s, 40, 13, 31, lo);
+            spr_rect(s, 2, 33, W - 4, 2, rgb(30, 30, 34));
+            static const int WX[4] = {6, 18, 56, 68}; for (int wx : WX) { spr_rect(s, wx, 33, 7, 7, rgb(20, 20, 22)); spr_rect(s, wx + 2, 35, 3, 3, rgb(120, 120, 126)); }
+        }
+        outlineAll(s);
+        g_spr[car ? S_BOXCAR : S_SHIPBOX0 + t] = s;
+    }
+    {   // bed (1x2 tiles): wood frame, pillow, rumpled blanket
+        Sprite s = spr_new(16, 32);
+        spr_rect(s, 0, 0, 16, 32, k); spr_rect(s, 1, 1, 14, 30, rgb(96, 68, 44));
+        spr_rect(s, 2, 2, 12, 28, rgb(214, 210, 196)); spr_rect(s, 3, 3, 10, 6, rgb(236, 232, 222));
+        spr_rect(s, 2, 11, 12, 19, rgb(92, 106, 140)); for (int y = 13; y < 29; y += 4) hline(s, 3, 12, y, rgb(72, 84, 116));
+        spr_set(s, 5, 15, rgb(120, 136, 170)); spr_set(s, 9, 21, rgb(120, 136, 170));
+        g_spr[S_BED] = s;
+    }
+    {   // sofa (2x1 tiles): back rest, two cushions, arms
+        Sprite s = spr_new(32, 16);
+        px f = rgb(118, 74, 56), fl = rgb(146, 96, 72), fd = rgb(84, 52, 40);
+        spr_rect(s, 0, 1, 32, 15, k); spr_rect(s, 1, 2, 30, 6, fd); spr_rect(s, 1, 2, 30, 1, fl);
+        spr_rect(s, 1, 8, 4, 7, f); spr_rect(s, 27, 8, 4, 7, f);
+        spr_rect(s, 5, 8, 11, 6, fl); spr_rect(s, 16, 8, 11, 6, fl); vline(s, 16, 8, 13, fd);
+        hline(s, 5, 26, 14, fd);
+        g_spr[S_SOFA] = s;
+    }
+    {   // fridge: off-white, door seam, handle
+        Sprite s = spr_new(16, 22);
+        spr_rect(s, 1, 0, 14, 22, k); spr_rect(s, 2, 1, 12, 20, rgb(208, 208, 198)); spr_rect(s, 2, 1, 12, 1, rgb(236, 236, 228));
+        hline(s, 2, 13, 8, rgb(150, 150, 144)); vline(s, 11, 3, 6, rgb(110, 110, 110)); vline(s, 11, 10, 15, rgb(110, 110, 110));
+        spr_rect(s, 4, 11, 3, 2, rgb(200, 70, 60));   // a fridge magnet
+        g_spr[S_FRIDGE] = s;
+    }
+}
+
 void art_init() {
     static bool done = false;
     if (done) return;
@@ -1077,6 +1148,7 @@ void art_init() {
     buildIcons();
     buildItems();
     buildBuildings();
+    buildYardArt();
     // logo zombie head for title (scaled portrait-like)
     bool f;
     g_spr[S_LOGO_ZOMBIE] = spr_copy(art_char(true, 0, 2, P_STAND, f));

@@ -306,6 +306,11 @@ static const LootEntry L_SHELF[] = {{IT_SHOTGUN, 1, 1, 2}, {IT_RIFLE, 1, 1, 2}, 
                                     {IT_AMMO_RIFLE, 3, 8, 3}, {IT_PACK_L, 1, 1, 1}, {IT_GENERATOR, 1, 1, 1}, {IT_AMMO_38, 6, 12, 2}};
 static const LootEntry L_CAR[] = {{IT_AMMO_SHELL, 3, 8, 3}, {IT_FUEL, 1, 1, 3}, {IT_AMMO_9MM, 6, 12, 3}, {IT_MRE, 1, 1, 2}, {IT_CROWBAR, 1, 1, 1}, {IT_TOOLS, 1, 1, 2}, {IT_SHOTGUN, 1, 1, 1}};
 static const LootEntry L_WRECK[] = {{IT_FUEL, 1, 1, 3}, {IT_SCRAP, 1, 2, 4}, {IT_TOOLS, 1, 1, 2}, {IT_CANNED, 1, 1, 2}, {IT_PLANKS, 1, 1, 1}};
+static const LootEntry L_GROCERY[] = {{IT_CANNED, 1, 2, 6}, {IT_MRE, 1, 1, 2}, {IT_PILLS, 1, 1, 2}, {IT_BANDAGE, 1, 1, 2}, {IT_FUEL, 1, 1, 1}};
+static const LootEntry L_PANTRY[] = {{IT_CANNED, 1, 2, 5}, {IT_PILLS, 1, 1, 2}, {IT_BANDAGE, 1, 1, 2}, {IT_TOOLS, 1, 1, 1}, {IT_AMMO_9MM, 3, 8, 1}};
+static const LootEntry L_FRIDGE[] = {{IT_CANNED, 1, 1, 5}, {IT_MRE, 1, 1, 1}, {IT_ANTIBIOTICS, 1, 1, 1}};
+static const LootEntry L_DRAWER[] = {{IT_BANDAGE, 1, 1, 3}, {IT_PILLS, 1, 1, 3}, {IT_AMMO_9MM, 3, 8, 2}, {IT_AMMO_38, 3, 6, 2}, {IT_REVOLVER, 1, 1, 1}, {IT_BAT, 1, 1, 1}, {IT_TOOLS, 1, 1, 1}};
+static const LootEntry L_FREIGHT[] = {{IT_SCRAP, 1, 2, 5}, {IT_PLANKS, 1, 2, 4}, {IT_FUEL, 1, 1, 3}, {IT_TOOLS, 1, 1, 3}, {IT_CANNED, 1, 2, 2}, {IT_CROWBAR, 1, 1, 1}, {IT_GENERATOR, 1, 1, 1}};
 
 void loot_generate(int loc, int ci, int propType, int special, Container& out) {
     out.n = 0; out.cap = 8;
@@ -316,7 +321,15 @@ void loot_generate(int loc, int ci, int propType, int special, Container& out) {
     case PR_DESK: T(L_DESK, 2); break; case PR_FILING: T(L_FILING, 2); break; case PR_LOCKER: T(L_LOCKER, 3); break;
     case PR_CRATE: T(L_CRATE, 3); break; case PR_MEDCAB: T(L_MED, 3); break; case PR_SHELF: T(L_SHELF, 3); break;
     case PR_CAR: T(L_CAR, 3); break; case PR_WRECK: T(L_WRECK, 2); break;
+    case PR_FRIDGE: T(L_FRIDGE, 2); break; case PR_SHIPBOX: case PR_BOXCAR: T(L_FREIGHT, 4); break;
     }
+    // the same furniture holds what that kind of place would stock
+    int map = LOCATIONS[loc].map;
+    if (propType == PR_SHELF && map == MAP_MARKET) T(L_GROCERY, 3);
+    if (propType == PR_SHELF && map == MAP_HOSPITAL) T(L_MED, 3);
+    if (propType == PR_SHELF && map == MAP_HOMES) T(L_PANTRY, 2);
+    if ((propType == PR_CRATE || propType == PR_LOCKER) && map == MAP_YARD) T(L_FREIGHT, 3);
+    if (propType == PR_DESK && map == MAP_HOMES) T(L_DRAWER, 2);
 #undef T
     if (special == 1 && G.loc[loc].gen == 0) out.push(makeItem(IT_KEYCARD));
     if (special == 2 && G.loc[loc].gen == 0) out.push(makeItem(IT_CELLKEY));
