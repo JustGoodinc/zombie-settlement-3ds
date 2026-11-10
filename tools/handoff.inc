@@ -170,7 +170,7 @@ static void captureScreens() {
     G.nz = 0;
     for (int k = 0; k < 4; k++) {
         Zombie& z = G.z[G.nz++]; memset(&z, 0, sizeof z);
-        z.x = z.px = u.x + 40 + k * 14; z.y = z.py = u.y + 6 - k * 10; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 1; z.variant = (uint8_t)k; z.hx = -1;
+        z.x = z.px = u.x + 40 + k * 14; z.y = z.py = u.y + 6 - k * 10; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 1; z.variant = toolLook(z, k); z.hx = -1;
         z.anim = Animator(); z.anim.play(AnimState::ZWalk, true);
     }
     u.fx = 1; u.fy = 0; u.dir = 0;
@@ -227,10 +227,11 @@ static const char* SPR_NAMES[S_COUNT] = {
     "icon_biohazard", "icon_people", "icon_clock", "logo_zombie",
     "tent", "barrel", "sandbags", "log_pile", "torch_f0", "torch_f1", "traffic_cone",
     "decal_tuft", "decal_flower", "decal_rock", "decal_paper", "decal_debris", "decal_oil", "decal_crack", "decal_blood_smear", "decal_leaves",
-    "icon_house", "icon_tree", "icon_train"};
+    "icon_house", "icon_tree", "icon_train",
+    "shipping_container_0", "shipping_container_1", "shipping_container_2", "shipping_container_3", "boxcar", "bed", "sofa", "fridge"};
 static const char* TILE_NAMES[TA_COUNT] = {"grass", "asphalt", "parking_line", "dirt", "lino", "wood", "carpet", "concrete", "wall_top", "wall_front",
     "window", "window_broken", "cell_bars", "fence", "extraction", "garden", "palisade", "door_closed", "door_open", "door_locked", "door_broken",
-    "cell_door", "gate_closed", "gate_open", "crack_overlay_1", "crack_overlay_2"};
+    "cell_door", "gate_closed", "gate_open", "crack_overlay_1", "crack_overlay_2", "rail", "water"};
 static const char* POSE_NAMES[P_COUNT] = {"stand", "breathe", "walk_a", "walk_b", "run_a", "run_b", "crouch", "reach", "lean_back", "lean_fwd", "hurt", "fall", "dead", "look", "aim"};
 static const char* DIR_NAMES[8] = {"e", "se", "s", "sw", "w", "nw", "n", "ne"};
 static const char* BLD_NAMES[BLD_TYPES] = {"infirmary", "workshop", "storage", "kitchen_garden", "living_quarters", "defenses"};
@@ -238,13 +239,30 @@ static const char* BLD_NAMES[BLD_TYPES] = {"infirmary", "workshop", "storage", "
 static int exportAssets() {
     char d[512], p[512], nm[80]; int n = 0;
     snprintf(d, sizeof d, "%s/assets", g_out); mkd(d);
-    const char* sub[] = {"props_icons", "tiles", "items", "characters", "portraits", "buildings", "ui", "audio", "app_icons", "sheets"};
+    const char* sub[] = {"props_icons", "tiles", "items", "characters", "portraits", "buildings", "ui", "audio", "app_icons", "sheets", "furniture", "levels"};
     for (const char* s : sub) { snprintf(p, sizeof p, "%s/%s", d, s); mkd(p); }
     for (int i = 0; i < S_COUNT; i++) if (g_spr[i].d) { snprintf(p, sizeof p, "%s/props_icons", d); spritePNG(p, SPR_NAMES[i], g_spr[i]); n++; }
-    for (int t = 0; t < TA_COUNT; t++) for (int v = 0; v < 4; v++) { snprintf(p, sizeof p, "%s/tiles", d); snprintf(nm, sizeof nm, "%s_v%d", TILE_NAMES[t], v); spritePNG(p, nm, g_tile[t][v]); n++; }
+    // floors and walls are baked per level now (assets/levels); the only tile sprites the game still draws are the
+    // door / window / gate overlays: _h = set in a horizontal wall (front view), _v = in a vertical wall (top view)
+    for (int t = TA_WINDOW; t < TA_COUNT; t++) {
+        if (t == TA_BARS || t == TA_FENCE || t == TA_EXTRACT || t == TA_GARDEN || t == TA_PALISADE || t == TA_RAIL || t == TA_WATER) continue;
+        bool two = t != TA_GATE_CLOSED && t != TA_GATE_OPEN && t != TA_CRACK1 && t != TA_CRACK2;
+        for (int v = 0; v < (two ? 2 : 1); v++) { snprintf(p, sizeof p, "%s/tiles", d); snprintf(nm, sizeof nm, two ? (v ? "%s_v" : "%s_h") : "%s", TILE_NAMES[t]); spritePNG(p, nm, g_tile[t][v]); n++; }
+    }
+    {   const Sprite* sp[160]; const char* fn[160]; int k = propart_list(sp, fn, 160);
+        for (int i = 0; i < k; i++) { snprintf(p, sizeof p, "%s/furniture", d); spritePNG(p, fn[i], *sp[i]); n++; } }
+    for (int mp = 0; mp < MAP_COUNT; mp++) {   // every map's baked level layer
+        static Map keep; keep = G.map;
+        map_load(G.map, mp); map_refresh(G.map); bake_level();
+        char s2[64]; slug(s2, map_name(mp)); snprintf(p, sizeof p, "%s/levels/%s.png", d, s2); gfx_writePNG(p, g_bake, g_bakeW, g_bakeH); n++;
+        G.map = keep; bake_level();
+    }
     for (int i = 1; i < IT_COUNT; i++) { char s2[64]; slug(s2, idef(i).name); snprintf(p, sizeof p, "%s/items", d); snprintf(nm, sizeof nm, "%02d_%s", i, s2); spritePNG(p, nm, g_item[i]); n++; }
-    for (int z = 0; z < 2; z++) for (int v = 0; v < (z ? ZOMB_VARIANTS : SURV_VARIANTS); v++) {
-        snprintf(p, sizeof p, "%s/characters/%s_%d", d, z ? "zombie" : "survivor", v); mkd(p);
+    static const char* const ZLOOK_NAMES[ZOMB_LOOKS] = {"office", "plaid", "long_hair", "hoodie", "suit", "officer", "riot", "inmate", "doctor", "nurse", "patient", "shop_staff",
+        "tracksuit", "hi_vis", "mechanic", "robe", "turned_0", "turned_1", "turned_2", "turned_3", "turned_4", "turned_5", "turned_6", "turned_7"};
+    for (int z = 0; z < 2; z++) for (int v = 0; v < (z ? ZOMB_LOOKS : SURV_VARIANTS); v++) {   // (zombies: version 0 of each look; versions 1-3 are recolours)
+        if (z) snprintf(p, sizeof p, "%s/characters/zombie_%02d_%s", d, v, ZLOOK_NAMES[v]); else snprintf(p, sizeof p, "%s/characters/survivor_%d", d, v);
+        mkd(p);
         for (int dir = 0; dir < 8; dir++) for (int ps = 0; ps < P_COUNT; ps++) {
             bool flip; const Sprite& s = art_char(z != 0, v, dir, (Pose)ps, flip);
             Sprite f = s;
@@ -321,11 +339,11 @@ static void writeDocs(int assetCount) {
     fprintf(m, "- PC shows both screens stacked (8 px gap, bottom centred), integer-scaled, mouse = stylus.\n- Pixel art is 1:1 on device; nearest-neighbour scaling only. Camera zoom (100/125/150/200%%, default 125%%) scales the world layer only; HUD and text render after scaling at native resolution.\n- Screenshots in `screens/` are composites at 2x; `screens/native/` has each screen at 1x.\n\n");
     fprintf(m, "## 2. Colour\n\nRGB565 on device (5/6/5 bits), so values are quantised. Hex below is the exact rendered value.\n\n| Token | Hex | Use |\n|---|---|---|\n");
     for (auto& s : SW) { char h[8]; hexOf(s.c, h); fprintf(m, "| `%s` | `%s` | %s |\n", s.name, h, s.use); }
-    fprintf(m, "\nAtmosphere grade (mixed toward by the light pass): day `#1E160E` warm, dusk `#2C160E` amber, night `#060A1A` blue; plus a screen-edge vignette.\n\n");
+    fprintf(m, "\nShadows blend toward a cool tint, never grey (smooth 8 px lattice, bilinear, ordered dither): day `#181838` navy, dusk `#301838` plum, night `#080C28` deep blue; plus a screen-edge vignette. Lamps, fires, muzzle flashes, police lightbars and burning wrecks add warm or coloured glows on top (additive).\n\n**One visual language everywhere (v0.4):** navy-black outlines (`#161620`), light from the upper left, a lit top face over a darker front on every object (walls, furniture, menu buttons), two or three clean tones per material instead of per-pixel noise, and gold for focus, selection and interaction.\n\n");
     fprintf(m, "## 3. Typography\n\n- Bitmap font 5x8 glyphs, 6 px advance, 10 px line height, 1 px `ink` drop shadow (`assets/ui/font_sheet@3x.png`).\n- Bold variant: glyph drawn twice, 7 px advance. Used for panel titles, tabs and buttons (falls back to regular when the label would not fit).\n- Large titles: same font at 2x-5x.\n- Minimum: never below 1x on device. Wrap at word boundaries; avoid lines over ~50 characters on the bottom screen.\n\n");
-    fprintf(m, "## 4. Grid, spacing, components\n\n- World tiles 16 px. Characters 16x24 (feet pivot). Props 16x16; cars 40x28 (3/4 view, 2x1 tile footprint); army tents 46x40; buildings drawn bottom-centred on 3x3 plots (up to 62x86); trees 32x32; buildings 48x48 on 3x3-tile plots.\n- Bottom screen: 4 px outer margin; panels have 3 px bevel + rivets; panel title bar 13 px (content starts at y+20); footer strip y 224-240.\n- Buttons: 18-22 px tall, 1 px ink edge, vertical gradient, light top-left / dark bottom-right bevel. States: normal, focused (gold border + dark-gold inner line), selected (gold fill), gold (call to action), disabled (flat, grey text), pressed (1 px down, inverted gradient).\n- Tabs: 15 px tall; active = gold gradient + gold top highlight + bright label.\n- Bars: 1 px ink frame, highlight row, 6 px segment ticks.\n- Inventory: 8 px of art per grid cell, drawn at 3x (24 px cells) for the 6x4 pack, 2x (16 px) for larger packs, 1x (12 px cells) in the loot screen.\n- See `assets/ui/components@3x.png`.\n\n");
+    fprintf(m, "## 4. Grid, spacing, components\n\n- World tiles 16 px. Characters 16x24 (feet pivot). Furniture is three-quarter view, 16 px wide and up to 24 tall, bottom-aligned on its tile (lit top face, darker front, navy outline), with per-map variants (`assets/furniture/`); cars 40x28 (3/4 view, 2x1 tile footprint, six paint jobs); army tents 46x40; buildings drawn bottom-centred on 3x3 plots (up to 62x86); trees 32x32; buildings 48x48 on 3x3-tile plots.\n- Bottom screen: 4 px outer margin; panels are data wells sunk into a navy slab (dark upper-left inner edge, lit lower-right); title strip 14 px in slate blue (content starts at y+20); footer strip y 224-240.\n- Buttons are raised blocks: 1 px navy outline, a face with a lit top and left edge, and a 2-3 px darker front below it. States: normal (slate blue), focused (gold ring + dark-gold inner ring + corner brackets), selected (solid gold face, dark lettering), gold (call to action), disabled (flat, sunk, grey text), pressed (the face sinks into the front).\n- Tabs: 15 px tall blocks; active = gold face with dark lettering.\n- Bars: 1 px ink frame, highlight row, 6 px segment ticks.\n- Inventory: 12 px of art per grid cell, drawn at 2x (24 px cells) for the 6x4 pack, 2x (16 px) for larger packs, 1x (12 px cells) in the loot screen.\n- See `assets/ui/components@3x.png`.\n\n");
     fprintf(m, "## 5. Input glyphs\n\nPrompts follow the active device: 3DS buttons (A red, B yellow, X blue, Y green; L/R/START/SELECT pills; D-pad + Circle Pad icons), keyboard keycaps using the player's bindings, Xbox labels when a pad is used. Rows 1-3 of `assets/ui/components@3x.png` show all three.\n\n");
-    fprintf(m, "## 6. Characters and animation\n\n- 16x24 chibi sprites built from hand-drawn parts (head, torso/arms, legs) in Try 2 style: stocky build, dark eyes under heavy brows, caps with brims jutting to one side. 8 survivor palettes (short hair / cap / long hair), 4 zombie palettes (pale, bald, blood streaks). 5 stored directions (W/SW/NW mirrored); side view is a 3/4 view. 15 poses each: %s", "stand, breathe, walk A/B, run A/B, crouch, reach, lean back/forward, hurt, fall, dead, look, aim.\n- Held weapons are separate side-view sprites drawn at the hand (grip + muzzle points), rotated for up/down facing; starburst muzzle flash.\n- Portraits: 24x24 three-quarter busts (cap brim with shadow, pack straps), light frame.\n");
+    fprintf(m, "## 6. Characters and animation\n\n- 16x24 chibi sprites built from hand-drawn parts (head, torso/arms, legs) in Try 2 style: stocky build, dark eyes under heavy brows, caps with brims jutting to one side. 8 survivor palettes (short hair / cap / long hair). Zombies come in 16 looks tied to the place (office worker, plaid shirt, long hair, hoodie, suit, police officer, riot gear, inmate, doctor, theatre nurse, patient, shop staff, tracksuit, hi-vis yard worker, mechanic, dressing gown), each in 4 versions (skin tone, wound, hair, top colour), plus a turned version of every survivor in their own clothes; looks differ in appearance only. 5 stored directions (W/SW/NW mirrored); side view is a 3/4 view. 15 poses each: %s", "stand, breathe, walk A/B, run A/B, crouch, reach, lean back/forward, hurt, fall, dead, look, aim.\n- Held weapons are separate side-view sprites drawn at the hand (grip + muzzle points), rotated for up/down facing; starburst muzzle flash.\n- Portraits: 24x24 three-quarter busts (cap brim with shadow, pack straps), light frame.\n");
     fprintf(m, "- Animation states and timings: `docs/ANIMATION_BIBLE.md` in the repo. Exported frames: `assets/characters/<set>/<dir>_<pose>.png` (+ `@4x`).\n\n");
     fprintf(m, "## 7. Screens (%d)\n\n", g_nshots);
     const char* lastArea = "";
@@ -335,11 +353,11 @@ static void writeDocs(int assetCount) {
         fprintf(m, "**%s** - `screens/%s.png`  \n%s\n\n", s.title, s.file, s.note[0] ? s.note : "");
     }
     fprintf(m, "## 8. Asset package (%d files)\n\n| Folder | Contents |\n|---|---|\n", assetCount);
-    fprintf(m, "| `assets/props_icons/` | props, decals, UI icons (transparent PNG, 1x and @4x) |\n| `assets/tiles/` | 26 tile types x 4 variants |\n| `assets/items/` | inventory item art (8 px per grid cell) |\n");
-    fprintf(m, "| `assets/characters/` | every survivor/zombie palette x 8 directions x 15 poses |\n| `assets/portraits/` | 24x24 portraits |\n| `assets/buildings/` | 6 buildings x plot + 3 levels |\n");
+    fprintf(m, "| `assets/props_icons/` | props, decals, UI icons (transparent PNG, 1x and @4x) |\n| `assets/tiles/` | door / window / gate overlays (`_h` in a horizontal wall, `_v` in a vertical wall) and crack overlays |\n| `assets/levels/` | every map as its baked level layer: floors, walls, fences, shadows, ground detail (1x PNG) |\n| `assets/furniture/` | furniture and vehicles, every variant |\n| `assets/items/` | inventory item art (12 px per grid cell) |\n");
+    fprintf(m, "| `assets/characters/` | every survivor palette and zombie look x 8 directions x 15 poses |\n| `assets/portraits/` | 24x24 portraits |\n| `assets/buildings/` | 6 buildings x plot + 3 levels |\n");
     fprintf(m, "| `assets/ui/` | components sheet, bottom-screen background, font sheet, palette strip |\n| `assets/audio/` | 29 effects + 4 ambience/music beds (WAV 22.05 kHz mono) |\n| `assets/sheets/` | review sheets (characters, tiles, props, items, buildings) |\n| `assets/app_icons/` | 3DS icon/banner, Windows .ico |\n\n");
     fprintf(m, "## 9. Review and mockup comparisons\n\n`review/` holds the staged Try 2 scenes and side-by-side comparisons (mockup left, game right): `compare_settlement.png`, `compare_combat.png`, `compare_characters.png`, `compare_portrait_cap.png`, `compare_portrait_longhair.png`, plus `character_lineup.png` (4x), `combat_police_station.png`, `settlement_day.png`, `settlement_dusk.png`, `settlement_overview_100.png`. Regenerate the scenes with `zs_tool --lineup`, `--duel` and `--base`.\n\n");
-    fprintf(m, "## 10. Open design work\n\n- Five launch maps are built and playtested (Police Station, Hospital, Supermarket, Train Yard, Neighborhood); more can be added as ASCII layouts in `src/world/maps.cpp` (check them with `zs_tool --playtest`).\n- 45-degree character directions reuse front/back art with a turned head.\n- Night lighting uses 8 px cells (stepped edges).\n- Bushes and street trees around the Police Station (the mockup has them).\n- All art is procedural/original; replacing any sprite only needs a same-size PNG mapped back into `src/core/art.cpp`.\n");
+    fprintf(m, "## 10. Open design work\n\n- Five launch maps are built and playtested (Police Station, Hospital, Supermarket, Train Yard, Neighborhood); more can be added as ASCII layouts in `src/world/maps.cpp` (check them with `zs_tool --playtest`).\n- 45-degree character directions reuse front/back art with a turned head.\n- Bushes and street trees around the Police Station (the mockup has them).\n- All art is procedural/original: characters and settlement buildings in `src/core/art.cpp`, floors/walls/ground detail in `src/gameplay/worldart.cpp`, furniture and vehicles in `propart.cpp`, item icons in `itemart.cpp`, combat effects in `fx.cpp`.\n- Review tools: `zs_tool --mapshots`, `--combat`, `--settlement`, `--rain`, `--gallery`, `--bench`, `--bench-bake`, `--playtest`.\n");
     fclose(m);
 
     // index.html: same content, visual
@@ -360,7 +378,7 @@ static void writeDocs(int assetCount) {
     fprintf(h, "</table><p>Atmosphere grade: day <code>#1E160E</code>, dusk <code>#2C160E</code>, night <code>#060A1A</code>, plus vignette.</p>");
     fprintf(h, "<h2>Typography</h2><p>5&times;8 bitmap font, 6 px advance, 10 px line, 1 px ink shadow. Bold (7 px advance) for titles, tabs, buttons.</p><img class=\"big\" src=\"assets/ui/font_sheet@3x.png\" alt=\"font sheet\">");
     fprintf(h, "<h2>Components &amp; input glyphs</h2><p>Panels, button states (normal, focused, selected, gold, disabled, left-aligned), tabs, bars, and input glyphs for 3DS / keyboard / Xbox.</p><img class=\"big\" src=\"assets/ui/components@3x.png\" alt=\"components\">");
-    fprintf(h, "<h3>Spacing</h3><ul><li>World tiles 16 px; characters 16&times;24 (feet pivot); buildings 48&times;48 on 3&times;3 plots.</li><li>Bottom screen margin 4 px; panel bevel 3 px; title bar 13 px; footer strip y 224&ndash;240.</li><li>Buttons 18&ndash;22 px tall; tabs 15 px.</li><li>Inventory cells 24 px (6&times;4 pack), 16 px (larger), 12 px (loot screen).</li></ul>");
+    fprintf(h, "<h3>Spacing</h3><ul><li>World tiles 16 px; characters 16&times;24 (feet pivot); buildings 48&times;48 on 3&times;3 plots.</li><li>Bottom screen margin 4 px; sunk panels with a 1 px rim; title bar 13 px; footer strip y 224&ndash;240.</li><li>Buttons 18&ndash;22 px tall; tabs 15 px.</li><li>Inventory cells 24 px (6&times;4 pack), 16 px (larger), 12 px (loot screen).</li></ul>");
     fprintf(h, "<h2>Art</h2><div class=\"grid\">");
     const char* sheets[][2] = {{"assets/sheets/characters.png", "Characters (all variants, directions, poses)"}, {"assets/sheets/tiles.png", "Tiles"}, {"assets/sheets/props_icons.png", "Props, decals, icons"}, {"assets/sheets/items.png", "Items"}, {"assets/sheets/buildings_portraits.png", "Buildings + portraits"}};
     for (auto& s : sheets) fprintf(h, "<div class=\"card\"><img src=\"%s\" alt=\"%s\"><b>%s</b></div>", s[0], s[1], s[1]);

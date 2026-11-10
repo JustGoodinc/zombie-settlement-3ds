@@ -322,6 +322,7 @@ static void playtest(const char* dir, int runs) {
 
 // map review (zs_tool --mapshots DIR): a stitched whole-map overview at 100% zoom by day, plus in-game
 // screenshots (top + bottom screen, default zoom) at the arrival point, the middle of the map, the far end, and at night
+extern bool g_overview;
 static void mapShots(const char* dir) {
     for (int loc = 0; loc < LOC_COUNT; loc++) {
         game_newGame(); G.set.tutorialDone = true;
@@ -334,7 +335,7 @@ static void mapShots(const char* dir) {
             static px vb[TOP_W * TOP_H];
             for (int cy = 0; cy < H; cy += TOP_H) for (int cx = 0; cx < W; cx += TOP_W) {
                 int ox = cx + TOP_W > W ? W - TOP_W : cx, oy = cy + TOP_H > H ? H - TOP_H : cy;
-                G.camX = (float)ox; G.camY = (float)oy; Canvas v; v.init(vb, TOP_W, TOP_H); render_world(v, 1);
+                G.camX = (float)ox; G.camY = (float)oy; Canvas v; v.init(vb, TOP_W, TOP_H); g_overview = true; render_world(v, 1); g_overview = false;
                 for (int y = 0; y < TOP_H; y++) memcpy(img + (oy + y) * W + ox, vb + y * TOP_W, TOP_W * sizeof(px));
             }
             snprintf(p, sizeof p, "%s/%s_overview.png", dir, name); gfx_writePNG(p, img, W, H); free(img); printf("  wrote %s\n", p); }
@@ -369,7 +370,7 @@ static void settlementShots(const char* dir) {
         float cx0 = G.camX, cy0 = G.camY;
         for (int cy = 0; cy < H; cy += TOP_H) for (int cx = 0; cx < W; cx += TOP_W) {
             int ox = cx + TOP_W > W ? W - TOP_W : cx, oy = cy + TOP_H > H ? H - TOP_H : cy;
-            G.camX = (float)ox; G.camY = (float)oy; Canvas v; v.init(vb, TOP_W, TOP_H); render_world(v, 1);
+            G.camX = (float)ox; G.camY = (float)oy; Canvas v; v.init(vb, TOP_W, TOP_H); g_overview = true; render_world(v, 1); g_overview = false;
             for (int y = 0; y < TOP_H; y++) memcpy(img + (oy + y) * W + ox, vb + y * TOP_W, TOP_W * sizeof(px));
         }
         G.camX = cx0; G.camY = cy0;
@@ -378,20 +379,40 @@ static void settlementShots(const char* dir) {
     G.set.zoom = zoom;
 }
 
-// combat showcase (zs_tool --combat DIR): a short scripted firefight in the police lobby by day and in the car park at
-// night; writes the top screen at the first muzzle flash, mid-fight and after it (to judge flash, blood, casings, light)
+// the open spot nearest the middle of the map with room to stage a fight to its east (inside a building or out)
+static bool fightSpot(bool indoor, int& bx, int& by) {
+    const Map& m = G.map; int best = 1 << 30; bool found = false;
+    for (int ty = 3; ty < m.h - 4; ty++) for (int tx = 3; tx < m.w - 10; tx++) {
+        if (((m.flags[m.idx(tx, ty)] & F_INDOOR) != 0) != indoor) continue;
+        int blocked = 0;
+        for (int y = ty - 2; y <= ty + 3; y++) for (int x = tx - 2; x <= tx + 9; x++) if ((m.flags[m.idx(x, y)] & F_BLOCK) || ((m.flags[m.idx(x, y)] & F_INDOOR) != 0) != indoor) blocked += y == ty ? 99 : 1;
+        int d = abs(tx - m.w / 2) + abs(ty - m.h / 2);
+        if (blocked <= 6 && d < best) { best = d; bx = tx; by = ty; found = true; }
+    }
+    return found;
+}
+// combat showcase (zs_tool --combat DIR): a short scripted firefight in the police lobby by day, in its car park at
+// night and somewhere open in each of the other locations; writes the top screen at the first muzzle flash, mid-fight
+// and after it (to judge flash, blood, casings, light, and who the dead are in each place)
 static void combatShots(const char* dir) {
-    const struct { const char* n; int tx, ty; float clock; } SC[2] = {{"combat_day", 22, 29, 11 * 60.0f}, {"combat_night", 24, 36, 22 * 60 + 30.0f}};
+    const struct { const char* n; int loc, tx, ty; bool indoor; float clock; } SC[6] = {
+        {"combat_day", 0, 22, 29, true, 11 * 60.0f}, {"combat_night", 0, 24, 36, false, 22 * 60 + 30.0f},
+        {"combat_hospital", 1, -1, -1, true, 14 * 60.0f}, {"combat_market", 2, -1, -1, true, 12 * 60.0f},
+        {"combat_yard", 3, -1, -1, false, 16 * 60 + 30.0f}, {"combat_homes", 4, -1, -1, false, 18 * 60 + 10.0f}};
     for (auto& sc : SC) {
         game_newGame(); G.set.tutorialDone = true;
         G.squad[0] = 0; G.squad[1] = 1; G.squad[2] = -1; G.st.surv[0].onExpedition = G.st.surv[1].onExpedition = true;
-        level_leave(); level_enter(MAP_POLICE, 0); ui_open(PN_HUD);
+        level_leave(); level_enter(LOCATIONS[sc.loc].map, sc.loc); ui_open(PN_HUD);
         G.clock = sc.clock; G.flashlight = sc.clock > 20 * 60; G.nz = 0;
-        for (int k = 0; k < G.nu; k++) { G.u[k].x = G.u[k].px = sc.tx * 16 + 8.0f - k * 14; G.u[k].y = G.u[k].py = sc.ty * 16 + 8.0f + k * 6; }
+        int tx = sc.tx, ty = sc.ty;
+        if (tx < 0 && !fightSpot(sc.indoor, tx, ty)) { printf("  %s: no open spot\n", sc.n); continue; }
+        for (int k = 0; k < G.nu; k++) if (!G.u[k].escort) { G.u[k].x = G.u[k].px = tx * 16 + 8.0f - k * 14; G.u[k].y = G.u[k].py = ty * 16 + 8.0f + k * 6; }
         Unit& u = G.u[0]; u.fx = 1; u.fy = 0;
         for (int k = 0; k < 6; k++) {
             Zombie& z = G.z[G.nz++]; memset(&z, 0, sizeof z);
-            z.x = z.px = u.x + 70 + (k % 3) * 26; z.y = z.py = u.y - 26 + (k / 3) * 44 + (k % 3) * 6; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 0.5f; z.variant = (uint8_t)(k % ZOMB_VARIANTS); z.hx = -1;
+            z.x = z.px = u.x + 70 + (k % 3) * 26; z.y = z.py = u.y - 26 + (k / 3) * 44 + (k % 3) * 6;
+            for (int r = 1; r < 5 && (G.map.flags[G.map.idx((int)(z.x / 16), (int)(z.y / 16))] & F_BLOCK); r++) z.y = z.py = z.y + 16;   // not inside the furniture
+            z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 0.5f; z.variant = toolLook(z, k); z.hx = -1;
             z.anim = Animator(); z.anim.play(AnimState::ZWalk, true);
         }
         G.camX = u.x - view_w() / 2 + 40; G.camY = u.y - view_h() / 2; step(20);
@@ -420,5 +441,29 @@ static void bakeBench() {
         for (int k = 0; k < 20; k++) bake_level();
         double ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t0).count() / 20;
         printf("bake %-16s %dx%d tiles  %.2f ms\n", map_name(map), G.map.w, G.map.h, ms);
+    }
+    // zombie frames are drawn the first time each is shown: the cost of one, and of everything a level could ask for
+    art_zombie_flush();
+    auto t0 = std::chrono::high_resolution_clock::now();
+    bool f; int n = 0;
+    for (int v = 0; v < ZOMB_VARIANTS; v++) for (int d = 0; d < 8; d++) for (int p = 0; p < P_COUNT; p++) { art_char(true, v, d, (Pose)p, f); n++; }
+    double us = std::chrono::duration<double, std::micro>(std::chrono::high_resolution_clock::now() - t0).count();
+    printf("zombie frames: %.1f us each on first use (%d distinct frames across all %d variants: %.1f ms, %.0f KB if every one were ever shown)\n",
+           us / (ZOMB_VARIANTS * 5 * P_COUNT), ZOMB_VARIANTS * 5 * P_COUNT, ZOMB_VARIANTS, us / 1000, ZOMB_VARIANTS * 5 * P_COUNT * (16 * 24 * 2 + 16) / 1024.0);
+    (void)n;
+}
+
+// zs_tool --rain DIR: the police car park on the first rainy day, at dusk and at night
+static void rainShots(const char* dir) {
+    game_newGame(); G.set.tutorialDone = true;
+    G.squad[0] = 0; G.squad[1] = 1; G.squad[2] = -1; G.st.surv[0].onExpedition = G.st.surv[1].onExpedition = true;
+    level_leave(); level_enter(MAP_POLICE, 0); ui_open(PN_HUD);
+    for (uint32_t d = 2; d < 40; d++) if (hash32(d * 31u + 2u * 7u) % 4 == 0) { G.day = d; break; }
+    G.nz = 0;
+    for (int k = 0; k < G.nu; k++) { G.u[k].x = G.u[k].px = 18 * 16 + 8.0f + k * 14; G.u[k].y = G.u[k].py = 36 * 16 + 8.0f; }
+    const struct { const char* n; float clock; } T[2] = {{"rain_dusk", 18 * 60 + 30.0f}, {"rain_night", 22 * 60 + 30.0f}};
+    for (auto& t : T) {
+        G.clock = t.clock; G.flashlight = t.clock > 20 * 60; G.camX = G.u[0].x - view_w() / 2; G.camY = G.u[0].y - view_h() / 2; step(30);
+        char p[512]; snprintf(p, sizeof p, "%s/%s.png", dir, t.n); gfx_writePNG(p, topB, TOP_W, TOP_H); printf("  wrote %s (day %u)\n", p, G.day);
     }
 }

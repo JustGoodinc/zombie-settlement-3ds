@@ -226,6 +226,7 @@ void fx_renderGlow(Canvas& c, int camX, int camY);
 
 // ---- propart.cpp: furniture / vehicle sprites in three-quarter view, with per-map and per-position variants
 void propart_init();
+int propart_list(const Sprite** out, const char** names, int max);  // every furniture sprite, named (asset export)
 int prop_fx(const Map& m, const Prop& p);                           // 1 = cruiser with a working lightbar, 2 = burning wreck
 void itemart_init();                                               // inventory icons, 12 px per cell
 const Sprite* prop_sprite(const Map& m, const Prop& p, int& ox, int& oy);   // nullptr = drawn by hand (trees, fires, lamps, plots)

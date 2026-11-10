@@ -4,7 +4,7 @@ All art is original and generated at startup by `src/core/art.cpp`, from hand-dr
 
 | Sheet | Contents |
 |---|---|
-| `characters.png` | 16×24 characters: 8 survivor + 4 zombie palette variants × 5 stored directions (W/SW/NW mirrored) × 14 poses |
+| `characters.png` | 16×24 characters: 8 survivor palettes + 24 zombie looks (16 by place, 8 turned survivors; version 0 of each, see `zs_tool --zombies` for the four versions) × 5 stored directions (W/SW/NW mirrored) × 15 poses |
 | `tiles.png` | 26 tile types × 4 variants (grass, asphalt, line, dirt, lino, wood, carpet, concrete, wall top/front, window/broken, bars, fence, extraction, garden, palisade, doors closed/open/locked/broken, cell door, gate, cracks) |
 | `props_icons.png` | tent, barrel, sandbags, log pile, torch, traffic cone, ground decals (tuft, flower, rock, paper, debris, oil, crack, blood smear, leaves), location icons, desk, filing cabinet, locker, crate, medical cabinet, shelf, police car, wreck, trees, bench, cot, chair, plant, cooler, campfire ×3, radio table, generator ×2, workbench, lamp, blood ×3, bag, bedroll, UI icons |
 | `items.png` | 29 inventory items |

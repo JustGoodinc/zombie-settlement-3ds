@@ -132,12 +132,87 @@ static const CharPal SURV_PAL[SURV_VARIANTS] = {
     {rgb(26, 22, 22), rgb(132, 88, 60), rgb(96, 62, 42), rgb(190, 156, 64), rgb(78, 78, 86), 0},
     {rgb(150, 72, 38), rgb(236, 190, 150), rgb(190, 136, 100), rgb(52, 120, 122), rgb(40, 50, 82), 2},
 };
-static const CharPal ZOMB_PAL[ZOMB_VARIANTS] = {   // pale, blood-soaked (Try 2)
-    {rgb(58, 52, 50), rgb(204, 196, 186), rgb(150, 138, 134), rgb(176, 168, 160), rgb(64, 60, 66), 0},
-    {rgb(40, 38, 38), rgb(186, 192, 172), rgb(132, 140, 122), rgb(118, 122, 112), rgb(70, 62, 54), 0},
-    {rgb(90, 74, 60), rgb(214, 204, 196), rgb(160, 146, 142), rgb(150, 120, 108), rgb(52, 56, 70), 2},
-    {rgb(30, 30, 32), rgb(196, 184, 180), rgb(142, 126, 124), rgb(98, 104, 122), rgb(60, 58, 54), 0},
+
+// ---------------------------------------------------------------- zombie looks
+// A zombie is whoever it used to be. Each look is a head (hair or headgear), an outfit, a skin tone and a wound, so a
+// crowd reads as people from the place they died in rather than one grey horde. Looks only: every zombie plays the
+// same. Every look also comes in four versions (skin tone, wound, hair and, for people who chose their own clothes,
+// the colour of the top), so a squad in the same uniform is still four different people.
+// Frames are drawn the first time they are needed and dropped when a level loads (art_zombie_flush): there are far
+// too many to make up front, and one level only ever shows a few of them.
+enum { ZH_BALD, ZH_HAIR, ZH_LONG, ZH_CAP, ZH_HARDHAT, ZH_HOOD, ZH_HELMET, ZH_SCRUBCAP, ZH_BEANIE, ZH_BANDAGE };
+enum { ZO_PLAIN, ZO_TIE, ZO_UNIFORM, ZO_RIOT, ZO_JUMPSUIT, ZO_COAT, ZO_SCRUBS, ZO_GOWN, ZO_APRON, ZO_VEST, ZO_OVERALLS, ZO_PLAID, ZO_ROBE, ZO_HOODIE, ZO_TRACK, ZO_PACK };
+enum { ZF_MAW, ZF_SLIT, ZF_TEETH, ZF_EYE, ZF_BEARD, ZF_GLASSES };
+enum { ZT_ASH, ZT_GREEN, ZT_BLUE, ZT_SALLOW, ZT_BRUISE, ZT_DARK };
+static const px ZTONE[6][2] = {   // dead skin: base, shade
+    {rgb(204, 196, 186), rgb(150, 138, 134)}, {rgb(176, 194, 158), rgb(120, 142, 112)}, {rgb(178, 192, 206), rgb(122, 138, 158)},
+    {rgb(210, 198, 148), rgb(156, 142, 100)}, {rgb(192, 172, 196), rgb(136, 116, 146)}, {rgb(148, 128, 114), rgb(102, 86, 78)},
 };
+struct ZombLook { px hair; uint8_t tone; px top, pants, trim; uint8_t head, outfit, face, alt; };   // hair = hair or headgear colour
+static const ZombLook ZLOOK[ZL_SURVIVOR] = {
+    {rgb(58, 52, 50),    ZT_ASH,    rgb(168, 184, 206), rgb(64, 60, 72),    rgb(150, 40, 44),   ZH_BALD,     ZO_TIE,      ZF_GLASSES},   // office worker: shirt and tie
+    {rgb(52, 38, 30),    ZT_GREEN,  rgb(172, 60, 52),   rgb(54, 70, 110),   rgb(104, 30, 36),   ZH_HAIR,     ZO_PLAID,    ZF_BEARD},     // plaid shirt, beard
+    {rgb(150, 72, 38),   ZT_ASH,    rgb(132, 86, 156),  rgb(52, 48, 68),    rgb(0, 0, 0),       ZH_LONG,     ZO_PLAIN,    ZF_MAW},       // long auburn hair, purple top
+    {rgb(46, 90, 96),    ZT_GREEN,  rgb(46, 90, 96),    rgb(38, 38, 52),    rgb(214, 214, 204), ZH_HOOD,     ZO_HOODIE,   ZF_SLIT},      // hood up
+    {rgb(152, 152, 160), ZT_BLUE,   rgb(54, 56, 74),    rgb(42, 44, 62),    rgb(184, 38, 42),   ZH_HAIR,     ZO_TIE,      ZF_TEETH},     // grey-haired suit, red tie
+    {rgb(38, 46, 82),    ZT_ASH,    rgb(50, 66, 112),   rgb(30, 36, 58),    rgb(232, 192, 64),  ZH_CAP,      ZO_UNIFORM,  ZF_MAW},       // police officer
+    {rgb(36, 40, 58),    ZT_SALLOW, rgb(44, 56, 94),    rgb(30, 34, 52),    rgb(138, 176, 198), ZH_HELMET,   ZO_RIOT,     ZF_MAW},       // riot gear, visor down
+    {rgb(60, 50, 44),    ZT_DARK,   rgb(230, 122, 40),  rgb(210, 104, 34),  rgb(238, 230, 212), ZH_BALD,     ZO_JUMPSUIT, ZF_EYE},       // inmate in orange
+    {rgb(44, 36, 36),    ZT_ASH,    rgb(234, 234, 226), rgb(58, 112, 116),  rgb(72, 144, 144),  ZH_HAIR,     ZO_COAT,     ZF_GLASSES},   // doctor: white coat over scrubs
+    {rgb(72, 152, 148),  ZT_SALLOW, rgb(72, 152, 148),  rgb(56, 122, 120),  rgb(214, 232, 238), ZH_SCRUBCAP, ZO_SCRUBS,   ZF_MAW},       // theatre nurse: cap and mask
+    {rgb(70, 60, 56),    ZT_BRUISE, rgb(170, 204, 218), rgb(0, 0, 0),       rgb(126, 166, 190), ZH_BANDAGE,  ZO_GOWN,     ZF_SLIT},      // patient: gown, bare legs, bandaged head
+    {rgb(194, 46, 42),   ZT_SALLOW, rgb(230, 226, 208), rgb(54, 54, 68),    rgb(194, 46, 42),   ZH_CAP,      ZO_APRON,    ZF_MAW},       // shop staff: red cap and apron
+    {rgb(224, 188, 96),  ZT_ASH,    rgb(232, 96, 142),  rgb(60, 64, 88),    rgb(250, 244, 234), ZH_LONG,     ZO_TRACK,    ZF_TEETH},     // blonde in a pink tracksuit
+    {rgb(242, 198, 40),  ZT_GREEN,  rgb(52, 64, 100),   rgb(76, 80, 94),    rgb(242, 122, 30),  ZH_HARDHAT,  ZO_VEST,     ZF_MAW},       // yard worker: hard hat, hi-vis vest
+    {rgb(152, 44, 40),   ZT_DARK,   rgb(132, 132, 140), rgb(52, 72, 120),   rgb(52, 72, 120),   ZH_BEANIE,   ZO_OVERALLS, ZF_BEARD},     // mechanic: beanie, denim overalls
+    {rgb(180, 176, 182), ZT_BRUISE, rgb(216, 130, 152), rgb(216, 130, 152), rgb(246, 238, 230), ZH_LONG,     ZO_ROBE,     ZF_SLIT},      // dressing gown and slippers
+};
+// versions 1..3 of each look: another top and another hair / hat colour (0 keeps the look's own; uniforms stay uniform)
+static const struct ZombAlt { px top[3], hair[3]; } ZALT[ZL_SURVIVOR] = {
+    /* office   */ {{rgb(228, 224, 210), rgb(216, 172, 180), rgb(170, 208, 182)}, {0, 0, 0}},
+    /* plaid    */ {{rgb(66, 122, 86), rgb(64, 94, 152), rgb(198, 152, 58)}, {rgb(36, 32, 36), rgb(150, 72, 38), rgb(152, 152, 160)}},
+    /* long     */ {{rgb(60, 134, 136), rgb(206, 162, 62), rgb(178, 66, 72)}, {rgb(36, 32, 36), rgb(216, 174, 88), rgb(98, 64, 42)}},
+    /* hoodie   */ {{rgb(122, 50, 58), rgb(94, 98, 112), rgb(54, 64, 112)}, {0, 0, 0}},
+    /* suit     */ {{rgb(48, 58, 94), rgb(90, 68, 54), rgb(98, 100, 110)}, {rgb(54, 40, 32), rgb(36, 32, 36), rgb(216, 174, 88)}},
+    /* cop      */ {{0, 0, 0}, {0, 0, 0}},
+    /* riot     */ {{0, 0, 0}, {0, 0, 0}},
+    /* prisoner */ {{0, 0, 0}, {0, 0, 0}},
+    /* doctor   */ {{0, 0, 0}, {rgb(150, 72, 38), rgb(152, 152, 160), rgb(216, 174, 88)}},
+    /* nurse    */ {{rgb(98, 132, 192), rgb(152, 112, 172), rgb(92, 162, 112)}, {0, 0, 0}},
+    /* patient  */ {{rgb(214, 212, 200), rgb(176, 214, 188), rgb(218, 190, 204)}, {0, 0, 0}},
+    /* clerk    */ {{0, 0, 0}, {0, 0, 0}},
+    /* jogger   */ {{rgb(72, 172, 202), rgb(152, 202, 72), rgb(242, 142, 52)}, {rgb(54, 40, 32), rgb(150, 72, 38), rgb(36, 32, 36)}},
+    /* hi-vis   */ {{0, 0, 0}, {rgb(242, 242, 234), rgb(242, 132, 42), rgb(62, 112, 202)}},
+    /* mechanic */ {{0, 0, 0}, {rgb(52, 64, 102), rgb(86, 102, 62), rgb(98, 98, 106)}},
+    /* robe     */ {{rgb(122, 172, 216), rgb(172, 142, 206), rgb(142, 202, 172)}, {rgb(54, 40, 32), rgb(216, 174, 88), rgb(36, 32, 36)}},
+};
+// the look and palette of zombie variant v (look + ZOMB_LOOKS * version); someone from the settlement who turned
+// keeps their own hair and clothes
+static ZombLook zombLook(int v, CharPal& p) {
+    int look = v % ZOMB_LOOKS, alt = v / ZOMB_LOOKS;
+    ZombLook L;
+    if (look >= ZL_SURVIVOR) {
+        const CharPal& s = SURV_PAL[look - ZL_SURVIVOR];
+        L = ZombLook{s.hair, 0, gfx_mix(s.shirt, rgb(128, 128, 124), 70), s.pants, 0, (uint8_t)(s.style == 1 ? ZH_CAP : (s.style == 2 ? ZH_LONG : ZH_HAIR)), ZO_PACK, ZF_MAW, 0};
+        p = CharPal{L.hair, gfx_mix(s.skin, rgb(178, 192, 172), 150), gfx_mix(s.skinS, rgb(122, 138, 120), 150), L.top, L.pants, s.style};
+        return L;
+    }
+    L = ZLOOK[look]; L.alt = (uint8_t)alt;
+    if (alt) {
+        const ZombAlt& A = ZALT[look];
+        if (A.top[alt - 1]) L.top = A.top[alt - 1];
+        if (A.hair[alt - 1]) L.hair = A.hair[alt - 1];
+        L.tone = (uint8_t)((L.tone + alt) % 6);
+        static const uint8_t WOUND[4] = {ZF_MAW, ZF_SLIT, ZF_TEETH, ZF_EYE};
+        if (L.face == ZF_BEARD || L.face == ZF_GLASSES) { if (alt & 1) L.face = alt == 1 ? ZF_MAW : ZF_TEETH; }   // every other one keeps the beard / glasses
+        else L.face = WOUND[((L.face == ZF_SLIT ? 1 : L.face == ZF_TEETH ? 2 : L.face == ZF_EYE ? 3 : 0) + alt) & 3];
+    }
+    if (L.head == ZH_HOOD || L.head == ZH_SCRUBCAP) L.hair = L.top;   // hood and theatre cap match the top
+    if (L.outfit == ZO_ROBE) L.pants = L.top;
+    if (L.outfit == ZO_SCRUBS) L.pants = gfx_scale(L.top, 205);
+    p = CharPal{L.hair, ZTONE[L.tone][0], ZTONE[L.tone][1], L.top, L.outfit == ZO_GOWN ? ZTONE[L.tone][0] : L.pants, (uint8_t)(L.head == ZH_CAP ? 1 : (L.head == ZH_LONG || L.head == ZH_HOOD ? 2 : 0))};
+    return L;
+}
 
 static Sprite parseHead(const char* const* rows, int view, int style) {
     Sprite h = spr_parse(rows, 14);
@@ -173,89 +248,295 @@ static Sprite recolorChar(const Sprite& base, const CharPal& p, bool zombie) {
     return s;
 }
 
-// zombie wounds: gaping bloody mouth, blood down the chin and shirt, torn clothes, patchy hair
-static void zombify(Sprite& s, const CharPal& p, int view, int drop, uint32_t seed) {
-    Rng r(seed);
-    px blood = rgb(168, 26, 26), dried = rgb(104, 18, 20), mouth = rgb(70, 8, 10);
+// A zombie's head, drawn on the 16x14 head before it is put on the body (so it follows every lean and turn):
+// headgear in the template's hair letters (they take the look's colour), wounds and features in final colours.
+static void zombHead(Sprite& h, int view, const ZombLook& L, uint32_t seed) {
+    const px H = pal_char('h'), J = pal_char('j'), Lt = pal_char('H'), k = pal_char('k'), s = pal_char('s'), S = pal_char('S'), eye = pal_char('e');
+    const px blood = rgb(168, 26, 26), dried = rgb(104, 18, 20), mouth = rgb(70, 8, 10), teeth = rgb(236, 228, 204), beard = rgb(50, 40, 36);
+    auto hair = [&](int x, int y) { px v = spr_get(h, x, y); return v == H || v == J || v == Lt; };
+    auto drawn = [&](int x, int y) { px v = spr_get(h, x, y); return v != KEYC && v != k; };
+    auto bare = [&](int y0, int x0) { for (int y = y0; y < 14; y++) for (int x = x0; x < 16; x++) if (hair(x, y)) spr_set(h, x, y, S); };   // nothing shows under a hat
+    auto rim = [&](int y) { for (int x = 0; x < 16; x++) if (drawn(x, y)) spr_set(h, x, y, J); };
+    switch (L.head) {
+    case ZH_CAP: {       // the cap takes the look's colour; what shows under it is ordinary hair
+        static const px UNDER[4] = {rgb(58, 46, 40), rgb(36, 32, 36), rgb(198, 162, 86), rgb(142, 142, 150)};
+        if (L.outfit != ZO_PACK) for (int y = view == 2 ? 10 : 8; y < 14; y++) for (int x = 0; x < 16; x++) if (hair(x, y)) spr_set(h, x, y, UNDER[L.alt & 3]);
+        break;
+    }
+    case ZH_HARDHAT: {   // dome with a brim wider than the head and a ridge along the crown
+        int brim = view == 2 ? 9 : 7;
+        bare(brim + 1, 0);
+        for (int x = 1; x <= 14; x++) spr_set(h, x, brim, J);
+        spr_set(h, 0, brim, k); spr_set(h, 15, brim, k);
+        if (view != 1) for (int y = 2; y <= 4; y++) { spr_set(h, 7, y, Lt); spr_set(h, 8, y, Lt); }
+        break;
+    }
+    case ZH_HOOD:        // parseHead's long sides are the hood; the face sits in its shadow
+        for (int x = view == 0 ? 3 : 6; x <= 13; x++) if (view != 2 && spr_get(h, x, 8) == s) spr_set(h, x, 8, S);
+        break;
+    case ZH_HELMET: {    // shell down to the brow, visor across the eyes
+        px glass = L.trim, shine = gfx_mix(L.trim, rgb(255, 255, 255), 130);
+        if (view == 2) { bare(10, 0); for (int y = 10; y <= 11; y++) for (int x = 2; x <= 13; x++) if (drawn(x, y)) spr_set(h, x, y, J); break; }
+        rim(7);
+        if (L.alt == 2) { rim(8); break; }   // one in four has the visor pushed up
+        for (int y = 8; y <= 10; y++) for (int x = view == 0 ? 2 : 4; x <= 13; x++)
+            if (drawn(x, y) && spr_get(h, x, y) != eye && !(view == 1 && x < 6 && hair(x, y))) spr_set(h, x, y, glass);   // (in profile the shell covers the back of the head)
+        int sx = view == 0 ? 3 : 7;
+        spr_set(h, sx, 8, shine); spr_set(h, sx + 1, 8, shine); spr_set(h, sx, 9, shine);
+        if (L.alt & 1) { int bx = view == 0 ? 9 : 10; spr_set(h, bx, 8, blood); spr_set(h, bx + 1, 8, blood); spr_set(h, bx + 1, 9, dried); spr_set(h, bx + 2, 10, blood); }   // ...and two are spattered
+        break;
+    }
+    case ZH_SCRUBCAP: {  // theatre cap, and a mask that has seen better days
+        px mask = L.trim, maskD = gfx_scale(L.trim, 205);
+        if (view == 2) break;
+        rim(7); bare(8, view == 0 ? 0 : 6);
+        int x0 = view == 0 ? 2 : 6;
+        for (int x = x0; x <= 13; x++) { if (drawn(x, 11)) spr_set(h, x, 11, mask); if (drawn(x, 12)) spr_set(h, x, 12, maskD); if (drawn(x, 13) && x > x0 + 1) spr_set(h, x, 13, maskD); }
+        break;
+    }
+    case ZH_BEANIE: {    // knitted hat with a folded band
+        int band = view == 2 ? 8 : 6;
+        bare(band + 2, 0);
+        rim(band); rim(band + 1);
+        break;
+    }
+    case ZH_BANDAGE:     // wrapped round the skull, bled through
+        for (int x = 0; x < 16; x++) { if (drawn(x, 4)) spr_set(h, x, 4, rgb(234, 230, 216)); if (drawn(x, 5)) spr_set(h, x, 5, rgb(192, 188, 178)); }
+        if (view == 0) { spr_set(h, 9, 4, blood); spr_set(h, 10, 4, blood); spr_set(h, 10, 5, dried); }
+        if (view == 1) { spr_set(h, 11, 4, blood); spr_set(h, 11, 5, dried); }
+        break;
+    }
+    bool masked = L.head == ZH_SCRUBCAP;
     if (view == 0) {
-        bool slit = (seed / 77) % 4 == 1;   // one variant has a black slit mouth instead of a bloody one (Try 2)
-        for (int y = 11; y <= 12; y++) for (int x = 6; x <= 9; x++) spr_set(s, x, y + drop, slit ? (y == 12 ? rgb(24, 14, 14) : p.skinS) : ((x == 6 || x == 9) ? blood : mouth));
-        for (int y = 3; y <= 6; y++) for (int x = 2; x <= 4 - (y > 4); x++) if (spr_get(s, x, y + drop) != pal_char('k')) spr_set(s, x, y + drop, (x == 2 || y == 3) ? dried : blood);   // solid smear on the scalp
+        if (L.face == ZF_BEARD) for (int y = 11; y <= 13; y++) for (int x = 2; x <= 13; x++) if (spr_get(h, x, y) == s || spr_get(h, x, y) == S) spr_set(h, x, y, y == 11 && (x < 4 || x > 11) ? gfx_scale(beard, 215) : beard);
+        if (L.face == ZF_SLIT) for (int x = 6; x <= 9; x++) { spr_set(h, x, 11, S); spr_set(h, x, 12, rgb(24, 14, 14)); }
+        else if (L.face == ZF_TEETH) for (int x = 5; x <= 10; x++) { spr_set(h, x, 11, x == 7 ? mouth : teeth); spr_set(h, x, 12, x == 5 || x == 10 ? blood : mouth); }
+        else for (int y = 11; y <= 12; y++) for (int x = 6; x <= 9; x++) spr_set(h, x, y, masked ? (y == 11 ? blood : dried) : ((x == 6 || x == 9) ? blood : mouth));   // gaping maw
+        if (L.face == ZF_EYE) { spr_set(h, 10, 9, mouth); spr_set(h, 11, 9, mouth); spr_set(h, 10, 10, blood); spr_set(h, 11, 10, blood); spr_set(h, 11, 11, blood); spr_set(h, 12, 12, dried); }
+        if (L.face == ZF_GLASSES) {   // heavy frames, one lens cracked
+            const px frame = rgb(22, 22, 34), lens = rgb(202, 226, 234);
+            for (int x = 3; x <= 12; x++) if (x < 7 || x > 8) spr_set(h, x, 8, frame);
+            spr_set(h, 3, 9, frame); spr_set(h, 12, 9, frame); spr_set(h, 7, 9, frame); spr_set(h, 8, 9, frame);
+            spr_set(h, 6, 9, lens); spr_set(h, 9, 9, lens); spr_set(h, 6, 10, lens); spr_set(h, 9, 10, rgb(250, 250, 250));
+        }
+        if (L.head == ZH_BALD || L.head == ZH_HAIR || L.head == ZH_LONG) {   // bare heads carry a wound: one of three, by look and version
+            int w = (int)(seed / 77 + L.alt) % 3;
+            if (w == 0) { spr_set(h, 3, 4, dried); spr_set(h, 3, 5, blood); spr_set(h, 4, 5, blood); spr_set(h, 3, 6, dried); }            // split scalp, left
+            if (w == 1) { spr_set(h, 10, 6, blood); spr_set(h, 10, 7, dried); spr_set(h, 11, 7, blood); }                                // gash at the hairline
+            if (w == 2) { spr_set(h, 11, 3, dried); spr_set(h, 12, 3, blood); spr_set(h, 12, 4, blood); spr_set(h, 13, 5, dried); }       // torn crown, right
+        }
     }
-    if (view == 1) { spr_set(s, 9, 11 + drop, mouth); spr_set(s, 10, 11 + drop, mouth); spr_set(s, 9, 12 + drop, blood); spr_set(s, 10, 12 + drop, blood); spr_set(s, 10, 13 + drop, dried); }
-    px shirt = p.shirt, shirtD = gfx_scale(p.shirt, 170), shirtL = gfx_mix(p.shirt, rgb(255, 255, 255), 60);
-    for (int i = 0; i < s.w * s.h; i++) {
-        px& v = s.d[i];
-        if (v == gfx_mix(p.hair, rgb(255, 255, 255), 70)) v = p.skin;                      // balding: pale scalp, a few dark strands
-        else if (v == p.hair) v = r.chance(0.07f) ? p.hair : gfx_mix(p.skin, p.skinS, 128);
-        else if (v == gfx_scale(p.hair, 165)) v = r.chance(0.15f) ? p.hair : p.skinS;
-        else if (v == shirt || v == shirtD || v == shirtL) { if (r.chance(0.05f)) v = p.skinS; else if (r.chance(0.03f)) v = dried; }   // a few tears
-        else if (v == p.pants && r.chance(0.03f)) v = dried;
-    }
-    if (view == 0) {
-
-        spr_set(s, 10, 6 + drop, blood); spr_set(s, 10, 7 + drop, dried); spr_set(s, 11, 7 + drop, blood);   // scalp gash
-    }
-    if (view == 1) for (int y = 14; y <= 17; y++) if (spr_get(s, 10, y + drop) != KEYC) spr_set(s, 10, y + drop, blood);
-    for (int k = 0; k < 3; k++) {   // long blood streaks soaking down the clothes (Try 2), not speckle
-        int sx = 4 + (int)(hash32(seed * 3 + k * 11) % 8), len = 3 + (int)(hash32(seed + k * 7) % 4);
-        for (int y = 0; y < len; y++) { int yy = 14 + drop + y; px c = spr_get(s, sx, yy); if (c != KEYC && c != pal_char('k')) spr_set(s, sx, yy, y < len - 1 ? blood : dried); }
-        px c2 = spr_get(s, sx + 1, 14 + drop); if (c2 != KEYC && c2 != pal_char('k')) spr_set(s, sx + 1, 14 + drop, dried);
+    if (view == 1) {
+        if (L.face == ZF_BEARD) for (int y = 11; y <= 13; y++) for (int x = 5; x <= 14; x++) if (spr_get(h, x, y) == s || spr_get(h, x, y) == S) spr_set(h, x, y, beard);
+        if (L.face == ZF_SLIT) { for (int x = 9; x <= 11; x++) spr_set(h, x, 12, rgb(24, 14, 14)); }
+        else if (L.face == ZF_TEETH) { for (int x = 9; x <= 12; x++) { spr_set(h, x, 11, teeth); if (x < 12) spr_set(h, x, 12, x == 9 ? blood : mouth); } }
+        else { spr_set(h, 9, 11, masked ? blood : mouth); spr_set(h, 10, 11, masked ? blood : mouth); spr_set(h, 9, 12, blood); spr_set(h, 10, 12, masked ? dried : blood); spr_set(h, 10, 13, dried); }
+        if (L.face == ZF_EYE) { spr_set(h, 11, 9, mouth); spr_set(h, 12, 9, mouth); spr_set(h, 11, 10, blood); spr_set(h, 12, 10, blood); spr_set(h, 12, 11, blood); }
+        if (L.face == ZF_GLASSES) { for (int x = 4; x <= 13; x++) if (drawn(x, 8)) spr_set(h, x, 8, rgb(22, 22, 34)); spr_set(h, 9, 9, rgb(202, 226, 234)); spr_set(h, 10, 9, rgb(202, 226, 234)); }
     }
 }
 
-static void buildCharacters() {
-    const char* const* HD[3] = {HD_FRONT, HD_SIDE, HD_BACK};
-    static const int VIEW[5] = {0, 0, 1, 2, 2}, TURN[5] = {0, 1, 0, 1, 0};
-    static const int FD[5] = {0, 1, 1, 1, 0};   // forward x (for leans / runs)
-    for (int z = 0; z < 2; z++) {
-        int nv = z ? ZOMB_VARIANTS : SURV_VARIANTS;
-        for (int v = 0; v < nv; v++) for (int d = 0; d < 5; d++) {
-            const CharPal& cp = z ? ZOMB_PAL[v] : SURV_PAL[v];
-            int view = VIEW[d], fdx = FD[d], t = TURN[d], zd = z ? 1 : 0;   // zombies hunch: head + torso one row lower
-            Sprite head = parseHead(HD[view], view, cp.style);
-            if (!z && (v == 0 || v == 3) && cp.style == 1 && view < 2) {   // red cap badge (character lock v3: S0 Marcus, S3 Javier), matches the portraits
-                int bx = view == 0 ? 7 : 10;
-                spr_set(head, bx, 4, rgb(240, 190, 180)); spr_set(head, bx + 1, 4, rgb(196, 50, 44));
-                spr_set(head, bx, 5, rgb(196, 50, 44)); spr_set(head, bx + 1, 5, rgb(140, 32, 30));
-            }
-            int idle = (z && view == 1) ? A_ZOMBIE : A_IDLE;   // zombies reach forward in profile, arms hang when facing the camera
-            Sprite raw[P_COUNT]; int drop[P_COUNT];
-            struct Def { int p, arm, leg, drop, lean, turn; };
-            const Def defs[] = {
-                {P_STAND, idle, L_STAND, zd, 0, t}, {P_BREATHE, idle, L_STAND, zd + 1, 0, t},
-                {P_WALK_A, (z && view == 1) ? A_ZOMBIE : A_SWING_A, L_STEP_A, zd, 0, t}, {P_WALK_B, (z && view == 1) ? A_ZOMBIE : A_SWING_B, L_STEP_B, zd, 0, t},
-                {P_RUN_A, (z && view == 1) ? A_ZOMBIE : A_SWING_A, L_RUN_A, zd, fdx, t}, {P_RUN_B, (z && view == 1) ? A_ZOMBIE : A_SWING_B, L_RUN_B, zd, fdx, t},
-                {P_CROUCH, idle, L_CROUCH, 2, 0, t}, {P_REACH, A_REACH, L_CROUCH, 2, fdx, t},
-                {P_LEAN_BACK, idle, L_STAND, zd, -fdx, t + (view == 1 ? -1 : 0)}, {P_LEAN_FWD, idle, view == 1 ? L_STEP_A : L_STAND, zd + 1, fdx, t},
-                {P_HURT, idle, L_STAND, zd, -fdx, t}, {P_FALL, idle, L_CROUCH, 4, -fdx, t},
-                {P_DEAD, idle, L_STAND, 0, 0, 0}, {P_LOOK, idle, L_STAND, zd, 0, view == 1 ? -1 : (t ? 0 : 1)},
-                {P_AIM, z ? idle : A_AIM, L_STAND, zd, 0, t},
-            };
-            for (const Def& df : defs) { raw[df.p] = compose(head, view, df.arm, df.leg, df.drop, df.lean, df.turn); drop[df.p] = df.drop; }
-            freeS(head);
-            Sprite* out = z ? zombPose[v][d] : survPose[v][d];
-            for (int p = 0; p < P_COUNT; p++) {
-                Sprite c = recolorChar(raw[p], cp, z != 0);
-                if (!z && v == 0 && cp.style == 1 && view != 2 && p != P_DEAD && p != P_LEAN_BACK && p != P_LEAN_FWD && p != P_HURT && p != P_FALL && p != P_RUN_A && p != P_RUN_B && p != P_REACH) spr_set(c, view == 0 ? 10 : 11, 15 + drop[p], pal_char('y'));   // chest badge
-                if (z) zombify(c, cp, view, drop[p], 1234 + v * 77 + d * 7);
-                freeS(raw[p]);
-                if (p == P_HURT) for (int i = 0; i < CW * CH; i++) if (c.d[i] != KEYC) c.d[i] = gfx_mix(c.d[i], pal::cream, 90);
-                if (p == P_DEAD) {   // lying body (24x16), darkened
-                    Sprite rr = spr_rot90(c); freeS(c); c = rr;
-                    for (int i = 0; i < c.w * c.h; i++) if (c.d[i] != KEYC) c.d[i] = gfx_scale(c.d[i], z ? 190 : 210);
-                }
-                out[p] = c;
-            }
+// The rest of a zombie, drawn on the finished frame: the outfit over the torso (at the pose's lean and drop, only
+// over cloth so arms and hands stay in front), bare scalps, then tears and blood.
+static void zombBody(Sprite& s, const ZombLook& L, const CharPal& p, int view, int drop, int lean, int headDx, uint32_t seed) {
+    const px k = pal_char('k'), belt = pal_char('B'), buckle = pal_char('Y'), shoe = pal_char('x'), white = rgb(255, 255, 255);
+    const px T = p.shirt, TL = gfx_mix(p.shirt, white, 60), TD = gfx_scale(p.shirt, 170);
+    const px blood = rgb(168, 26, 26), dried = rgb(104, 18, 20);
+    if (L.head == ZH_BALD || L.head == ZH_BANDAGE) {   // bare scalp in clean tones: lit crown, mid sides, shaded edge
+        const px hl = gfx_mix(p.hair, white, 70), hd = gfx_scale(p.hair, 165), mid = gfx_mix(p.skin, p.skinS, 128);
+        for (int y = 0; y < 14; y++) for (int x = 0; x < 16; x++) {
+            int X = x + headDx, Y = y + drop; if (X < 0 || X >= s.w || Y >= s.h) continue;
+            px& v = s.d[Y * s.w + X];
+            if (v == hl) v = p.skin; else if (v == p.hair) v = y <= 4 ? p.skin : mid; else if (v == hd) v = p.skinS;
         }
     }
+    auto at = [&](int tx, int ty) -> px* {   // a drawn, non-outline pixel of the torso (torso columns 0..15, rows 0..5 and on down the legs)
+        int X = tx + lean, Y = 14 + drop + ty; if (X < 0 || X >= s.w || Y < 0 || Y >= s.h) return nullptr;
+        px* q = &s.d[Y * s.w + X]; return (*q == KEYC || *q == k) ? nullptr : q;
+    };
+    auto put = [&](int tx, int ty, px c) { if (px* q = at(tx, ty)) *q = c; };
+    auto cloth = [&](int tx, int ty, px c) { px* q = at(tx, ty); if (q && (*q == T || *q == TL || *q == TD)) *q = c; };
+    auto band = [&](px c, px bk) { for (int tx = 3; tx <= 12; tx++) if (px* q = at(tx, 4)) { if (*q == belt) *q = c; else if (*q == buckle) *q = bk; } };   // the belt row
+    auto hem = [&](int x0, int x1, px c) { for (int tx = x0; tx <= x1; tx++) if (px* q = at(tx, 5)) if (*q == p.pants || *q == gfx_scale(p.pants, 160)) *q = c; };
+    auto shoes = [&](px c) { for (int i = 20 * s.w; i < s.w * s.h; i++) if (s.d[i] == shoe) s.d[i] = c; };
+    if (view == 2 && L.outfit != ZO_PACK)   // only survivors carry packs: fill the pack's place with the back of the shirt
+        for (int ty = 1; ty <= 4; ty++) for (int tx = 4; tx <= 11; tx++) {
+            int X = tx + lean, Y = 14 + drop + ty; if (X < 0 || X >= s.w || Y >= s.h || s.d[Y * s.w + X] == KEYC) continue;
+            s.d[Y * s.w + X] = ty == 4 ? belt : (tx >= 10 ? TD : T);
+        }
+    const bool back = view == 2; const int cs = view == 1 ? 1 : 0;   // the chest centre sits one column right in the 3/4 view
+    switch (L.outfit) {
+    case ZO_TIE: {   // white collar, tie
+        if (back) break;
+        px W = rgb(238, 234, 224);
+        cloth(6 + cs, 1, W); cloth(9 + cs, 1, W); cloth(7 + cs, 1, L.trim); cloth(8 + cs, 1, L.trim);
+        cloth(7 + cs, 2, L.trim); cloth(8 + cs, 2, gfx_scale(L.trim, 170)); cloth(7 + cs, 3, L.trim);
+        break;
+    }
+    case ZO_UNIFORM:   // badge, dark tie, black belt
+        if (!back) { cloth(10 + cs, 1, L.trim); cloth(10 + cs, 2, gfx_scale(L.trim, 170)); cloth(7 + cs, 1, gfx_scale(T, 110)); cloth(7 + cs, 2, gfx_scale(T, 110)); }
+        band(rgb(26, 26, 38), buckle);
+        break;
+    case ZO_RIOT: {    // armoured vest with a pale name strip
+        px V = rgb(40, 44, 62), VL = rgb(72, 78, 102), VD = rgb(30, 33, 48);
+        for (int tx = 3; tx <= 12; tx++) cloth(tx, 0, V);
+        for (int ty = 1; ty <= 3; ty++) for (int tx = 4; tx <= 11; tx++) cloth(tx, ty, ty == 1 && tx > 4 && tx < 11 ? VL : (tx >= 10 ? VD : V));
+        for (int tx = back ? 5 : 6 + cs; tx <= (back ? 10 : 9 + cs); tx++) if (px* q = at(tx, 2)) if (*q == V || *q == VD) *q = rgb(208, 212, 216);
+        band(rgb(26, 26, 38), rgb(26, 26, 38));
+        break;
+    }
+    case ZO_JUMPSUIT:  // one piece, zip down the front, number patch
+        if (back) { for (int tx = 6; tx <= 9; tx++) cloth(tx, 2, gfx_scale(T, 120)); }
+        else { for (int ty = 1; ty <= 3; ty++) cloth(7 + cs, ty, TD); cloth(9 + cs, 2, L.trim); cloth(10 + cs, 2, L.trim); }
+        band(TD, TD);
+        break;
+    case ZO_COAT: {    // open white coat over scrubs
+        px W2 = gfx_scale(T, 212);
+        band(W2, W2); hem(5, 10, W2);
+        if (!back) {
+            for (int ty = 1; ty <= 3; ty++) { cloth(7 + cs, ty, L.trim); cloth(8 + cs, ty, gfx_scale(L.trim, 190)); }
+            put(7 + cs, 4, gfx_scale(L.trim, 170)); put(8 + cs, 4, gfx_scale(L.trim, 150));
+            cloth(6 + cs, 1, W2); cloth(9 + cs, 1, W2); cloth(10 + cs, 3, W2); cloth(10 + cs, 2, rgb(60, 96, 178));   // lapels, pocket, pen
+        } else { cloth(7, 2, W2); cloth(7, 3, W2); }
+        break;
+    }
+    case ZO_SCRUBS:    // V-neck, drawstring
+        if (!back) { cloth(7 + cs, 1, p.skinS); cloth(8 + cs, 1, p.skinS); cloth(10 + cs, 2, TL); cloth(10 + cs, 3, TL); }
+        band(TD, back ? TD : TL);
+        break;
+    case ZO_GOWN:      // hospital gown: spotted, tied at the back, nothing underneath
+        band(T, T); hem(4, 11, TD); shoes(p.skinS);
+        cloth(5, 2, L.trim); cloth(8, 2, L.trim); cloth(10, 3, L.trim); cloth(6, 3, L.trim); cloth(4, 1, L.trim); cloth(11, 1, L.trim); cloth(6, 4, L.trim); cloth(9, 4, L.trim);
+        if (back) for (int ty = 1; ty <= 4; ty++) if (ty != 2) { cloth(7, ty, p.skinS); cloth(8, ty, p.skin); }   // open down the back, one tie still holding
+        break;
+    case ZO_APRON: {   // bib apron over a shirt
+        px A = L.trim, AD = gfx_scale(A, 175);
+        if (back) { cloth(6, 0, A); cloth(9, 0, A); cloth(6, 1, A); cloth(9, 1, A); put(7, 4, A); put(8, 4, A); break; }
+        cloth(6 + cs, 0, A); cloth(9 + cs, 0, A);
+        for (int ty = 1; ty <= 3; ty++) for (int tx = 5 + cs; tx <= 10 + cs; tx++) cloth(tx, ty, tx == 10 + cs ? AD : A);
+        for (int tx = 5 + cs; tx <= 10 + cs; tx++) if (px* q = at(tx, 4)) if (*q == belt || *q == buckle) *q = tx == 10 + cs ? AD : A;
+        hem(5, 10, AD);
+        put(9 + cs, 1, rgb(242, 238, 226));   // name tag
+        break;
+    }
+    case ZO_VEST: {    // hi-vis vest, reflective tape
+        px V = L.trim, VD = gfx_scale(V, 190), R = rgb(250, 242, 176);
+        for (int tx = 4; tx <= 11; tx++) cloth(tx, 0, V);
+        for (int ty = 1; ty <= 3; ty++) for (int tx = 4; tx <= 11; tx++) cloth(tx, ty, tx >= 10 ? VD : V);
+        for (int tx = 4; tx <= 11; tx++) if (px* q = at(tx, 3)) if (*q == V || *q == VD) *q = R;
+        for (int ty = 1; ty <= 2; ty++) { if (px* q = at(5 + cs, ty)) if (*q == V) *q = R; if (px* q = at(10 + cs, ty)) if (*q == V || *q == VD) *q = R; }
+        break;
+    }
+    case ZO_OVERALLS: {   // denim bib and straps, brass buttons
+        px D = L.trim;
+        band(D, D);
+        if (back) { cloth(5, 0, D); cloth(5, 1, D); cloth(6, 2, D); cloth(7, 3, D); cloth(10, 0, D); cloth(10, 1, D); cloth(9, 2, D); cloth(8, 3, D); break; }
+        cloth(5 + cs, 0, D); cloth(10 + cs, 0, D); cloth(5 + cs, 1, D); cloth(10 + cs, 1, D);
+        for (int ty = 2; ty <= 3; ty++) for (int tx = 5 + cs; tx <= 10 + cs; tx++) cloth(tx, ty, tx == 10 + cs ? gfx_scale(D, 190) : D);
+        put(5 + cs, 2, rgb(216, 182, 92)); put(10 + cs, 2, rgb(216, 182, 92));
+        break;
+    }
+    case ZO_PLAID:     // checked shirt
+        for (int ty = 0; ty <= 4; ty++) for (int tx = 0; tx < 16; tx++) if (tx % 3 == 2 || (ty % 2 == 0 && tx % 3 == 0)) cloth(tx, ty, tx % 3 == 2 ? L.trim : gfx_mix(T, L.trim, 128));
+        break;
+    case ZO_ROBE: {    // dressing gown: pale lapels and sash, slippers
+        px W = L.trim, WD = gfx_scale(W, 200);
+        band(W, WD); shoes(gfx_mix(T, white, 110));
+        if (back) break;
+        cloth(6 + cs, 0, W); cloth(9 + cs, 0, W); cloth(6 + cs, 1, W); cloth(9 + cs, 1, W); cloth(7 + cs, 1, p.skinS); cloth(8 + cs, 1, p.skinS);
+        cloth(7 + cs, 2, W); cloth(8 + cs, 3, W);
+        put(9 + cs, 5, W);
+        break;
+    }
+    case ZO_HOODIE:    // drawstrings, front pocket
+        band(TD, TD);
+        if (back) break;
+        cloth(6 + cs, 1, L.trim); cloth(6 + cs, 2, L.trim); cloth(9 + cs, 1, L.trim); cloth(9 + cs, 2, L.trim);
+        for (int tx = 6 + cs; tx <= 9 + cs; tx++) cloth(tx, 3, TD);
+        break;
+    case ZO_TRACK:     // zip and a stripe down each sleeve
+        band(TD, L.trim);
+        for (int ty = 1; ty <= 3; ty++) { cloth(1, ty, L.trim); cloth(14, ty, L.trim); if (!back) cloth(7 + cs, ty, L.trim); }
+        break;
+    }
+    // tears, and blood soaking down the clothes in long streaks rather than speckle
+    for (int ty = 0; ty <= 4; ty++) for (int tx = 0; tx < 16; tx++) {
+        px* q = at(tx, ty); if (!q || (*q != T && *q != TL && *q != TD)) continue;
+        int r = (int)(hash32(seed * 7 + tx * 131 + ty * 17) % 100);
+        if (r < 5) *q = p.skinS; else if (r < 8) *q = dried;
+    }
+    for (int i = 20 * s.w; i < s.w * s.h; i++) if (s.d[i] == p.pants && hash32(seed * 5 + i) % 100 < 3) s.d[i] = dried;
+    if (view == 1) for (int ty = 0; ty <= 1; ty++) if (px* q = at(10, ty)) *q = blood;   // down the chin onto the chest
+    for (int i = 0, n = L.outfit == ZO_COAT ? 3 : 1 + (int)(hash32(seed * 13) % 2); i < n; i++) {
+        int sx = 4 + (int)(hash32(seed * 3 + i * 11) % 8), len = 2 + (int)(hash32(seed + i * 7) % 3);
+        for (int y = 0; y < len; y++) if (px* q = at(sx, y)) *q = y < len - 1 ? blood : dried;
+        if (px* q = at(sx + 1, 0)) *q = dried;
+    }
+}
+
+// how pose `pose` is put together for the stored direction d (0 front, 1 front-side, 2 side, 3 back-side, 4 back)
+struct PoseDef { int p, arm, leg, drop, lean, turn; };
+static const int CH_VIEW[5] = {0, 0, 1, 2, 2}, CH_TURN[5] = {0, 1, 0, 1, 0}, CH_FD[5] = {0, 1, 1, 1, 0};   // head/body view, head turn, forward x (leans, runs)
+static PoseDef poseDef(bool z, int d, int pose) {
+    int view = CH_VIEW[d], fdx = CH_FD[d], t = CH_TURN[d], zd = z ? 1 : 0;   // zombies hunch: head + torso one row lower
+    int idle = (z && view == 1) ? A_ZOMBIE : A_IDLE;   // zombies reach forward in profile, arms hang when facing the camera
+    const PoseDef defs[] = {
+        {P_STAND, idle, L_STAND, zd, 0, t}, {P_BREATHE, idle, L_STAND, zd + 1, 0, t},
+        {P_WALK_A, (z && view == 1) ? A_ZOMBIE : A_SWING_A, L_STEP_A, zd, 0, t}, {P_WALK_B, (z && view == 1) ? A_ZOMBIE : A_SWING_B, L_STEP_B, zd, 0, t},
+        {P_RUN_A, (z && view == 1) ? A_ZOMBIE : A_SWING_A, L_RUN_A, zd, fdx, t}, {P_RUN_B, (z && view == 1) ? A_ZOMBIE : A_SWING_B, L_RUN_B, zd, fdx, t},
+        {P_CROUCH, idle, L_CROUCH, 2, 0, t}, {P_REACH, A_REACH, L_CROUCH, 2, fdx, t},
+        {P_LEAN_BACK, idle, L_STAND, zd, -fdx, t + (view == 1 ? -1 : 0)}, {P_LEAN_FWD, idle, view == 1 ? L_STEP_A : L_STAND, zd + 1, fdx, t},
+        {P_HURT, idle, L_STAND, zd, -fdx, t}, {P_FALL, idle, L_CROUCH, 4, -fdx, t},
+        {P_DEAD, idle, L_STAND, 0, 0, 0}, {P_LOOK, idle, L_STAND, zd, 0, view == 1 ? -1 : (t ? 0 : 1)},
+        {P_AIM, z ? idle : A_AIM, L_STAND, zd, 0, t},
+    };
+    for (const PoseDef& df : defs) if (df.p == pose) return df;
+    return defs[0];
+}
+
+// one finished frame of a survivor (z = false) or a zombie look
+static Sprite charFrame(bool z, int v, int d, int pose) {
+    static const char* const* const HD[3] = {HD_FRONT, HD_SIDE, HD_BACK};
+    CharPal cp; ZombLook look{};
+    if (z) look = zombLook(v, cp); else cp = SURV_PAL[v];
+    const int view = CH_VIEW[d]; const PoseDef df = poseDef(z, d, pose); const uint32_t seed = 1234 + v * 77 + d * 7;
+    Sprite head = parseHead(HD[view], view, cp.style);
+    if (!z && (v == 0 || v == 3) && cp.style == 1 && view < 2) {   // red cap badge (character lock v3: S0 Marcus, S3 Javier), matches the portraits
+        int bx = view == 0 ? 7 : 10;
+        spr_set(head, bx, 4, rgb(240, 190, 180)); spr_set(head, bx + 1, 4, rgb(196, 50, 44));
+        spr_set(head, bx, 5, rgb(196, 50, 44)); spr_set(head, bx + 1, 5, rgb(140, 32, 30));
+    }
+    if (z) zombHead(head, view, look, seed);
+    Sprite raw = compose(head, view, df.arm, df.leg, df.drop, df.lean, df.turn);
+    freeS(head);
+    Sprite c = recolorChar(raw, cp, z);
+    freeS(raw);
+    if (!z && v == 0 && cp.style == 1 && view != 2 && pose != P_DEAD && pose != P_LEAN_BACK && pose != P_LEAN_FWD && pose != P_HURT && pose != P_FALL && pose != P_RUN_A && pose != P_RUN_B && pose != P_REACH) spr_set(c, view == 0 ? 10 : 11, 15 + df.drop, pal_char('y'));   // chest badge
+    if (z) zombBody(c, look, cp, view, df.drop, df.lean, df.lean + df.turn, seed);
+    if (pose == P_HURT) for (int i = 0; i < CW * CH; i++) if (c.d[i] != KEYC) c.d[i] = gfx_mix(c.d[i], pal::cream, 90);
+    if (pose == P_DEAD) {   // lying body (24x16), darkened
+        Sprite rr = spr_rot90(c); freeS(c); c = rr;
+        for (int i = 0; i < c.w * c.h; i++) if (c.d[i] != KEYC) c.d[i] = gfx_scale(c.d[i], z ? 190 : 210);
+    }
+    return c;
+}
+
+static void buildCharacters() {
+    for (int v = 0; v < SURV_VARIANTS; v++) for (int d = 0; d < 5; d++) for (int p = 0; p < P_COUNT; p++) survPose[v][d][p] = charFrame(false, v, d, p);
+}
+void art_zombie_flush() {
+    for (auto& look : zombPose) for (auto& dir : look) for (Sprite& s : dir) freeS(s);
 }
 
 const Sprite& art_char(bool zombie, int variant, int dir, Pose p, bool& flip) {
     static const int MAP[8] = {2, 1, 0, 1, 2, 3, 4, 3};
     flip = (dir == 3 || dir == 4 || dir == 5);
     int d = MAP[dir & 7];
-    if (zombie) return zombPose[variant % ZOMB_VARIANTS][d][p];
+    if (zombie) {
+        Sprite& s = zombPose[variant % ZOMB_VARIANTS][d][p];
+        if (!s.d) s = charFrame(true, variant % ZOMB_VARIANTS, d, p);
+        return s;
+    }
     return survPose[variant % SURV_VARIANTS][d][p];
 }
 
@@ -1151,5 +1432,5 @@ void art_init() {
     buildYardArt();
     // logo zombie head for title (scaled portrait-like)
     bool f;
-    g_spr[S_LOGO_ZOMBIE] = spr_copy(art_char(true, 0, 2, P_STAND, f));
+    g_spr[S_LOGO_ZOMBIE] = spr_copy(art_char(true, ZL_OFFICE + ZOMB_LOOKS, 2, P_STAND, f));   // the green one in a shirt and tie
 }

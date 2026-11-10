@@ -63,6 +63,9 @@ struct LocationDef {
     int8_t map;        // index into world maps, -1 = not yet surveyed
 };
 extern const LocationDef LOCATIONS[LOC_COUNT];
+// Which zombie look (art.h ZombLookId) turns up at a spawn: the place's own people indoors, passers-by in the street.
+// h is any hash of the spawn. Appearance only; it never touches the game's random numbers.
+int zombie_look(int mapId, bool indoor, uint32_t h);
 
 enum Skill : uint8_t { SK_SHOOT, SK_MELEE, SK_MEDIC, SK_MECH, SK_FARM, SK_GUARD, SK_COUNT };
 extern const char* SKILL_NAMES[SK_COUNT];

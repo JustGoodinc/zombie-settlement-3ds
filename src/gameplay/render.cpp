@@ -105,8 +105,31 @@ static const Sprite& barrierSprite(int tx, int ty) {
     return b.state == BS_LOCKED ? g_tile[TA_DOOR_LOCKED][v] : g_tile[TA_DOOR_CLOSED][v];
 }
 
-// three flickering flame tongues (fire pit); drawn again after lighting so they stay the brightest thing on screen
+// Flames are drawn in the depth-sorted scene, so anyone standing in front covers them. Their pixels are set aside
+// before the lighting pass and put back after it: fire stays the brightest thing on screen without painting over people.
+enum { FLAME_W = 19, FLAME_H = 23, FLAME_SITES = 8 };
+static const px FLAME_COL[3] = {rgb(226, 82, 30), rgb(250, 156, 40), rgb(255, 230, 130)};
+static struct FlameSite { int16_t x, y; px keep[FLAME_W * FLAME_H]; } s_flame[FLAME_SITES];
+static int s_nflame;
+static void flamesKeep(const Canvas& c) {
+    for (int k = 0; k < s_nflame; k++) {
+        FlameSite& f = s_flame[k];
+        for (int j = 0; j < FLAME_H; j++) for (int i = 0; i < FLAME_W; i++) {
+            int x = f.x + i, y = f.y + j; px v = KEYC;
+            if (x >= 0 && y >= 0 && x < c.w && y < c.h) { px q = c.p[y * c.w + x]; if (q == FLAME_COL[0] || q == FLAME_COL[1] || q == FLAME_COL[2]) v = q; }
+            f.keep[j * FLAME_W + i] = v;
+        }
+    }
+}
+static void flamesPut(Canvas& c) {
+    for (int k = 0; k < s_nflame; k++) {
+        const FlameSite& f = s_flame[k];
+        for (int j = 0; j < FLAME_H; j++) for (int i = 0; i < FLAME_W; i++) { px v = f.keep[j * FLAME_W + i]; if (v != KEYC) c.p[(f.y + j) * c.w + f.x + i] = v; }
+    }
+}
+// three flickering flame tongues
 static void drawFlames(Canvas& c, int cx, int cy) {
+    if (s_nflame < FLAME_SITES) { s_flame[s_nflame].x = (int16_t)(cx - FLAME_W / 2); s_flame[s_nflame].y = (int16_t)(cy - FLAME_H + 1); s_nflame++; }
     for (int k = 0; k < 3; k++) {
         int ox = (k - 1) * 4, h = (k == 1 ? 17 : 11) + (int)(sinf(G.uiTime * 9.0f + k * 2.1f) * 3);
         for (int r = 0; r < h; r++) {
@@ -182,6 +205,7 @@ enum { DK_PROP, DK_ZOMB, DK_UNIT, DK_NPC, DK_BAG };
 // optional stage profiler (zs_tool --bench sets the clock; zero cost otherwise)
 double (*g_profNow)() = nullptr; double g_prof[8];
 static double profT;
+bool g_overview;   // review tool only: whole-map captures are stitched from several views, so they skip the screen-edge vignette
 static inline void profMark(int i) { if (!g_profNow) return; double t = g_profNow(); if (i >= 0) g_prof[i] += t - profT; profT = t; }
 // Soft light pools: falloff masks ((1-d)^2, 0..255) cached per size, so each pixel is one multiply and a blend.
 // additive = the light adds to what is there (glows, muzzle flash); otherwise it tints towards the colour.
@@ -210,8 +234,14 @@ static void lightPool(Canvas& c, int cx, int cy, int rx, int ry, px col, int ama
     }
 }
 
+// Weather is cosmetic and fixed per day and place (never on day 1, so the first outing is clear): about one day in four it rains.
+static bool rainingNow() {
+    if (!G.inLevel || G.day <= 1) return false;
+    return hash32(G.day * 31u + (uint32_t)(G.curLoc + 2) * 7u) % 4 == 0;
+}
+
 void render_world(Canvas& c, float alpha) {
-    profMark(-1);
+    profMark(-1); s_nflame = 0;
     Map& m = G.map;
     float sh = G.shake > 0 && G.set.shake ? G.shake : 0;
     camX = (int)(G.camX + g_fxKickX) + (sh > 0 ? (int)((hash32(G.tick * 7) % 3) - 1) * (int)ceilf(sh) : 0);   // + recoil kick (render only)
@@ -345,7 +375,11 @@ void render_world(Canvas& c, float alpha) {
             const Prop& p = m.prop[d.idx];
             int x = p.tx * 16 - camX, y = p.ty * 16 - camY;
             int pox, poy;
-            if (const Sprite* ps = prop_sprite(m, p, pox, poy)) { gfx_blit(c, *ps, x + pox, y + poy); continue; }   // furniture and vehicles
+            if (const Sprite* ps = prop_sprite(m, p, pox, poy)) {   // furniture and vehicles
+                gfx_blit(c, *ps, x + pox, y + poy);
+                if (prop_fx(m, p) == 2) drawFlames(c, x - 4 + 32, y - 12 + 14);   // a wreck that is still burning
+                continue;
+            }
             switch (p.type) {
             case PR_TREE: {
                 // gentle sway: canopy offset by a slow sine, trunk static
@@ -374,7 +408,7 @@ void render_world(Canvas& c, float alpha) {
                 for (int k = 0; k < 5; k++) { float t = fmodf(G.uiTime * 0.7f + k * 0.2f, 1.0f); gfx_pset(c, cx + (int)(sinf(t * 9 + k * 1.7f) * 4), cy - 14 - (int)(t * 18), t < 0.5f ? rgb(255, 214, 100) : rgb(236, 120, 40)); }
                 break;
             }
-            case PR_RADIO: gfx_blit(c, g_spr[S_RADIO], x, y); if ((int)(G.uiTime * 2) & 1) gfx_pset(c, x + 12, y + 4, rgb(255, 80, 60)); break;
+            case PR_RADIO: gfx_blit(c, g_spr[S_RADIO], x, y); if ((int)(G.uiTime * 2) & 1) gfx_pset(c, x + 8, y + 5, rgb(255, 150, 130)); break;
             case PR_LAMP: {   // tall iron lamp post with a boxed lantern (Try 2)
                 int lx = x + 7;
                 gfx_fill(c, lx - 3, y + 12, 7, 3, rgb(30, 30, 34)); gfx_fill(c, lx - 2, y + 11, 5, 1, rgb(60, 60, 66));
@@ -464,6 +498,23 @@ void render_world(Canvas& c, float alpha) {
     }
 
     fx_render(c, camX, camY);
+    if (rainingNow()) {   // slanting streaks and splashes, only where there is sky overhead
+        auto open = [&](int x, int y) { int wx = x + camX, wy = y + camY; if (wx < 0 || wy < 0 || wx >= m.w * 16 || wy >= m.h * 16) return false; int i = m.idx(wx >> 4, wy >> 4); return !(m.flags[i] & F_INDOOR) && m.t[i] != T_WALL; };
+        int n = c.w * c.h / 320;
+        for (int i = 0; i < n; i++) {
+            uint32_t h = hash32(i * 7919u + 17u);
+            float ph = fmodf(G.uiTime * (150 + (h % 80)) + (float)((h >> 8) % 400), (float)(c.h + 24));
+            int x = (int)((h >> 4) % (uint32_t)(c.w + 40)) - (int)(ph * 0.25f), y = (int)ph - 12;
+            if (!open(x, y)) continue;
+            gfx_pset(c, x, y, rgb(176, 196, 220)); gfx_pset(c, x + 1, y - 2, rgb(136, 156, 186)); gfx_pset(c, x + 1, y - 3, rgb(112, 132, 164));
+        }
+        for (int i = 0; i < n / 3; i++) {
+            uint32_t h = hash32(i * 31u + (uint32_t)(G.uiTime * 12) * 977u); int x = (int)(h % (uint32_t)c.w), y = (int)((h >> 10) % (uint32_t)c.h);
+            if (!open(x, y)) continue;
+            gfx_pset(c, x, y, rgb(196, 212, 230)); gfx_pset(c, x - 1, y, rgb(140, 160, 190)); gfx_pset(c, x + 1, y, rgb(140, 160, 190));
+        }
+    }
+    flamesKeep(c);
     profMark(1);   // tiles, props, characters, particles
     // ---- lighting: the per-tile light map is sampled on an 8 px lattice and interpolated across every cell,
     // with ordered dithering between the 32 blend levels, so light falls off smoothly instead of in blocks.
@@ -477,14 +528,14 @@ void render_world(Canvas& c, float alpha) {
         const int VW = c.w, VH = c.h;
         int li0 = camX >> 3, lj0 = camY >> 3, lw = (VW >> 3) + 2, lh = (VH >> 3) + 2;
         if (lw > LW) lw = LW; if (lh > LH) lh = LH;
-        int dayAdd = (int)(day * 60), vigK = G.scene == SC_SETTLEMENT ? 110 : 78;
+        int dayAdd = (int)(day * 82), vigK = g_overview ? 0 : (G.scene == SC_SETTLEMENT ? 110 : 78); bool rain = rainingNow();   // by day rooms are fully lit, so the torch beam does not show
         // what the eye gets from a tile: the gameplay light, plus daylight filling rooms you can see or remember,
         // plus a moonlit floor outdoors so the night stays readable (gameplay still uses the true light map)
         auto tileV = [&](int tx, int ty) -> int {
             tx = tx < 0 ? 0 : (tx >= m.w ? m.w - 1 : tx); ty = ty < 0 ? 0 : (ty >= m.h ? m.h - 1 : ty);
             int i = m.idx(tx, ty), v = G.light[i];
             if (m.flags[i] & F_INDOOR) { if (v >= 60 || G.explored[i]) v += dayAdd; }
-            else if (G.scene == SC_EXPEDITION && v < 150) v = 150 - (150 - v) / 3;
+            else { if (G.scene == SC_EXPEDITION && v < 150) v = 150 - (150 - v) / 3; if (rain) v = v * 218 >> 8; }   // overcast
             return v > 255 ? 255 : v;
         };
         int nfl; const FxLight* fls = fx_lights(nfl);
@@ -562,7 +613,6 @@ void render_world(Canvas& c, float alpha) {
             if (x < -60 || y < -60 || x > c.w + 60 || y > c.h + 60) continue;
             if (p.type == PR_FIRE) {
                 lightPool(c, x + 8, y + 10, 70, 40, rgb(255, 140, 50), (int)(170 * dk * flick));
-                drawFlames(c, x + 8, y + 12);   // flames stay the brightest thing on screen
             } else if (p.type == PR_LAMP) {
                 lightPool(c, x + 7, y + 4, 36, 20, rgb(255, 180, 80), (int)(140 * dk));
                 lightPool(c, x + 7, y - 17, 9, 9, rgb(255, 210, 120), (int)(160 * dk));
@@ -623,10 +673,19 @@ void render_world(Canvas& c, float alpha) {
             } else {
                 int fx0 = x - 4 + 32, fy0 = y - 12 + 14;
                 for (int q = 0; q < 4; q++) { float t = fmodf(G.uiTime * 0.5f + q * 0.25f + p.tx * 0.13f, 1.0f); int sz = 2 + (int)(t * 5); gfx_fillA(c, fx0 + (int)(sinf(t * 5 + q) * 3 + t * 8) - sz / 2, fy0 - 10 - (int)(t * 30) - sz / 2, sz, sz, rgb(56, 56, 68), (int)(150 * (1 - t))); }
-                drawFlames(c, fx0, fy0);
                 lightPool(c, fx0, fy0 + 4, 44, 24, rgb(255, 130, 40), (int)(36 + 110 * dkk), true);
             }
         }
+    }
+    flamesPut(c);
+    // unsearched containers in view catch the light now and then, so loot reads at a glance
+    if (G.curLoc >= 0) for (int k = 0; k < m.nprop; k++) {
+        const Prop& p = m.prop[k]; if (p.container < 0 || G.loc[G.curLoc].generated[p.container]) continue;
+        int x = p.tx * 16 - camX, y = p.ty * 16 - camY; if (x < -70 || y < -30 || x > c.w + 8 || y > c.h + 30) continue;
+        if (G.light[m.idx(p.tx, p.ty)] < 60) continue;
+        float ph = fmodf(G.uiTime * 0.45f + (hash32(k * 977u) % 100) / 100.0f, 1.0f); if (ph > 0.14f) continue;
+        int gx = x + p.tw * 16 - 5, gy = y - 4, r = ph < 0.05f || ph > 0.10f ? 1 : 2;
+        gfx_fill(c, gx - r, gy, 2 * r + 1, 1, rgb(236, 255, 190)); gfx_fill(c, gx, gy - r, 1, 2 * r + 1, rgb(236, 255, 190)); gfx_pset(c, gx, gy, rgb(255, 255, 255));
     }
     // muzzle flashes and impact sparks glow on top of everything (additive, so they bloom instead of tinting)
     {

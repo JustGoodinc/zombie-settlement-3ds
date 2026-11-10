@@ -447,6 +447,85 @@ void stampSprite(const Sprite& s, int x, int y) {
     }
 }
 
+
+// ---------------------------------------------------------------- lived-in detail (all baked, so it is free at run time)
+bool groundHard(int wx, int wy) {   // outdoor road / pavement pixel
+    if (wx < 0 || wy < 0 || wx >= g_bakeW || wy >= g_bakeH) return false;
+    int tx = wx >> 4, ty = wy >> 4; uint8_t t = M->t[M->idx(tx, ty)];
+    return (t == T_ASPHALT || t == T_LINE || t == T_CONCRETE) && !indoorAt(tx, ty) && M->propAt[M->idx(tx, ty)] < 0;
+}
+void puddle(int cx, int cy, int rx, int ry, uint32_t seed) {
+    for (int y = -ry; y <= ry; y++) for (int x = -rx; x <= rx; x++) {
+        int e = x * x * ry * ry + y * y * rx * rx, lim = rx * rx * ry * ry; lim = lim * (200 + (int)(h2((cx + x) >> 1, (cy + y) >> 1, seed) & 63)) >> 8;
+        if (e > lim || !groundHard(cx + x, cy + y)) continue;
+        px& p = g_bake[(cy + y) * g_bakeW + cx + x];
+        bool rim = (x + 1) * (x + 1) * ry * ry + (y - 1) * (y - 1) * rx * rx > lim || y == -ry;      // the far edge catches the sky
+        p = rim && y < 0 ? gfx_mixf(p, rgb(150, 176, 200), 150) : gfx_mixf(p, rgb(34, 46, 74), 150);
+    }
+    bake_mark(cx - rx / 3, cy - ry / 3, rgb(190, 214, 230)); bake_mark(cx - rx / 3 + 1, cy - ry / 3, rgb(150, 176, 200));
+}
+void crack(int x, int y, int len, uint32_t seed) {
+    int dx = (seed & 1) ? 1 : -1;
+    for (int i = 0; i < len; i++) {
+        uint32_t h = hash32(seed + i * 31);
+        if (groundHard(x, y)) { px& p = g_bake[y * g_bakeW + x]; p = gfx_mixf(p, rgb(20, 20, 32), 120); if (groundHard(x, y + 1) && (h & 3) == 0) { px& q = g_bake[(y + 1) * g_bakeW + x]; q = gfx_mixf(q, rgb(200, 200, 200), 220); } }
+        x += dx; if ((h >> 4) % 3 == 0) y += ((h >> 8) & 1) ? 1 : -1;
+        if ((h >> 12) % 11 == 0) dx = -dx;
+    }
+}
+void tyreMarks(int x, int y, int len, uint32_t seed) {
+    float a = (seed % 628) / 100.0f, turn = ((int)((seed >> 8) % 9) - 4) * 0.006f, fx = (float)x, fy = (float)y;
+    for (int i = 0; i < len; i++) {
+        for (int s = -1; s <= 1; s += 2) {
+            int px_ = (int)(fx - sinf(a) * 3 * s), py_ = (int)(fy + cosf(a) * 3 * s);
+            if (groundHard(px_, py_)) { px& p = g_bake[py_ * g_bakeW + px_]; p = gfx_mixf(p, rgb(24, 24, 34), 196); }
+        }
+        fx += cosf(a); fy += sinf(a) * 0.6f; a += turn;
+    }
+}
+void detailPass() {
+    const Map& m = *M;
+    for (int ty = 0; ty < m.h; ty++) for (int tx = 0; tx < m.w; tx++) {
+        int i = m.idx(tx, ty); uint8_t t = m.t[i]; uint32_t h = h2(tx, ty, 301 + m.id);
+        bool hardOut = (t == T_ASPHALT || t == T_CONCRETE) && !indoorAt(tx, ty);
+        if (hardOut && m.propAt[i] < 0) {
+            int r = h % 1000;
+            if (r < 24) puddle(tx * 16 + 8, ty * 16 + 8, 5 + (h >> 10) % 6, 3 + (h >> 14) % 3, h);
+            else if (r < 60) crack(tx * 16 + (h >> 10) % 16, ty * 16 + (h >> 14) % 16, 10 + (h >> 18) % 18, h);
+            else if (r < 72 && t == T_ASPHALT) tyreMarks(tx * 16 + 8, ty * 16 + 8, 22 + (h >> 10) % 16, h);
+        }
+        // weeds and flowers pushing up along the foot of outside walls
+        if (!indoorAt(tx, ty) && !solidWall(tx, ty) && (t == T_GRASS || t == T_CONCRETE || t == T_ASPHALT || t == T_DIRT) && solidWall(tx, ty - 1) && (h >> 5) % 3 == 0)
+            stampSprite(g_spr[(m.id == MAP_HOMES && (h >> 9) % 2) ? S_DEC_FLOWER : S_DEC_TUFT], tx * 16 + (h >> 12) % 9, ty * 16 - 2);
+        // a mat just inside every outside door
+        int k = barKind(tx, ty);
+        if (k == BK_DOOR || k == BK_KEYDOOR) {
+            static const int D[4][2] = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+            for (auto& d : D) {
+                int ix = tx + d[0], iy = ty + d[1], ox = tx - d[0], oy = ty - d[1];
+                if (!inMap(ix, iy) || !inMap(ox, oy) || !indoorAt(ix, iy) || indoorAt(ox, oy) || solidWall(ix, iy) || !isFloorType(m.t[m.idx(ix, iy)])) continue;
+                bool horiz = d[1] != 0; int w = horiz ? 12 : 6, hh = horiz ? 6 : 12, x0 = ix * 16 + (16 - w) / 2, y0 = iy * 16 + (16 - hh) / 2;
+                px mat = (h >> 3) & 1 ? rgb(122, 86, 62) : rgb(70, 110, 96);
+                for (int y = 0; y < hh; y++) for (int x = 0; x < w; x++) if (floorPixel(x0 + x, y0 + y)) g_bake[(y0 + y) * g_bakeW + x0 + x] = (x == 0 || y == 0 || x == w - 1 || y == hh - 1) ? dk(mat, 170) : (((x + y) & 1) ? mat : lt(mat, 30));
+            }
+        }
+    }
+    // hospital wayfinding: coloured lines run the length of the main corridor
+    if (m.id == MAP_HOSPITAL) for (int tx = 0; tx < m.w; tx++) for (int ty = 14; ty <= 16; ty++) if (m.in(tx, ty) && m.t[m.idx(tx, ty)] == T_TILE && ty == 15)
+        for (int x = 0; x < 16; x++) { bake_dot(tx * 16 + x, ty * 16 + 5, rgb(214, 76, 72)); bake_dot(tx * 16 + x, ty * 16 + 6, rgb(170, 52, 54)); bake_dot(tx * 16 + x, ty * 16 + 9, rgb(72, 132, 212)); bake_dot(tx * 16 + x, ty * 16 + 10, rgb(52, 100, 170)); }
+    // police lobby: the department badge set into the floor inside the front doors
+    if (m.id == MAP_POLICE) {
+        int cx = 25 * 16, cy = 29 * 16;
+        for (int y = -14; y <= 14; y++) for (int x = -14; x <= 14; x++) {
+            int d = x * x + y * y; if (d > 14 * 14 || !floorPixel(cx + x, cy + y) || !indoorAt((cx + x) >> 4, (cy + y) >> 4)) continue;
+            px& p = g_bake[(cy + y) * g_bakeW + cx + x];
+            if (d > 12 * 12) p = rgb(206, 170, 70); else if (d > 11 * 11) p = rgb(150, 118, 46); else p = gfx_mixf(p, rgb(44, 64, 118), 200);
+            // five-pointed star
+            float a = atan2f((float)y, (float)x) + 1.5708f, r = sqrtf((float)d), k = cosf(0.6283f) / cosf(fmodf(a + 62.8318f, 1.2566f) - 0.6283f);
+            if (r < 9.5f * k * 0.52f + 0.0f || r < 4.0f) p = rgb(236, 226, 196);
+        }
+    }
+}
 } // namespace
 
 // ---------------------------------------------------------------- public
@@ -484,9 +563,10 @@ void bake_level() {
         if (t == T_GRASS) dec = r < 9 ? S_DEC_TUFT : (r < 14 ? S_DEC_FLOWER : (r < 17 ? S_DEC_ROCK : (r < 19 ? S_DEC_LEAVES : -1)));
         else if (t == T_DIRT) dec = r < 6 ? S_DEC_ROCK : (r < 11 ? S_DEC_TUFT : (r < 13 ? S_DEC_LEAVES : -1));
         else if (t == T_ASPHALT || t == T_LINE) dec = r < 2 ? S_DEC_OIL : (r < 6 ? S_DEC_CRACK : (r < 11 ? S_DEC_PAPER : (r < 13 ? S_DEC_DEBRIS : -1)));
-        else if (isFloorType(t)) dec = r < 5 ? S_DEC_PAPER : (r < 8 ? S_DEC_DEBRIS : (r < 10 ? S_DEC_CRACK : ((r < 12 && m.id == MAP_POLICE) ? S_DEC_SMEAR : -1)));
+        else if (isFloorType(t)) dec = r < 5 ? S_DEC_PAPER : (r < 8 ? S_DEC_DEBRIS : (r < 9 ? S_DEC_CRACK : ((r < 11 && m.id != MAP_MARKET) ? S_DEC_SMEAR : -1)));
         if (dec >= 0) stampSprite(g_spr[dec], tx * 16 + dx, ty * 16 + dy);
     }
+    detailPass();
     // contact shadows, then the fences that stand on the ground
     for (int ty = 0; ty < m.h; ty++) for (int tx = 0; tx < m.w; tx++) {
         uint8_t t = m.t[m.idx(tx, ty)];

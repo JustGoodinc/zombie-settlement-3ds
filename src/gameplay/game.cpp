@@ -377,7 +377,10 @@ void level_enter(int mapId, int loc) {
             Zombie& z = G.z[G.nz++];
             memset(&z, 0, sizeof z);
             z.x = z.px = sp.x * 16 + 8.0f; z.y = z.py = sp.y * 16 + 10.0f;
-            z.hp = 100; z.spawnIdx = (int8_t)idx; z.variant = (uint8_t)(hash32(idx * 7 + L.gen) % ZOMB_VARIANTS);
+            z.hp = 100; z.spawnIdx = (int8_t)idx;
+            // who they were (looks only): the place's own people indoors, inmates by the cells, passers-by outside
+            z.variant = (uint8_t)zombie_look(mapId, (G.map.flags[G.map.idx(sp.x, sp.y)] & F_INDOOR) != 0, hash32(idx * 7 + L.gen));
+            for (int b = 0; b < G.map.nbar; b++) if (G.map.bar[b].kind == BK_CELLDOOR && abs(G.map.bar[b].x - sp.x) + abs(G.map.bar[b].y - sp.y) <= 3) z.variant = (uint8_t)(ZL_PRISONER + z.variant / ZOMB_LOOKS * ZOMB_LOOKS);
             z.speed = 0.85f + (hash32(idx * 13 + 5) % 30) / 100.0f;
             z.state = sp.kind == 'Z' ? ZS_IDLE : (sp.kind == 'z' ? ZS_WANDER : ZS_LYING);
             z.anim = Animator(); z.anim.speed = 0.85f + (hash32(idx * 31) % 30) / 100.0f;
@@ -420,6 +423,7 @@ void level_enter(int mapId, int loc) {
         }
     }
     G.camX = G.u[0].x - view_w() / 2; G.camY = G.u[0].y - view_h() / 2;
+    art_zombie_flush();   // zombie frames are drawn on demand: start each level with an empty set
     bake_level();   // draw the static level layer once (floors, walls, shadows); the renderer copies from it
     fx_reset();
 
@@ -1207,7 +1211,7 @@ void spawn_turned(int sv) {
     if (x >= 0 && G.nz < MAX_ZOMB) {
         Zombie& z = G.z[G.nz++];
         memset(&z, 0, sizeof z);
-        z.x = z.px = x; z.y = z.py = y; z.hp = 100; z.spawnIdx = -1; z.variant = (uint8_t)(sv % ZOMB_VARIANTS);
+        z.x = z.px = x; z.y = z.py = y; z.hp = 100; z.spawnIdx = -1; z.variant = (uint8_t)(ZL_SURVIVOR + s.variant % SURV_VARIANTS);   // still in their own clothes
         z.speed = 1.0f; z.state = ZS_CHASE; z.target = (int8_t)G.ctrl; z.hx = 0; z.hy = 1;
         z.anim = Animator(); z.anim.play(AnimState::ZRise, true);
         journal(JK_DEATH, "%s turned into a zombie!", s.name);

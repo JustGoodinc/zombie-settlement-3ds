@@ -205,6 +205,78 @@ static void testContainers() {
     CHECK(hasCard);
 }
 
+// the visual layers are cosmetic: the baked level layer matches the map, permanent marks only land on floors,
+// and the effects layer never draws from the gameplay RNG (so the rules play out exactly as before)
+static void testVisualLayers() {
+    SECTION("visuals: baked level layer and cosmetic effects leave gameplay alone");
+    startExpedition();
+    CHECK(g_bakeW == G.map.w * 16 && g_bakeH == G.map.h * 16);
+    int wx = -1, wy = -1, fx0 = -1, fy0 = -1;
+    for (int ty = 0; ty < G.map.h && (wx < 0 || fx0 < 0); ty++) for (int tx = 0; tx < G.map.w; tx++) {
+        uint8_t t = G.map.t[G.map.idx(tx, ty)];
+        if (t == T_WALL && wx < 0) { wx = tx * 16 + 8; wy = ty * 16 + 8; }
+        if (t == T_TILE && fx0 < 0 && G.map.propAt[G.map.idx(tx, ty)] < 0) { fx0 = tx * 16 + 8; fy0 = ty * 16 + 8; }
+    }
+    CHECK(wx >= 0 && fx0 >= 0);
+    px wallBefore = g_bake[wy * g_bakeW + wx], floorBefore = g_bake[fy0 * g_bakeW + fx0];
+    bake_blob((float)wx, (float)wy, 4, rgb(200, 20, 30), 256, 7);       // blood cannot paint a wall top
+    bake_blob((float)fx0, (float)fy0, 4, rgb(200, 20, 30), 256, 7);     // ...but it stains the floor
+    CHECK(g_bake[wy * g_bakeW + wx] == wallBefore);
+    CHECK(g_bake[fy0 * g_bakeW + fx0] != floorBefore);
+    uint32_t seed = G.rng.s;
+    fx_shot(100, 100, 1, 0, 2, true); fx_bulletHit(120, 100, 1, 0, false); fx_bulletHit(120, 100, 1, 0, true); fx_kill(130, 100);
+    for (int i = 0; i < 90; i++) fx_update(DT);
+    CHECK(G.rng.s == seed);                                              // cosmetic effects use their own RNG
+    CHECK(g_fxKickX < 0.01f && g_fxKickX > -0.01f);                      // recoil has settled
+    for (int id = 1; id < IT_COUNT; id++) {                              // every icon fills its inventory footprint exactly
+        bool ok = g_item[id].d && g_item[id].w == idef(id).w * ITEM_UNIT && g_item[id].h == idef(id).h * ITEM_UNIT;
+        if (!ok) printf("  icon %d (%s) is %dx%d\n", id, idef(id).name, g_item[id].w, g_item[id].h);
+        CHECK(ok);
+    }
+}
+
+// zombie looks: every look and version draws, no two are near-copies, every location fields a varied crowd, and
+// picking a look never touches the game's random numbers
+static void testZombieLooks() {
+    SECTION("visuals: zombie looks");
+    bool f;
+    auto differ = [&](int a, int b) {   // pixels that differ between two zombies facing the camera (of 384)
+        const Sprite& A = art_char(true, a, 2, P_STAND, f); const Sprite& B = art_char(true, b, 2, P_STAND, f);
+        int n = 0; for (int i = 0; i < A.w * A.h; i++) n += A.d[i] != B.d[i];
+        return n;
+    };
+    bool sized = true;
+    for (int v = 0; v < ZOMB_VARIANTS; v++) for (int d = 0; d < 8; d++) { const Sprite& s = art_char(true, v, d, P_WALK_A, f); if (!s.d || s.w != 16 || s.h != 24) sized = false; }
+    CHECK(sized);
+    int looks = 9999, versions = 9999;
+    for (int a = 0; a < ZL_SURVIVOR; a++) for (int b = a + 1; b < ZL_SURVIVOR; b++) { int n = differ(a, b); if (n < looks) looks = n; }
+    for (int a = 0; a < ZL_SURVIVOR; a++) for (int j = 0; j < ZOMB_ALTS; j++) for (int k = j + 1; k < ZOMB_ALTS; k++) { int n = differ(a + ZOMB_LOOKS * j, a + ZOMB_LOOKS * k); if (n < versions) versions = n; }
+    printf("  closest pair of looks differs in %d px, closest pair of versions in %d px (of 384)\n", looks, versions);
+    CHECK(looks >= 60);
+    CHECK(versions >= 30);
+    const Sprite* first = &art_char(true, ZL_COP, 2, P_STAND, f);
+    CHECK(first == &art_char(true, ZL_COP, 2, P_STAND, f));               // frames are drawn once and kept...
+    art_zombie_flush();
+    CHECK(art_char(true, ZL_COP, 2, P_STAND, f).d != nullptr);            // ...and are drawn again after a flush
+    uint32_t seed = G.rng.s;
+    for (int l = 0; l < LOC_COUNT; l++) for (int in = 0; in < 2; in++) {
+        bool seen[ZOMB_LOOKS] = {}; int kinds = 0, bad = 0;
+        for (uint32_t h = 0; h < 400; h++) {
+            int v = zombie_look(LOCATIONS[l].map, in != 0, hash32(h * 7 + 1));
+            if (v < 0 || v >= ZOMB_VARIANTS || v % ZOMB_LOOKS >= ZL_SURVIVOR) bad++;
+            else if (!seen[v % ZOMB_LOOKS]) { seen[v % ZOMB_LOOKS] = true; kinds++; }
+        }
+        CHECK(bad == 0);
+        CHECK(kinds >= 5);                                                // a varied crowd, indoors and out
+    }
+    CHECK(G.rng.s == seed);
+    startExpedition();   // a fresh police station: a mix of people, and whoever is by the cells wears orange
+    bool seen[ZOMB_LOOKS] = {}; int kinds = 0, inmates = 0;
+    for (int i = 0; i < G.nz; i++) { int lk = G.z[i].variant % ZOMB_LOOKS; if (!seen[lk]) { seen[lk] = true; kinds++; } if (lk == ZL_PRISONER) inmates++; }
+    CHECK(kinds >= 4);
+    CHECK(inmates >= 1);
+}
+
 // every launch location: within engine limits, every container has a reachable open side, no sealed floor
 static void testLaunchMaps() {
     SECTION("maps: all five launch locations are well formed");
@@ -566,6 +638,8 @@ int main() {
     testContainers();
     testMapsAndZombies();
     testLaunchMaps();
+    testVisualLayers();
+    testZombieLooks();
     testSettlement();
     testSave();
     testAnimation();

@@ -22,7 +22,16 @@ enum SprId {
     S_COUNT
 };
 
-enum { SURV_VARIANTS = 8, ZOMB_VARIANTS = 4, PORTRAITS = 8, BLD_TYPES = 6, BLD_LEVELS = 4 };
+// Zombie looks: who each one used to be (art.cpp draws them, zombie_look() in content.cpp decides who turns up where).
+// They differ in appearance only.
+enum ZombLookId {
+    ZL_OFFICE, ZL_PLAID, ZL_LONG, ZL_HOODIE, ZL_SUIT, ZL_COP, ZL_RIOT, ZL_PRISONER, ZL_DOCTOR, ZL_NURSE, ZL_PATIENT,
+    ZL_CLERK, ZL_JOGGER, ZL_HIVIS, ZL_MECHANIC, ZL_ROBE,
+    ZL_SURVIVOR,   // + survivor variant: someone from the settlement who turned keeps their own hair and clothes
+};
+// A zombie's variant is look + ZOMB_LOOKS * version: each look comes in ZOMB_ALTS versions (other skin, wound, hair, top).
+enum { SURV_VARIANTS = 8, ZOMB_LOOKS = ZL_SURVIVOR + SURV_VARIANTS, ZOMB_ALTS = 4, ZOMB_VARIANTS = ZOMB_LOOKS * ZOMB_ALTS,
+       PORTRAITS = 8, BLD_TYPES = 6, BLD_LEVELS = 4 };
 
 extern Sprite g_tile[TA_COUNT][4];
 extern Sprite g_spr[S_COUNT];
@@ -38,4 +47,6 @@ extern BldFx g_bldFx[BLD_TYPES][BLD_LEVELS];
 
 void art_init();
 // Character pose lookup: zombie=false -> survivor variants. dir is dir8() index.
+// Zombie frames are drawn on first use, so the reference is good until the next art_zombie_flush().
 const Sprite& art_char(bool zombie, int variant, int dir, Pose p, bool& flip);
+void art_zombie_flush();   // drop the zombie frames drawn so far (called when a level loads, to bound memory)

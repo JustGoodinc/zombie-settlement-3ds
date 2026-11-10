@@ -4,14 +4,20 @@ A top-down pixel-art zombie survival and settlement-management game for **Window
 
 Run expeditions to handcrafted locations, scavenge containers, organise a grid backpack, fight or avoid zombies, extract, and grow your settlement of survivors. Survivors die permanently.
 
-![Settlement and Police Station](screenshots/auto/09_police_lobby.png)
+![Police station, hospital, supermarket, train yard, neighbourhood and the settlement](docs/showcase.png)
+
+The dead are whoever they used to be: officers, inmates and riot police in the station, doctors, nurses and patients in the hospital, shop staff and shoppers in the supermarket, yard crews in hard hats, neighbours in dressing gowns. Sixteen looks, four versions of each, and anyone from your settlement who turns keeps their own clothes.
+
+![Zombie looks: sixteen people, four versions of each](docs/zombie_looks.png)
+
+These screenshots are from the current development build. The v0.3.0 download below predates this art pass ([docs/ART_DIRECTION.md](docs/ART_DIRECTION.md)).
 
 ## Status
 
-Early playable vertical slice (v0.1). See [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md) for exact per-feature status and [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for limitations.
+Early playable build. See [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md) for exact per-feature status and [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for limitations.
 
-**Playable now:** settlement (5 survivors, 6 buildings, jobs, resources, recruitment, infirmary, workshop, stash), the Police Station expedition (zombies, containers, keycard and cell doors, survivor rescue, extraction), the grid inventory with stylus drag, rotation and stacking, day/night with a flashlight, infection and permanent death, incidents, and save/load.
-**Not yet:** the other six world-map locations (shown as "Unscouted"), real-hardware verification of the 3DS build, and an FBI QR install test.
+**Playable now:** settlement (5 survivors, 6 buildings, jobs, resources, recruitment, infirmary, workshop, stash), five expeditions (Police Station, Hospital, Supermarket, Train Yard, Neighborhood) with zombies, containers, keys and locked doors, survivor rescue and extraction, the grid inventory with stylus drag, rotation and stacking, day/night with a flashlight, infection and permanent death, incidents, and save/load.
+**Not yet:** real-hardware verification of the 3DS build (frame rate and load times are unmeasured on a console), and an FBI QR install test.
 
 ## Install
 
@@ -59,7 +65,7 @@ cmake -S . -B build -A x64 && cmake --build build --config Release
 make
 ```
 
-Tests: `build\zs_tests.exe`. Developer tool: `zs_tool --gallery DIR`, `--shots DIR`, `--bench`, `--icons DIR`, `--handoff DIR` (design handoff: every screen, every asset, audio, HTML + Markdown spec).
+Tests: `build\zs_tests.exe`. Developer tool: `zs_tool --gallery DIR`, `--shots DIR`, `--bench`, `--icons DIR`, `--handoff DIR` (design handoff: every screen, every asset, audio, HTML + Markdown spec), `--playtest DIR` (a bot plays every map through the real input), and art review sheets: `--mapshots DIR`, `--combat DIR`, `--settlement DIR`, `--zombies DIR`.
 Details: [docs/WINDOWS_BUILD.md](docs/WINDOWS_BUILD.md), [docs/NINTENDO_3DS_BUILD.md](docs/NINTENDO_3DS_BUILD.md).
 
 ## Licence

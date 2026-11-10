@@ -1,5 +1,6 @@
 #include "content.h"
 #include "../world/world.h"
+#include "../core/art.h"
 
 #define NOW {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0}
 //                         dmg acc pel  cd  mag ammo           dur noise rng cone st reach auto shake reload
@@ -69,6 +70,27 @@ const LocationDef LOCATIONS[LOC_COUNT] = {
     {"Neighborhood", "Mixed supplies, Food", "Low", MAP_HOMES},
 };
 
-const char* SKILL_NAMES[SK_COUNT] = {"Shooting", "Melee", "Medical", "Mechanical", "Farming", "Guarding"};
+// Zombie looks by place. Each pool holds ten entries (repeats weight them). Indoors you meet the people who worked,
+// were held or were treated there; outside it is passers-by, with one in five drawn from the building's own cast.
+int zombie_look(int mapId, bool indoor, uint32_t h) {
+    static const uint8_t STREET[10]  = {ZL_OFFICE, ZL_PLAID, ZL_LONG, ZL_HOODIE, ZL_SUIT, ZL_JOGGER, ZL_ROBE, ZL_PLAID, ZL_HOODIE, ZL_LONG};
+    static const uint8_t STATION[10] = {ZL_COP, ZL_COP, ZL_COP, ZL_COP, ZL_RIOT, ZL_RIOT, ZL_PRISONER, ZL_OFFICE, ZL_SUIT, ZL_PLAID};
+    static const uint8_t WARDS[10]   = {ZL_PATIENT, ZL_PATIENT, ZL_PATIENT, ZL_DOCTOR, ZL_DOCTOR, ZL_NURSE, ZL_NURSE, ZL_ROBE, ZL_OFFICE, ZL_LONG};
+    static const uint8_t AISLES[10]  = {ZL_CLERK, ZL_CLERK, ZL_CLERK, ZL_JOGGER, ZL_LONG, ZL_PLAID, ZL_HOODIE, ZL_SUIT, ZL_ROBE, ZL_OFFICE};
+    static const uint8_t YARD[10]    = {ZL_HIVIS, ZL_HIVIS, ZL_HIVIS, ZL_HIVIS, ZL_MECHANIC, ZL_MECHANIC, ZL_MECHANIC, ZL_HOODIE, ZL_PLAID, ZL_OFFICE};
+    static const uint8_t HOMES[10]   = {ZL_ROBE, ZL_ROBE, ZL_LONG, ZL_JOGGER, ZL_PLAID, ZL_OFFICE, ZL_HOODIE, ZL_SUIT, ZL_LONG, ZL_PLAID};
+    bool inside = indoor || (h >> 8) % 5 == 0;
+    const uint8_t* pool = STREET;
+    switch (mapId) {
+    case MAP_POLICE: if (inside) pool = STATION; break;
+    case MAP_HOSPITAL: if (inside) pool = WARDS; break;
+    case MAP_MARKET: if (inside) pool = AISLES; break;
+    case MAP_YARD: pool = YARD; break;     // mostly open air: the crews are everywhere
+    case MAP_HOMES: pool = HOMES; break;   // residents, indoors and out
+    }
+    return pool[h % 10] + ZOMB_LOOKS * (int)((h >> 12) % ZOMB_ALTS);   // + which of the four versions of that look
+}
+
+const char* SKILL_NAMES[SK_COUNT] ={"Shooting", "Melee", "Medical", "Mechanical", "Farming", "Guarding"};
 const char* JOB_NAMES[JOB_COUNT] = {"Idle", "Guard", "Medic", "Mechanic", "Farmer", "Worker"};
 const char* RES_NAMES[RES_COUNT] = {"Food", "Medicine", "Ammo", "Materials", "Fuel"};

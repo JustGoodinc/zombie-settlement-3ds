@@ -8,6 +8,7 @@
 #include "../core/rng.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 namespace {
 
@@ -145,6 +146,11 @@ static void smallArt() {
         static const char* R[] = {"................", "................", "................", "................", "..kkkkkkkkkkkk..", ".khhhhhkhhhhhhk.", ".kttttskttttttk.", ".kttttskttttsdk.",
                                   "kkkkkkkkkkkkkkkk", "khhhkhhhhhhkhhhk", "kttskttttttkttsk", "kttskttttsdkttdk", "kddskddddddkdddk", "kkkkkkkkkkkkkkkk", "................", "................"};
         static const px C[] = {K, rgb(216, 196, 150), rgb(188, 166, 122), rgb(160, 138, 100), rgb(132, 112, 82)}; g_spr[S_SANDBAG] = ascii(R, 16, "khtsd", C); }
+    {   // radio and map table: the settlement's command post
+        static const char* R[] = {"................", "..........k.....", "..........k.....", "...kkkkkkkkk....", "...kGGGGGGGk....", "...kgddgrggk....", "...kggggggsk....", "kkkkkkkkkkkkkkkk",
+                                  "kTTTTTTTTTTTTTTk", "ktmmmmtttwwwwttk", "ktmlmmtttwwwwttk", "kBBBBBBBBBBBBBBk", "kbbbbbbbbbbbbbbk", "kbk..........kbk", "kkk..........kkk", "................"};
+        static const px C[] = {K, rgb(110, 116, 138), rgb(72, 76, 96), rgb(232, 226, 204), rgb(240, 80, 70), rgb(50, 52, 68), rgb(214, 166, 112), rgb(186, 136, 88), rgb(236, 228, 200), rgb(150, 130, 96), rgb(240, 240, 232), rgb(150, 106, 68), rgb(124, 84, 54)};
+        g_spr[S_RADIO] = ascii(R, 16, "kGgdrsTtmlwBb", C); }
     {   // log pile: three cut logs, pale rings facing us
         static const char* R[] = {"................", "................", "................", ".....kkkkkk.....", "....krrrrrrk....", "....krmmmmrk....", "....krmddmrk....", "..kkkkrmmrkkkk..",
                                   ".krrrrkkkkrrrrk.", ".krmmmrkkrmmmrk.", ".krmddmrrmddmrk.", ".krmddmrrmddmrk.", ".krmmmrkkrmmmrk.", ".kbbbbbkkbbbbbk.", "..kkkkkkkkkkkk..", "................"};
@@ -334,4 +340,19 @@ int prop_fx(const Map& m, const Prop& p) {
     if (p.type == PR_CAR && (id == MAP_POLICE || (h % 6) == 0)) return ((h >> 9) & 1) ? 1 : 0;
     if (p.type == PR_WRECK && ((h >> 7) % 3) == 0) return 2;
     return 0;
+}
+
+// every furniture / vehicle sprite with a name, for the asset export (zs_tool --handoff)
+int propart_list(const Sprite** out, const char** names, int max) {
+    static char nm[160][28]; int n = 0;
+    auto add = [&](const Sprite& s, const char* base, int v) { if (n >= max || n >= 160 || !s.d) return; snprintf(nm[n], sizeof nm[n], v >= 0 ? "%s_%d" : "%s", base, v); out[n] = &s; names[n] = nm[n]; n++; };
+    static const char* MAPN[MAP_COUNT] = {"police", "settlement", "hospital", "market", "homes", "yard"};
+    for (int i = 0; i < 4; i++) add(desk[i], i == 3 ? "checkout" : (i == 2 ? "dresser" : "desk"), i);
+    for (int i = 0; i < 2; i++) { add(filing[i], "filing_cabinet", i); add(locker[i], "locker", i); add(bench[i], i ? "waiting_seats" : "bench", -1); add(cot[i], i ? "cell_cot" : "hospital_bed", -1); add(cooler[i], i ? "freezer" : "water_cooler", -1); add(wreck[i], "wreck", i); }
+    for (int i = 0; i < 3; i++) { add(crate[i], i == 0 ? "crate_wood" : (i == 1 ? "box_cardboard" : "crate_military"), -1); add(plant[i], "plant", i); }
+    add(medcab, "medical_cabinet", -1); add(chair, "office_chair", -1);
+    for (int i = 0; i < 4; i++) add(barrel[i], "oil_drum", i);
+    for (int i = 0; i < 6; i++) add(car[i], i ? "car" : "police_cruiser", i ? i : -1);
+    for (int m = 0; m < MAP_COUNT; m++) { char b[24]; for (int v = 0; v < 3; v++) { snprintf(b, sizeof b, "shelf_%s", MAPN[m]); add(shelf[m][v], b, v); } for (int v = 0; v < 2; v++) { snprintf(b, sizeof b, "shelf_%s_sparse", MAPN[m]); add(shelfSparse[m][v], b, v); } }
+    return n;
 }

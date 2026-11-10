@@ -44,17 +44,50 @@ static void shot(const char* dir, const char* name) {
 
 // art review: the Try 2 style-guide lineup (3 survivors + 3 zombies facing the camera) and every
 // direction's walk cycle + aim, at 4x, for side-by-side comparison with the mockup
+// one character frame at a scale (the frame is looked up first: it says whether to mirror)
+static void blitChar(Canvas& c, bool zombie, int variant, int dir, Pose pose, int x, int y, int scale) {
+    bool flip; const Sprite& s = art_char(zombie, variant, dir, pose, flip);
+    gfx_blit(c, s, x, y, scale, flip);
+}
 static void lineup(const char* path) {
     const int S = 4, W = 8 * 20 * S, H = 4 * 28 * S;
     px* img = (px*)malloc(W * H * sizeof(px)); for (int i = 0; i < W * H; i++) img[i] = rgb(66, 64, 66);
     Canvas c; c.init(img, W, H);
-    const int SV[3] = {2, 1, 3}; bool f;
-    for (int i = 0; i < 3; i++) gfx_blit(c, art_char(false, SV[i], 2, P_STAND, f), (1 + i) * 20 * S, 2 * S, S, f);
-    for (int i = 0; i < 3; i++) gfx_blit(c, art_char(true, i, 2, P_STAND, f), (4 + i) * 20 * S, 2 * S, S, f);
+    const int SV[3] = {2, 1, 3};
+    for (int i = 0; i < 3; i++) blitChar(c, false, SV[i], 2, P_STAND, (1 + i) * 20 * S, 2 * S, S);
+    for (int i = 0; i < 3; i++) blitChar(c, true, i, 2, P_STAND, (4 + i) * 20 * S, 2 * S, S);
     const int D[3] = {2, 0, 6}; const Pose PS[6] = {P_STAND, P_WALK_A, P_STAND, P_WALK_B, P_AIM, P_RUN_A};
-    for (int r = 0; r < 3; r++) for (int k = 0; k < 6; k++) gfx_blit(c, art_char(false, 0, D[r], PS[k], f), (1 + k) * 20 * S, (1 + r) * 28 * S + 2 * S, S, f);
+    for (int r = 0; r < 3; r++) for (int k = 0; k < 6; k++) blitChar(c, false, 0, D[r], PS[k], (1 + k) * 20 * S, (1 + r) * 28 * S + 2 * S, S);
     gfx_writePNG(path, img, W, H); free(img);
     printf("lineup written to %s\n", path);
+}
+// art review (zs_tool --zombies DIR): zombie_looks.png shows every look from the front, in 3/4 view, from behind and
+// mid-step at 3x on alternating light-floor and dark-road cells; zombie_versions.png shows the four versions of each
+// of the sixteen place looks side by side (one row per version)
+static void zombies(const char* dir) {
+    char path[512];
+    {
+        const int S = 3, CELL_W = 78, CELL_H = 30, COLS = 6, ROWS = (ZOMB_LOOKS + COLS - 1) / COLS, W = COLS * CELL_W * S, H = ROWS * CELL_H * S;
+        px* img = (px*)malloc(W * H * sizeof(px));
+        for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) img[y * W + x] = ((x / (CELL_W * S) + y / (CELL_H * S)) & 1) ? rgb(70, 74, 92) : rgb(196, 186, 166);
+        Canvas c; c.init(img, W, H);
+        static const int D[4] = {2, 0, 6, 0}; static const Pose P[4] = {P_STAND, P_STAND, P_STAND, P_WALK_A};
+        for (int v = 0; v < ZOMB_LOOKS; v++) for (int k = 0; k < 4; k++) blitChar(c, true, v, D[k], P[k], ((v % COLS) * CELL_W + 3 + k * 18) * S, ((v / COLS) * CELL_H + 3) * S, S);
+        snprintf(path, sizeof path, "%s/zombie_looks.png", dir); gfx_writePNG(path, img, W, H); free(img); printf("  wrote %s\n", path);
+    }
+    {
+        const int S = 3, CELL_W = 20, CELL_H = 28, W = ZL_SURVIVOR * CELL_W * S, H = ZOMB_ALTS * CELL_H * S;
+        px* img = (px*)malloc(W * H * sizeof(px));
+        for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) img[y * W + x] = (x / (CELL_W * S)) & 1 ? rgb(70, 74, 92) : rgb(196, 186, 166);
+        Canvas c; c.init(img, W, H);
+        for (int a = 0; a < ZOMB_ALTS; a++) for (int v = 0; v < ZL_SURVIVOR; v++) blitChar(c, true, v + ZOMB_LOOKS * a, 2, P_STAND, (v * CELL_W + 2) * S, (a * CELL_H + 2) * S, S);
+        snprintf(path, sizeof path, "%s/zombie_versions.png", dir); gfx_writePNG(path, img, W, H); free(img); printf("  wrote %s\n", path);
+    }
+}
+// a look for a zombie the tools place by hand, picked the way the game picks one for a spawn on that spot
+static uint8_t toolLook(const Zombie& z, int k) {
+    int tx = (int)(z.x / 16), ty = (int)(z.y / 16);
+    return (uint8_t)zombie_look(G.map.id, G.map.in(tx, ty) && (G.map.flags[G.map.idx(tx, ty)] & F_INDOOR), hash32(k * 977u + 13));
 }
 // the Try 2 "Exploration & Combat" panel restaged: leader facing east firing at zombies (top screen, 200% zoom)
 static void duel(const char* path) {
@@ -67,7 +100,7 @@ static void duel(const char* path) {
     G.nz = 0;
     for (int k = 0; k < 2; k++) {
         Zombie& z = G.z[G.nz++]; memset(&z, 0, sizeof z);
-        z.x = z.px = u.x + 64 + k * 10; z.y = z.py = u.y - 20 + k * 34; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 0.01f; z.variant = (uint8_t)k; z.hx = -1;
+        z.x = z.px = u.x + 64 + k * 10; z.y = z.py = u.y - 20 + k * 34; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 0.01f; z.variant = toolLook(z, k); z.hx = -1;
         z.anim = Animator(); z.anim.play(AnimState::ZWalk, true);
     }
     u.fx = 1; u.fy = 0; u.dir = 0; step(25);   // let the flashlight beam swing round first
@@ -96,12 +129,12 @@ static void base(const char* dir) {
 static void gallery(const char* dir) {
     // characters: rows = variant x direction, columns = poses (2x scale)
     {
-        int cols = P_COUNT, rows = (SURV_VARIANTS + ZOMB_VARIANTS) * 5, S = 2;
+        int cols = P_COUNT, rows = (SURV_VARIANTS + ZOMB_LOOKS) * 5, S = 2;
         int W = cols * 26 * S, H = rows * 26 * S;
         px* img = (px*)malloc(W * H * sizeof(px)); for (int i = 0; i < W * H; i++) img[i] = rgb(60, 58, 54);
         Canvas c; c.init(img, W, H);
         static const int D5[5] = {2, 1, 0, 7, 6};
-        for (int z = 0; z < 2; z++) for (int v = 0; v < (z ? ZOMB_VARIANTS : SURV_VARIANTS); v++) for (int d = 0; d < 5; d++) for (int p = 0; p < P_COUNT; p++) {
+        for (int z = 0; z < 2; z++) for (int v = 0; v < (z ? ZOMB_LOOKS : SURV_VARIANTS); v++) for (int d = 0; d < 5; d++) for (int p = 0; p < P_COUNT; p++) {
             bool f; const Sprite& s = art_char(z != 0, v, D5[d], (Pose)p, f);
             int row = (z ? SURV_VARIANTS : 0) * 5 + v * 5 + d;
             gfx_blit(c, s, p * 26 * S + S, row * 26 * S + S, S, f);
@@ -152,26 +185,28 @@ static void shots(const char* dir) {
     g_buildingSel = B_INFIRMARY; ui_open(PN_BUILDING); step(10); shot(dir, "04_build_menu");
     ui_open(PN_SURVIVORS); step(10); shot(dir, "05_survivors");
     ui_open(PN_WORLDMAP); step(10); shot(dir, "06_world_map");
-    tap(220, 206);  // Deploy -> prep
+    tap(289, 36);   // Deploy (right rail, top) -> prep
     step(5); shot(dir, "07_expedition_prep");
     G.squad[1] = 4; step(2);
-    tap(70, 206);   // Deploy
+    tap(289, 36);   // Deploy
     step(40); shot(dir, "08_police_arrival");
-    // walk north toward the lobby doors and open them
-    Input up; up.ay = -1;
-    for (int i = 0; i < 70; i++) step(1, up);
-    press(BTN_A); step(20);
-    for (int i = 0; i < 40; i++) step(1, up);
-    step(5); shot(dir, "09_police_lobby");
-    // find and search the nearest container
+    // stand at the lobby doors (tiles 26-27, row 32), open them and walk in. Wandering zombies are cleared so the
+    // scripted route is the same every run; the combat shots below bring their own.
     Unit& u = G.u[G.ctrl];
+    G.nz = 0;
+    for (int k = 0; k < G.nu; k++) { Unit& q = G.u[k]; if (q.escort) continue; q.x = q.px = 27 * 16.0f + (k == G.ctrl ? 0 : 14); q.y = q.py = 33 * 16 + (k == G.ctrl ? 6.0f : 14.0f); }
+    Input up; up.ay = -1;
+    step(4, up); press(BTN_A); step(20);
+    for (int i = 0; i < 30; i++) step(1, up);
+    G.nz = 0; step(5); shot(dir, "09_police_lobby");
+    // find and search the nearest container
     int best = -1; float bd = 1e9f;
     for (int i = 0; i < G.map.nprop; i++) { const Prop& p = G.map.prop[i]; if (p.container < 0) continue; float dx = p.tx * 16 + 8 - u.x, dy = p.ty * 16 + 8 - u.y; if (dx * dx + dy * dy < bd) { bd = dx * dx + dy * dy; best = i; } }
     if (best >= 0) { const Prop& p = G.map.prop[best]; u.x = u.px = p.tx * 16 + 8.0f; u.y = u.py = p.ty * 16 + 26.0f; u.fx = 0; u.fy = -1; }
     step(6); shot(dir, "10_container_highlight");
     press(BTN_A); step(14); shot(dir, "11_searching");
     step(40); shot(dir, "12_container_menu");
-    tap(176, 148);  // Take All
+    tap(30, 36);    // Take All (left rail, top)
     step(4); shot(dir, "13_container_taken");
     press(BTN_B); step(4);
     ui_open(PN_INVENTORY); step(8); shot(dir, "14_inventory");
@@ -180,7 +215,7 @@ static void shots(const char* dir) {
     G.nz = 0;
     for (int k = 0; k < 4; k++) {
         Zombie& z = G.z[G.nz++]; memset(&z, 0, sizeof z);
-        z.x = z.px = u.x + 30 + k * 12; z.y = z.py = u.y + 10 - k * 8; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 1; z.variant = (uint8_t)k; z.hx = -1;
+        z.x = z.px = u.x + 30 + k * 12; z.y = z.py = u.y + 10 - k * 8; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 1; z.variant = toolLook(z, k); z.hx = -1;
         z.anim = Animator(); z.anim.play(AnimState::ZWalk, true);
     }
     u.fx = 1; u.fy = 0; u.dir = 0; step(25);   // let the flashlight beam swing round first
@@ -255,7 +290,7 @@ static void bench() {
     while (G.nz < 60) {
         Zombie& z = G.z[G.nz++]; memset(&z, 0, sizeof z);
         z.x = z.px = u.x - 160 + (G.nz % 12) * 26; z.y = z.py = u.y - 140 + (G.nz / 12) * 22;
-        z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 1; z.variant = (uint8_t)(G.nz & 3); z.hx = 0; z.hy = 1;
+        z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 1; z.variant = toolLook(z, G.nz); z.hx = 0; z.hy = 1;
         z.anim = Animator(); z.anim.play(AnimState::ZWalk, true);
     }
     Survivor& s = G.st.surv[0];
@@ -279,21 +314,20 @@ static void bench() {
 }
 
 static void icons(const char* dir) {
-    // 48x48 icon: zombie head silhouette over a red moon
+    // icon and banner are cut from the title screen so the HOME menu matches the game: dusk sky, sun, skyline, logo
+    static px tt[TOP_W * TOP_H]; Canvas tc; tc.init(tt, TOP_W, TOP_H);
+    G.uiTime = 0.4f; render_title(tc);
+    // 48x48 icon: the sun over the skyline (half scale), a zombie in front
     static px ic[48 * 48]; Canvas c; c.init(ic, 48, 48);
-    for (int y = 0; y < 48; y++) for (int x = 0; x < 48; x++) ic[y * 48 + x] = gfx_mix(rgb(20, 22, 34), rgb(60, 30, 30), y * 5);
-    gfx_circle(c, 32, 14, 9, rgb(150, 50, 40), true);
-    gfx_blit(c, g_portrait[0], 0, 0);
-    bool f; gfx_blit(c, art_char(true, 0, 2, P_STAND, f), 8, 14, 2);
-    gfx_fill(c, 0, 44, 48, 4, rgb(40, 30, 26));
+    for (int y = 0; y < 48; y++) for (int x = 0; x < 48; x++) ic[y * 48 + x] = tt[(98 + y * 2) * TOP_W + 70 + x * 2];
+    bool f; const Sprite& zs = art_char(true, ZL_OFFICE + ZOMB_LOOKS, 2, P_STAND, f);   // the icon zombie: green, shirt and tie
+    gfx_fill(c, 0, 40, 48, 8, rgb(26, 22, 44));
+    gfx_blit(c, zs, 24 - zs.w, 46 - zs.h * 2, 2, f);
+    gfx_rect(c, 0, 0, 48, 48, rgb(22, 22, 34));
     char p[512]; snprintf(p, sizeof p, "%s/icon.png", dir); gfx_writePNG(p, ic, 48, 48);
-    // banner 256x128 (3DS HOME menu top screen)
-    static px bn[256 * 128]; Canvas b; b.init(bn, 256, 128);
-    for (int y = 0; y < 128; y++) for (int x = 0; x < 256; x++) bn[y * 256 + x] = gfx_mix(rgb(14, 16, 26), rgb(46, 36, 36), y * 2);
-    for (int x = 0; x < 256; x += 16) gfx_blit(b, g_tile[TA_WALL_FRONT][(x / 16) & 3], x, 96), gfx_blit(b, g_tile[TA_ASPHALT][(x / 16) & 3], x, 112);
-    for (int i = 0; i < 5; i++) gfx_blit(b, art_char(true, i % 4, 2, P_STAND, f), 20 + i * 48, 92, 1);
-    gfx_text(b, 128 - gfx_textW("STAYING", 4) / 2 + 2, 14 + 2, "STAYING", rgb(80, 10, 10), 4, false); gfx_text(b, 128 - gfx_textW("STAYING", 4) / 2, 14, "STAYING", pal::cream, 4, false);
-    gfx_text(b, 128 - gfx_textW("ALIVE", 5) / 2 + 2, 48 + 2, "ALIVE", rgb(80, 10, 10), 5, false); gfx_text(b, 128 - gfx_textW("ALIVE", 5) / 2, 48, "ALIVE", pal::red, 5, false);
+    // banner 256x128 (3DS HOME menu top screen): the logo over the skyline
+    static px bn[256 * 128];
+    for (int y = 0; y < 128; y++) memcpy(bn + y * 256, tt + (y + 12) * TOP_W + 72, 256 * sizeof(px));
     snprintf(p, sizeof p, "%s/banner.png", dir); gfx_writePNG(p, bn, 256, 128);
     // Windows .ico containing the PNG (Vista+ format)
     snprintf(p, sizeof p, "%s/icon.png", dir);
@@ -334,6 +368,7 @@ int main(int argc, char** argv) {
     else if (argc >= 3 && !strcmp(argv[1], "--icons")) icons(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--handoff")) handoff(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--lineup")) lineup(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "--zombies")) zombies(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--duel")) duel(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--base")) base(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--playtest")) playtest(argv[2], argc >= 4 ? atoi(argv[3]) : 30);
@@ -341,6 +376,7 @@ int main(int argc, char** argv) {
     else if (argc >= 3 && !strcmp(argv[1], "--settlement")) settlementShots(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--combat")) combatShots(argv[2]);
     else if (argc >= 2 && !strcmp(argv[1], "--bench-bake")) bakeBench();
+    else if (argc >= 3 && !strcmp(argv[1], "--rain")) rainShots(argv[2]);
     else { printf("usage: zs_tool --gallery DIR | --shots DIR | --bench | --icons DIR\n"); return 1; }
     return 0;
 }

@@ -556,21 +556,21 @@ static void minimap(Canvas& c, int x, int y, int w, int h) {
     Map& m = G.map;
     int scale = 2; if (m.w * 3 <= w && m.h * 3 <= h) scale = 3;
     int ox = x + (w - m.w * scale) / 2, oy = y + (h - m.h * scale) / 2;
-    gfx_fill(c, x, y, w, h, rgb(18, 18, 22));
+    gfx_fill(c, x, y, w, h, rgb(16, 16, 28));
     for (int ty = 0; ty < m.h; ty++) for (int tx = 0; tx < m.w; tx++) {
         int i = m.idx(tx, ty);
         if (G.scene == SC_EXPEDITION && !G.explored[i]) continue;
         uint8_t t = m.t[i]; px col;
-        if (t == T_WALL || t == T_PALISADE) col = rgb(150, 146, 136);
-        else if (t == T_DOOR) col = m.bar[m.barAt[i]].kind == BK_WINDOW ? rgb(80, 120, 140) : rgb(170, 120, 60);
+        if (t == T_WALL || t == T_PALISADE) col = rgb(120, 124, 160);
+        else if (t == T_DOOR) col = m.bar[m.barAt[i]].kind == BK_WINDOW ? rgb(112, 186, 216) : rgb(236, 196, 72);
         else if (t == T_EXTRACT) col = pal::lime;
-        else if (m.flags[i] & F_INDOOR) col = rgb(60, 58, 54);
-        else col = rgb(38, 44, 32);
-        if (m.propAt[i] >= 0 && m.prop[m.propAt[i]].container >= 0) col = G.curLoc >= 0 && G.loc[G.curLoc].generated[m.prop[m.propAt[i]].container] ? rgb(90, 90, 90) : rgb(110, 160, 60);
-        if (m.propAt[i] >= 0 && m.prop[m.propAt[i]].type == PR_PLOT) col = G.st.bLevel[m.prop[m.propAt[i]].special] ? rgb(170, 130, 80) : rgb(90, 74, 56);
-        else if (m.propAt[i] >= 0 && m.prop[m.propAt[i]].solid && G.scene == SC_SETTLEMENT) col = rgb(110, 100, 80);
-        if (t == T_GARDEN) col = rgb(70, 110, 50);
-        if (t == T_DIRT && G.scene == SC_SETTLEMENT) col = rgb(80, 66, 48);
+        else if (m.flags[i] & F_INDOOR) col = rgb(64, 68, 100);
+        else col = (t == T_GRASS ? rgb(58, 96, 62) : (t == T_WATER ? rgb(30, 78, 104) : (t == T_RAIL ? rgb(96, 90, 86) : rgb(50, 52, 68))));
+        if (m.propAt[i] >= 0 && m.prop[m.propAt[i]].container >= 0) col = G.curLoc >= 0 && G.loc[G.curLoc].generated[m.prop[m.propAt[i]].container] ? rgb(96, 100, 124) : rgb(154, 228, 64);
+        if (m.propAt[i] >= 0 && m.prop[m.propAt[i]].type == PR_PLOT) col = G.st.bLevel[m.prop[m.propAt[i]].special] ? rgb(214, 164, 96) : rgb(110, 90, 66);
+        else if (m.propAt[i] >= 0 && m.prop[m.propAt[i]].solid && G.scene == SC_SETTLEMENT) col = rgb(140, 124, 96);
+        if (t == T_GARDEN) col = rgb(96, 150, 70);
+        if (t == T_DIRT && G.scene == SC_SETTLEMENT) col = rgb(132, 102, 72);
         gfx_fill(c, ox + tx * scale, oy + ty * scale, scale, scale, col);
     }
     for (int i = 0; i < G.nu; i++) if (G.u[i].alive) {
@@ -1165,7 +1165,7 @@ static void panelWorkshop(Canvas& c) {
 // ---------------------------------------------------------------- world map + prep
 static int g_mapSel = 0;
 static void mapThumb(Canvas& c, int x, int y, int w, int h, int loc) {
-    gfx_fill(c, x, y, w, h, rgb(20, 22, 18));
+    gfx_fill(c, x, y, w, h, rgb(16, 16, 28));
     if (LOCATIONS[loc].map < 0) {
         gfx_textC(c, x + w / 2, y + h / 2 - 8, "UNSCOUTED", pal::grey);
         gfx_textC(c, x + w / 2, y + h / 2 + 4, "Route not yet found", pal::grey);
@@ -1175,7 +1175,8 @@ static void mapThumb(Canvas& c, int x, int y, int w, int h, int loc) {
         int sc = 2, ox = x + (w - thumb.w * sc) / 2, oy = y + (h - thumb.h * sc) / 2;
         for (int ty = 0; ty < thumb.h; ty++) for (int tx = 0; tx < thumb.w; tx++) {
             uint8_t t = thumb.t[thumb.idx(tx, ty)];
-            px col = t == T_WALL ? rgb(160, 150, 136) : t == T_DOOR ? rgb(170, 120, 60) : (t == T_GRASS ? rgb(56, 70, 40) : (t == T_ASPHALT || t == T_LINE ? rgb(54, 54, 58) : (t == T_EXTRACT ? pal::lime : rgb(110, 104, 94))));
+            px col = t == T_WALL ? rgb(120, 124, 160) : t == T_DOOR ? rgb(236, 196, 72) : t == T_GRASS ? rgb(70, 116, 70) : (t == T_ASPHALT || t == T_LINE) ? rgb(62, 64, 80) : t == T_EXTRACT ? pal::lime
+                   : t == T_WATER ? rgb(30, 78, 104) : t == T_RAIL ? rgb(96, 90, 86) : t == T_DIRT ? rgb(150, 116, 80) : t == T_WOOD ? rgb(166, 118, 76) : t == T_CARPET ? rgb(70, 90, 140) : t == T_CONCRETE ? rgb(140, 140, 138) : rgb(150, 160, 170);
             int X = ox + tx * sc, Y = oy + ty * sc;
             if (X >= x && Y >= y && X + sc <= x + w && Y + sc <= y + h) gfx_fill(c, X, Y, sc, sc, col);
         }
@@ -1186,7 +1187,9 @@ static void mapThumb(Canvas& c, int x, int y, int w, int h, int loc) {
 static void panelWorldMap(Canvas& c) {
     // left rail: the locations (thumb-pickable); middle: preview + intel; right rail: Deploy / Back
     for (int l = 0; l < LOC_COUNT; l++) {
-        if (rail(c, 0, l, LOC_COUNT, LOCATIONS[l].name, sel == l ? UB_SELECTED : 0)) sel = l;
+        const char* nm = LOCATIONS[l].name;   // the thumb buttons are 58 px wide: long single words get a short form (the full name is in the panel)
+        if (!strcmp(nm, "Supermarket")) nm = "Market"; else if (!strcmp(nm, "Neighborhood")) nm = "Homes";
+        if (rail(c, 0, l, LOC_COUNT, nm, sel == l ? UB_SELECTED : 0)) sel = l;
         if (LOCATIONS[l].map < 0) { int h = (RH - (LOC_COUNT - 1) * 4) / LOC_COUNT; gfx_fillA(c, RLX, RTOP + l * (h + 4), RW, h, pal::ink, 90); }
     }
     if (sel >= LOC_COUNT) sel = 0;
