@@ -937,31 +937,44 @@ static void update_settlers(float dt) {
         if (!s.alive || s.onExpedition || i == G.u[G.ctrl].sv) continue;
         // job anchor: where this survivor works / sleeps
         float ax = G.map.spawnX * 16.0f, ay = G.map.spawnY * 16.0f;
-        int plot = -1;
+        int plot = -1; float fireX = -1, fireY = 0;
         switch (s.job) { case JOB_MEDIC: plot = B_INFIRMARY; break; case JOB_MECHANIC: plot = B_WORKSHOP; break; case JOB_FARMER: plot = B_KITCHEN; break; case JOB_WORKER: plot = B_STORAGE; break; case JOB_GUARD: plot = B_DEFENSES; break; }
-        bool sleeping = night && s.job != JOB_GUARD;
+        int hourNow = ((int)G.clock / 60) % 24;
+        bool sleeping = (hourNow >= 22 || hourNow < 6) && s.job != JOB_GUARD;
+        bool gather = hourNow >= 17 && hourNow < 22 && s.job != JOB_GUARD && !s.quarantined;   // evenings: everyone off duty gathers at the fire (Try 2)
+        (void)night;
         if (s.quarantined) plot = B_INFIRMARY;
         if (sleeping) plot = -2;
+        if (gather) plot = -3;
         for (int k = 0; k < G.map.nprop; k++) {
             const Prop& p = G.map.prop[k];
             if (plot >= 0 && p.type == PR_PLOT && p.special == plot) { ax = p.tx * 16 + 24.0f; ay = p.ty * 16 + 56.0f; }
             if (plot == -2 && p.type == PR_FIRE) { ax = p.tx * 16 + 8.0f + ((i % 5) - 2) * 18.0f; ay = p.ty * 16 + 30.0f + (i / 5) * 14.0f; }
+            if (plot == -3 && p.type == PR_FIRE) { float a = i * 1.26f + 0.6f; ax = p.tx * 16 + 8.0f + cosf(a) * 34; ay = p.ty * 16 + 10.0f + sinf(a) * 20; fireX = p.tx * 16 + 8.0f; fireY = p.ty * 16 + 10.0f; }
         }
         if (s.job == JOB_GUARD && !sleeping) { ax = G.map.exitX * 16 + 8.0f + ((i & 1) ? -40.0f : 40.0f); ay = G.map.exitY * 16 - 20.0f - (i % 3) * 10.0f; }
         n.asleep = sleeping && len2(n.x - ax, n.y - ay) < 6;
         n.wait -= dt;
         if (n.wait <= 0) {
             n.wait = 2.5f + (hash32(i * 17 + G.tick) % 40) / 10.0f;
-            float r = sleeping ? 0.0f : (s.job == JOB_GUARD ? 26.0f : 18.0f);
+            float r = (sleeping || gather) ? 3.0f : (s.job == JOB_GUARD ? 26.0f : 18.0f);
             n.tx = ax + ((int)(hash32(i + G.tick) % 100) - 50) / 50.0f * r;
             n.ty = ay + ((int)(hash32(i * 3 + G.tick) % 100) - 50) / 50.0f * r * 0.5f;
         }
         float dx = n.tx - n.x, dy = n.ty - n.y, d = len2(dx, dy);
         if (d > 2) {
             float sp = 26 * (0.6f + day * 0.4f);
+            float ox = n.x, oy = n.y;
             map_move(G.map, n.x, n.y, dx / d * sp * dt, dy / d * sp * dt, 5);
+            if (fabsf(n.x - ox) + fabsf(n.y - oy) < sp * dt * 0.3f) {   // blocked: slide around the obstacle, then give up and step through
+                n.stuck += dt;
+                float side = (hash32(i * 7) & 1) ? 1.0f : -1.0f;
+                map_move(G.map, n.x, n.y, -dy / d * sp * dt * side, dx / d * sp * dt * side, 5);
+                if (n.stuck > 4) { n.x = n.tx; n.y = n.ty; n.stuck = 0; }
+            } else n.stuck = 0;
             n.dir = (uint8_t)dir8(dx, dy); n.anim.play(AnimState::Walk); n.working = false;
         } else if (n.asleep) n.anim.play(AnimState::Sleep);
+        else if (gather && fireX >= 0) { n.dir = (uint8_t)dir8(fireX - n.x, fireY - n.y); n.anim.play(AnimState::Idle); n.working = false; }   // warming up, facing the fire
         else if (s.job == JOB_GUARD) { n.anim.play(AnimState::Guard); if (n.anim.state == AnimState::Guard && n.anim.frame == 1) n.dir = (uint8_t)((n.dir + 1) & 7); }
         else if (s.job != JOB_NONE) { n.anim.play(AnimState::Work); n.working = true; n.dir = 6; }
         else n.anim.play(AnimState::Idle);
@@ -1026,6 +1039,15 @@ static void update_level(float dt) {
     G.camX += (tx - G.camX) * fminf(1, dt * 6); G.camY += (ty - G.camY) * fminf(1, dt * 6);
     G.camX = clampf(G.camX, 0, (float)(G.map.w * 16 - view_w())); G.camY = clampf(G.camY, 0, (float)(G.map.h * 16 - view_h()));
     if (G.map.w * 16 < view_w()) G.camX = (G.map.w * 16 - view_w()) / 2.0f;
+    if (G.scene == SC_SETTLEMENT) {   // frame the compound fence to fence (Try 2 overview), towers poking over the top fence
+        int y0 = 1 << 30, y1 = -1;
+        for (int i = 0; i < G.map.w * G.map.h; i++) if (G.map.t[i] == T_PALISADE) { int y = i / G.map.w; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        if (y1 >= 0) {
+            float top = y0 * 16.0f - 20, bot = (y1 + 1) * 16.0f + 4;
+            if (bot - top <= view_h()) G.camY = (top + bot - view_h()) / 2.0f;
+            else G.camY = clampf(G.camY, top, bot - view_h());
+        }
+    }
     if (G.shake > 0) G.shake -= dt * 12;
     if (G.toastT > 0) G.toastT -= dt;
     float fa = G.flashlight ? 1.0f : 0.0f; G.flashAnim += (fa - G.flashAnim) * fminf(1, dt * 8);

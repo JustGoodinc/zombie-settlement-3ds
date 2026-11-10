@@ -83,9 +83,9 @@ static void base(const char* dir) {
     G.st.generator = true;
     level_enter(MAP_SETTLEMENT, -1); ui_open(PN_HUD);
     char p[512];
-    const struct { const char* n; float clock; int zoom; } shots[3] = {{"base_day", 11 * 60, 200}, {"base_dusk", 19 * 60 + 30, 200}, {"base_all", 13 * 60, 100}};
+    const struct { const char* n; float clock; int zoom; } shots[3] = {{"base_day", 11 * 60, 200}, {"base_dusk", 18 * 60 + 40, 200}, {"base_all", 13 * 60, 100}};
     for (auto& s : shots) {
-        G.clock = s.clock; G.set.zoom = (uint8_t)s.zoom; step(40);
+        G.clock = s.clock; G.set.zoom = (uint8_t)s.zoom; step(360);   // let settlers walk to their evening spots
         snprintf(p, sizeof p, "%s/%s.png", dir, s.n); gfx_writePNG(p, topB, TOP_W, TOP_H);
         printf("  wrote %s\n", p);
     }

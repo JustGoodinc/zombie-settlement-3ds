@@ -30,7 +30,7 @@ void render_compute_light() {
         if (!m.in(tx, ty)) continue;
         int i = m.idx(tx, ty);
         bool indoor = (m.flags[i] & F_INDOOR) != 0;
-        float L = indoor ? 70 + day * 104 : 28 + day * 210;
+        float L = indoor ? 70 + day * 104 : (G.scene == SC_SETTLEMENT ? 70 + day * 176 : 28 + day * 210);   // the settlement keeps a lantern-lit floor
         float cx = tx * 16 + 8.0f, cy = ty * 16 + 8.0f, dx = cx - p.x, dy = cy - (p.y - 4), d = sqrtf(dx * dx + dy * dy);
         bool los = d < 12 || map_los(m, p.x, p.y - 4, cx, cy);
         if (los) {
@@ -95,6 +95,20 @@ static const Sprite& tileSprite(int tx, int ty) {
     return g_tile[TA_DIRT][0];
 }
 
+// three flickering flame tongues (fire pit); drawn again after lighting so they stay the brightest thing on screen
+static void drawFlames(Canvas& c, int cx, int cy) {
+    for (int k = 0; k < 3; k++) {
+        int ox = (k - 1) * 4, h = (k == 1 ? 17 : 11) + (int)(sinf(G.uiTime * 9.0f + k * 2.1f) * 3);
+        for (int r = 0; r < h; r++) {
+            float f = 1.0f - (float)r / h; int sway = (int)(sinf(G.uiTime * 7.0f + r * 0.5f + k) * (1 - f) * 2);
+            int w = 1 + (int)(f * (k == 1 ? 6 : 4));
+            int fx0 = cx + ox + sway - w / 2, fy = cy - 1 - r;
+            gfx_fill(c, fx0, fy, w, 1, rgb(226, 82, 30));
+            if (w > 2) gfx_fill(c, fx0 + 1, fy, w - 2, 1, rgb(250, 156, 40));
+            if (w > 4 && f > 0.35f) gfx_fill(c, fx0 + 2, fy, w - 4, 1, rgb(255, 230, 130));
+        }
+    }
+}
 static void drawChar(Canvas& c, bool zombie, int variant, float x, float y, uint8_t dir, const Animator& a, float fx, float fy, float flash, int weaponId, float muzzle, bool shadow = true) {
     const AnimFrame& f = a.cur();
     bool flip;
@@ -163,6 +177,8 @@ void render_world(Canvas& c, float alpha) {
     render_compute_light();
     gfx_clear(c, pal::black);
     int tx0 = camX / 16, ty0 = camY / 16, tx1 = (camX + view_w()) / 16 + 1, ty1 = (camY + view_h()) / 16 + 1;
+    int palX0 = 1 << 30, palX1 = -1, palY0 = 1 << 30, palY1 = -1;   // the compound's fence bounds (settlement only)
+    if (G.scene == SC_SETTLEMENT) for (int y = 0; y < m.h; y++) for (int x = 0; x < m.w; x++) if (m.t[m.idx(x, y)] == T_PALISADE) { if (x < palX0) palX0 = x; if (x > palX1) palX1 = x; if (y < palY0) palY0 = y; if (y > palY1) palY1 = y; }
     for (int ty = ty0; ty <= ty1; ty++) for (int tx = tx0; tx <= tx1; tx++) {
         if (!m.in(tx, ty)) continue;
         int bx = tx * 16 - camX, by = ty * 16 - camY;
@@ -175,6 +191,7 @@ void render_world(Canvas& c, float alpha) {
             if (b.state != BS_BROKEN && b.state != BS_OPEN && hp < 0.66f) gfx_blit(c, g_tile[hp < 0.33f ? TA_CRACK2 : TA_CRACK1][0], bx + jx, by);
         } else gfx_blit(c, tileSprite(tx, ty), bx, by);
         if (m.t[i] == T_EXTRACT && ((int)(G.uiTime * 2) & 1)) gfx_rect(c, bx + 2, by + 2, 12, 12, rgb(154, 228, 64));
+        if (G.scene == SC_SETTLEMENT && m.t[i] == T_GRASS && (tx < palX0 || tx > palX1 || ty < palY0 || ty > palY1)) gfx_fillA(c, bx, by, 16, 16, rgb(10, 24, 14), 130);   // dark forest floor beyond the fence
         uint8_t t = m.t[i];
         if (t == T_WALL || t == T_PALISADE || t == T_DOOR || t == T_BARS || t == T_FENCE) continue;
         // ground detail scattered deterministically (no storage, identical every frame)
@@ -231,7 +248,7 @@ void render_world(Canvas& c, float alpha) {
         case PR_PLOT: if (G.st.bLevel[p.special]) { const Sprite& bs = g_bldWorld[p.special][G.st.bLevel[p.special] > 3 ? 3 : G.st.bLevel[p.special]]; shadow(bs, x + 24 - bs.w / 2, y + 48 - bs.h, 4, 3, 150); } break;
         case PR_CAR: shadow(g_spr[S_CAR], x, y, 2, 3, 140); break;
         case PR_WRECK: shadow(g_spr[S_WRECK], x, y, 2, 3, 140); break;
-        case PR_TENT: shadow(g_spr[S_TENT], x, y - 8, 3, 3, 150); break;
+        case PR_TENT: shadow(g_spr[S_TENT], x - 7, y - 24, 3, 3, 150); break;
         case PR_CHAIR: case PR_CONE: case PR_GENERATOR: break;
         default: if (p.type <= PR_LOGS && p.type != PR_PLOT) {
             static const int SPR[PR_COUNT] = {S_DESK, S_FILING, S_LOCKER, S_CRATE, S_MEDCAB, S_SHELF, S_CAR, S_WRECK, S_TREE, S_BENCH, S_COT, S_CHAIR, S_PLANT, S_COOLER,
@@ -285,7 +302,7 @@ void render_world(Canvas& c, float alpha) {
                 break;
             }
             case PR_BENCH: gfx_blit(c, g_spr[S_BENCH], x, y); break;
-            case PR_TENT: gfx_blit(c, g_spr[S_TENT], x, y - 8); break;
+            case PR_TENT: gfx_blit(c, g_spr[S_TENT], x - 7, y - 24); break;
             case PR_BARREL: gfx_blit(c, g_spr[S_BARREL], x, y); break;
             case PR_SANDBAG: gfx_blit(c, g_spr[S_SANDBAG], x, y); break;
             case PR_LOGS: gfx_blit(c, g_spr[S_LOGS], x, y); break;
@@ -295,16 +312,36 @@ void render_world(Canvas& c, float alpha) {
             case PR_CHAIR: gfx_blit(c, g_spr[S_CHAIR], x, y); break;
             case PR_PLANT: gfx_blit(c, g_spr[S_PLANT], x, y); break;
             case PR_COOLER: gfx_blit(c, g_spr[S_COOLER], x, y); break;
-            case PR_FIRE: {   // stone fire pit (Try 2): ring of stones, charred logs, flames, rising sparks
-                for (int a = 0; a < 12; a++) { float ang = a * 0.5236f; int sx = x + 8 + (int)(cosf(ang) * 9), sy = y + 11 + (int)(sinf(ang) * 5); gfx_fill(c, sx - 1, sy - 1, 3, 2, a & 1 ? rgb(128, 124, 116) : rgb(104, 100, 94)); gfx_pset(c, sx - 1, sy - 1, rgb(160, 156, 148)); }
-                gfx_fill(c, x + 3, y + 10, 10, 2, rgb(60, 40, 28)); gfx_fill(c, x + 5, y + 9, 6, 1, rgb(90, 50, 30));
-                gfx_blit(c, g_spr[S_FIRE0 + (int)(G.uiTime * 8) % 3], x, y - 2);
-                for (int k = 0; k < 3; k++) { float t = fmodf(G.uiTime * 0.8f + k * 0.33f, 1.0f); gfx_pset(c, x + 8 + (int)(sinf(t * 9 + k) * 3), y + 2 - (int)(t * 16), t < 0.5f ? rgb(255, 210, 90) : rgb(230, 110, 40)); }
+            case PR_FIRE: {   // Try 2 fire pit: wide stone ring, crossed logs, three flame tongues, sparks
+                int cx = x + 8, cy = y + 12;
+                for (int a = 0; a < 16; a++) {   // back half of the ring first
+                    float ang = a * 0.3927f; int sx = cx + (int)(cosf(ang) * 12), sy = cy + (int)(sinf(ang) * 5);
+                    if (sinf(ang) > 0) continue;
+                    gfx_fill(c, sx - 2, sy - 1, 4, 3, rgb(40, 38, 40)); gfx_fill(c, sx - 1, sy - 1, 3, 2, a & 1 ? rgb(150, 146, 138) : rgb(122, 118, 112)); gfx_pset(c, sx - 1, sy - 1, rgb(186, 182, 172));
+                }
+                gfx_fill(c, cx - 9, cy - 2, 18, 5, rgb(34, 26, 22));                 // ash bed
+                gfx_line(c, cx - 7, cy + 1, cx + 6, cy - 2, rgb(70, 44, 28)); gfx_line(c, cx - 6, cy - 2, cx + 7, cy + 1, rgb(86, 54, 32));   // crossed logs
+                gfx_pset(c, cx - 2, cy, rgb(255, 120, 40)); gfx_pset(c, cx + 3, cy - 1, rgb(255, 160, 60));                                   // embers
+                drawFlames(c, cx, cy);
+                for (int a = 0; a < 16; a++) {   // front half of the ring over the flames' base
+                    float ang = a * 0.3927f; int sx = cx + (int)(cosf(ang) * 12), sy = cy + (int)(sinf(ang) * 5);
+                    if (sinf(ang) <= 0) continue;
+                    gfx_fill(c, sx - 2, sy - 1, 4, 3, rgb(40, 38, 40)); gfx_fill(c, sx - 1, sy - 1, 3, 2, a & 1 ? rgb(150, 146, 138) : rgb(122, 118, 112)); gfx_pset(c, sx - 1, sy - 1, rgb(186, 182, 172));
+                }
+                for (int k = 0; k < 5; k++) { float t = fmodf(G.uiTime * 0.7f + k * 0.2f, 1.0f); gfx_pset(c, cx + (int)(sinf(t * 9 + k * 1.7f) * 4), cy - 14 - (int)(t * 18), t < 0.5f ? rgb(255, 214, 100) : rgb(236, 120, 40)); }
                 break;
             }
             case PR_RADIO: gfx_blit(c, g_spr[S_RADIO], x, y); if ((int)(G.uiTime * 2) & 1) gfx_pset(c, x + 12, y + 4, rgb(255, 80, 60)); break;
             case PR_WORKBENCH: gfx_blit(c, g_spr[S_WORKBENCH], x, y); break;
-            case PR_LAMP: gfx_blit(c, g_spr[S_LAMP], x, y - 4); break;
+            case PR_LAMP: {   // tall iron lamp post with a boxed lantern (Try 2)
+                int lx = x + 7;
+                gfx_fill(c, lx - 3, y + 12, 7, 3, rgb(30, 30, 34)); gfx_fill(c, lx - 2, y + 11, 5, 1, rgb(60, 60, 66));
+                gfx_fill(c, lx - 1, y - 12, 3, 24, rgb(26, 26, 30)); gfx_fill(c, lx, y - 12, 1, 24, rgb(70, 70, 78));
+                gfx_fill(c, lx - 4, y - 22, 9, 11, rgb(26, 26, 30)); gfx_fill(c, lx - 3, y - 21, 7, 8, rgb(255, 206, 100)); gfx_fill(c, lx - 2, y - 20, 2, 3, rgb(255, 244, 196));
+                gfx_fill(c, lx, y - 21, 1, 8, rgb(40, 36, 34)); gfx_fill(c, lx - 3, y - 17, 7, 1, rgb(40, 36, 34));   // lantern frame + panes
+                gfx_fill(c, lx - 5, y - 24, 11, 2, rgb(40, 40, 46)); gfx_pset(c, lx, y - 25, rgb(40, 40, 46));
+                break;
+            }
             case PR_GENERATOR: if (G.st.generator) gfx_blit(c, g_spr[S_GENPROP0 + ((int)(G.uiTime * 14) & 1)], x, y); break;
             case PR_PLOT: {
                 int b = p.special, lv = G.st.bLevel[b] > 3 ? 3 : G.st.bLevel[b];
@@ -394,7 +431,8 @@ void render_world(Canvas& c, float alpha) {
     // ---- lighting: 8x8 cells, each blended toward its neighbours to soften tile edges
     float day = daylight();
     // warm dusty grade by day, amber at dusk, deep blue at night
-    px tint = day > 0.6f ? rgb(30, 22, 14) : (day > 0.15f ? rgb(44, 22, 14) : rgb(6, 10, 26));
+    px tint = G.scene == SC_SETTLEMENT ? (day > 0.15f ? rgb(46, 30, 44) : rgb(14, 16, 40))   // settlement: violet dusk shadows keep the warm lights popping
+                                       : (day > 0.6f ? rgb(30, 22, 14) : (day > 0.15f ? rgb(44, 22, 14) : rgb(6, 10, 26)));
     for (int ty = ty0; ty <= ty1; ty++) for (int tx = tx0; tx <= tx1; tx++) {
         if (!m.in(tx, ty)) continue;
         int L = G.light[m.idx(tx, ty)];
@@ -406,7 +444,7 @@ void render_world(Canvas& c, float alpha) {
             int x0 = tx * 16 + ox * 8 - camX, y0 = ty * 16 + oy * 8 - camY;
             // vignette: darken toward the screen edges (folded into the same pass)
             int VW = view_w(), VH = view_h(); float vx = (x0 + 4 - VW / 2) / (float)(VW / 2), vy = (y0 + 4 - VH / 2) / (float)(VH / 2);
-            v = v * (256 - (int)(70 * (vx * vx + vy * vy))) >> 8;
+            v = v * (256 - (int)((G.scene == SC_SETTLEMENT ? 110 : 70) * (vx * vx + vy * vy))) >> 8;
             if (v >= 250) continue;
             for (int y = y0; y < y0 + 8; y++) {
                 if (y < 0 || y >= c.h) continue;
@@ -415,10 +453,53 @@ void render_world(Canvas& c, float alpha) {
             }
         }
     }
+    // golden hour over the settlement (Try 2 evening): warm, saturated, a touch brighter
+    if (G.scene == SC_SETTLEMENT) {
+        int amt = 0;
+        for (int i = 0; i < c.w * c.h; i++) {   // saturation boost (+30%) then a light warm wash
+            px v = c.p[i]; int r = ((v >> 11) & 31) << 3, g = ((v >> 5) & 63) << 2, b = (v & 31) << 3, l = (r * 3 + g * 6 + b) / 10;
+            r = l + (r - l) * 23 / 20; g = l + (g - l) * 23 / 20; b = l + (b - l) * 23 / 20;
+            r = r < 0 ? 0 : (r > 255 ? 255 : r); g = g < 0 ? 0 : (g > 255 ? 255 : g); b = b < 0 ? 0 : (b > 255 ? 255 : b);
+            c.p[i] = amt > 0 ? gfx_mix(rgb(r, g, b), rgb(255, 172, 92), amt) : rgb(r, g, b);
+        }
+    }
     // ---- post-light overlays (stay readable at night)
-    if (G.scene == SC_SETTLEMENT && day < 0.65f) {
+    if (day < 0.97f) {
+        // warm light pools around fires, lamps and torches (Try 2 dusk): per-pixel radial blend
+        float dk = fminf(1.0f, (1.0f - day) / 0.45f);   // lights are at full strength well before full dark
+        auto pool = [&](int cx, int cy, int rx, int ry, px col, int amax) {
+            for (int dy = -ry; dy <= ry; dy++) {
+                int yy = cy + dy; if (yy < 0 || yy >= c.h) continue;
+                for (int dx = -rx; dx <= rx; dx++) {
+                    int xx = cx + dx; if (xx < 0 || xx >= c.w) continue;
+                    float d = (float)(dx * dx) / (rx * rx) + (float)(dy * dy) / (ry * ry); if (d >= 1) continue;
+                    px& p = c.p[yy * c.w + xx]; p = gfx_mix(p, col, (int)(amax * (1 - d) * (1 - d)));
+                }
+            }
+        };
+        float flick = 0.9f + 0.1f * sinf(G.uiTime * 13) * sinf(G.uiTime * 7.3f);
+        for (int k = 0; k < m.nprop; k++) {
+            const Prop& p = m.prop[k];
+            int x = p.tx * 16 - camX, y = p.ty * 16 - camY;
+            if (x < -60 || y < -60 || x > c.w + 60 || y > c.h + 60) continue;
+            if (p.type == PR_FIRE) {
+                pool(x + 8, y + 10, 70, 40, rgb(255, 140, 50), (int)(170 * dk * flick));
+                drawFlames(c, x + 8, y + 12);   // flames stay the brightest thing on screen
+            } else if (p.type == PR_LAMP) {
+                pool(x + 7, y + 4, 36, 20, rgb(255, 180, 80), (int)(140 * dk));
+                pool(x + 7, y - 17, 9, 9, rgb(255, 210, 120), (int)(160 * dk));
+                gfx_fill(c, x + 4, y - 21, 3, 3, rgb(255, 230, 150)); gfx_fill(c, x + 8, y - 21, 3, 3, rgb(255, 214, 110)); gfx_fill(c, x + 4, y - 16, 3, 3, rgb(255, 214, 110)); gfx_fill(c, x + 8, y - 16, 3, 3, rgb(255, 200, 100));
+            } else if (p.type == PR_TENT) {
+                pool(x + 16, y + 6, 26, 12, rgb(255, 160, 70), (int)(90 * dk));
+                gfx_fillA(c, x - 7 + 17, y - 24 + 26, 12, 11, rgb(240, 172, 76), (int)(110 * dk)); gfx_fillA(c, x - 7 + 19, y - 24 + 27, 8, 4, rgb(255, 220, 130), (int)(160 * dk));
+            } else if (p.type == PR_TORCH) {
+                pool(x + 8, y + 6, 22, 13, rgb(255, 150, 60), (int)(120 * dk * flick));
+            }
+        }
+    }
+    if (G.scene == SC_SETTLEMENT && day < 0.95f) {
         // windows stay lit through the dark: re-light the panes and bloom a warm halo
-        float dk = (0.65f - day) / 0.65f;
+        float dk = fminf(1.0f, (1.0f - day) / 0.45f);
         for (int k = 0; k < m.nprop; k++) {
             const Prop& p = m.prop[k];
             if (p.type != PR_PLOT || !G.st.bLevel[p.special]) continue;

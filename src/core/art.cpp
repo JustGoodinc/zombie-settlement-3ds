@@ -19,6 +19,9 @@ static Sprite zombPose[ZOMB_VARIANTS][5][P_COUNT];
 
 #define ROWS(name, ...) static const char* const name[] = {__VA_ARGS__}
 #define PARSE(name) spr_parse(name, (int)(sizeof(name) / sizeof(name[0])))
+static void hline(Sprite& s, int x0, int x1, int y, px c);
+static void dline(Sprite& s, int x0, int y0, int x1, int y1, px c);
+static void outlineAll(Sprite& s);
 
 // ---------------------------------------------------------------- characters (16x24 chibi, Try 2 style)
 // Built from hand-drawn parts so every animation frame is drawn, not smeared:
@@ -311,8 +314,10 @@ static void buildTiles() {
         Sprite ln = tileNoise(rgb(54, 54, 58), 14, sd + 2);
         for (int y = 0; y < 16; y++) if (hash32(y + v * 7) % 7) { spr_set(ln, 7, y, rgb(196, 170, 70)); spr_set(ln, 8, y, rgb(170, 146, 60)); }
         g_tile[TA_LINE][v] = ln;
-        Sprite dt = tileNoise(rgb(92, 72, 52), 20, sd + 3);
-        for (int i = 0; i < 3; i++) spr_set(dt, r.range(16), r.range(16), rgb(120, 110, 96));
+        Sprite dt = tileNoise(rgb(134, 98, 68), 12, sd + 3);   // warm packed dirt (Try 2)
+        for (int i = 0; i < 3; i++) { int x = r.range(13), y = r.range(13); spr_rect(dt, x, y, 3, 2, rgb(102, 78, 54)); }        // worn patches
+        for (int i = 0; i < 2; i++) { int x = 1 + r.range(13), y = 1 + r.range(13); spr_set(dt, x, y, rgb(168, 154, 132)); spr_set(dt, x, y + 1, rgb(80, 62, 44)); }   // pebbles
+        if (v == 2) { spr_set(dt, 4, 11, rgb(96, 130, 60)); spr_set(dt, 5, 10, rgb(110, 150, 66)); spr_set(dt, 6, 11, rgb(96, 130, 60)); }   // a stray tuft
         g_tile[TA_DIRT][v] = dt;
         // police lino checker with grout and grime
         Sprite t = spr_new(16, 16);
@@ -383,13 +388,17 @@ static void buildTiles() {
         for (int y = 1; y < 16; y += 5) for (int x = 2 + (v & 1); x < 15; x += 3) { spr_set(gd, x, y, rgb(90, 150, 60)); spr_set(gd, x, y - 1 < 0 ? 0 : y - 1, rgb(110, 170, 70)); }
         g_tile[TA_GARDEN][v] = gd;
         Sprite pl = spr_new(16, 16);
+        // weathered grey picket boards (Try 2): dark gaps, uneven pointed tops, two rails, lit left edges
         for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) {
-            int log = x / 4; px b = (log & 1) ? rgb(104, 76, 48) : rgb(92, 66, 42);
-            if ((x & 3) == 3) b = rgb(54, 38, 26);
-            if (y < 3 && ((x & 3) == 0 || (x & 3) == 3) && y < 2) b = KEYC;  // sharpened tops
-            pl.d[y * 16 + x] = b == KEYC ? rgb(70, 84, 44) : noisy(b, hash32(sd * 19 + y * 16 + x), 10);
+            int board = x / 4, bx = x & 3, top = (int)(hash32(sd * 7 + v * 5 + board) % 3);
+            px b = (board & 1) ? rgb(74, 76, 84) : rgb(86, 88, 96);
+            if (bx == 0) b = rgb(116, 118, 128);
+            if (bx == 3) b = rgb(30, 30, 36);
+            if (y < top || (y == top && (bx == 0 || bx == 3))) b = KEYC;
+            else if (y == top || (y == top + 1 && bx == 1)) b = rgb(132, 134, 142);
+            pl.d[y * 16 + x] = b == KEYC ? rgb(64, 78, 42) : noisy(b, hash32(sd * 19 + y * 16 + x), 8);
         }
-        for (int x = 0; x < 16; x++) spr_set(pl, x, 9, rgb(60, 44, 30));
+        for (int x = 0; x < 16; x++) { if ((x & 3) != 3) { spr_set(pl, x, 6, rgb(56, 56, 62)); spr_set(pl, x, 12, rgb(56, 56, 62)); spr_set(pl, x, 5, rgb(100, 102, 110)); } }
         g_tile[TA_PALISADE][v] = pl;
     }
     for (int v = 0; v < 4; v++) {
@@ -576,19 +585,31 @@ static void buildProps() {
     {   Sprite s = spr_new(16, 16);  // bedroll
         spr_rect(s, 1, 4, 14, 9, pal_char('k')); spr_rect(s, 2, 5, 12, 7, rgb(84, 92, 60)); spr_rect(s, 2, 5, 3, 7, rgb(170, 160, 130));
         g_spr[S_BEDROLL] = s; }
-    {   // canvas ridge tent seen from above (32x24): two sloped panels, dark opening, patches
-        Sprite s = spr_new(32, 24);
-        px k = pal_char('k'), lit = rgb(128, 136, 80), dk = rgb(86, 94, 54), seam = rgb(64, 70, 40);
-        for (int y = 2; y < 21; y++) {
-            int inset = y < 6 ? 6 - y : 0;
-            for (int x = 2 + inset; x < 30 - inset; x++) spr_set(s, x, y, y < 11 ? lit : dk);
-            spr_set(s, 1 + inset, y, k); spr_set(s, 30 - inset, y, k);
+    {   // Try 2 army tent (46x40): big canvas roof with panel seams, darker front wall, warm lit doorway with crates
+        Sprite in = spr_new(44, 38);
+        px roof = rgb(112, 146, 82), roofD = rgb(84, 114, 60), wall = rgb(72, 100, 54), wallD = rgb(56, 80, 42);
+        for (int y = 0; y < 22; y++) {
+            int inset = (21 - y) / 4;
+            for (int x = inset; x < 44 - inset; x++) {
+                px c = noisy(y < 3 ? gfx_mix(roof, rgb(255, 255, 255), 40) : roof, hash32(x * 31 + y * 7 + 5), 8);
+                if ((x - inset) % 9 == 0) c = roofD;                       // panel seams
+                if (y == 21) c = roofD;
+                spr_set(in, x, y, c);
+            }
         }
-        for (int x = 2; x < 30; x++) { spr_set(s, x, 11, seam); spr_set(s, x, 21, k); }
-        for (int x = 6; x < 26; x++) spr_set(s, x, 1, k);
-        for (int y = 3; y < 21; y += 4) for (int x = 6; x < 26; x += 6) spr_set(s, x, y, y < 11 ? rgb(146, 152, 92) : seam);
-        spr_rect(s, 13, 14, 6, 7, rgb(30, 28, 22)); spr_rect(s, 14, 13, 4, 1, rgb(30, 28, 22));
-        spr_set(s, 0, 22, rgb(150, 140, 110)); spr_set(s, 1, 21, rgb(150, 140, 110)); spr_set(s, 31, 22, rgb(150, 140, 110)); spr_set(s, 30, 21, rgb(150, 140, 110));
+        for (int k = 0; k < 3; k++) { int px0 = 6 + k * 13, py0 = 6 + (k & 1) * 6; spr_rect(in, px0, py0, 5, 4, rgb(124, 132, 92)); }   // patches
+        for (int y = 22; y < 37; y++) for (int x = 1; x < 43; x++) spr_set(in, x, y, noisy((x % 7 == 0) ? wallD : wall, hash32(x * 13 + y), 8));
+        // doorway: rolled-up flaps, warm lantern light, crates inside
+        spr_rect(in, 15, 24, 14, 13, rgb(34, 26, 20));
+        spr_rect(in, 16, 25, 12, 12, rgb(232, 164, 70)); spr_rect(in, 18, 26, 8, 4, rgb(252, 214, 120));
+        spr_rect(in, 17, 31, 6, 5, rgb(140, 98, 54)); hline(in, 17, 22, 33, rgb(100, 70, 40));
+        spr_rect(in, 23, 32, 4, 4, rgb(120, 84, 48));
+        spr_rect(in, 13, 23, 3, 5, roofD); spr_rect(in, 28, 23, 3, 5, roofD);
+        Sprite s = spr_new(46, 40);
+        for (int y = 0; y < in.h; y++) for (int x = 0; x < in.w; x++) { px v = spr_get(in, x, y); if (v != KEYC) spr_set(s, x + 1, y + 1, v); }
+        free(in.d);
+        outlineAll(s);
+        dline(s, 0, 39, 3, 24, rgb(170, 160, 120)); dline(s, 45, 39, 42, 24, rgb(170, 160, 120));   // guy ropes
         g_spr[S_TENT] = s;
     }
     {   // rusty oil drum
@@ -816,13 +837,13 @@ static void bldQuarters(Sprite& s, BldFx& fx, int lv, int W, int H) {
 }
 
 static void bldTower(Sprite& s, BldFx& fx, int lv, int W, int H) {
-    int cabTop = 6, cabBot = 26, deck = cabBot + 1;
+    int cabTop = 7, cabBot = 33, deck = cabBot + 1;
     px wood = rgb(124, 88, 56), woodD = rgb(86, 60, 38), woodL = rgb(156, 116, 76);
     // legs (back pair darker), braces, ladder
     texRect(s, 9, deck, 3, H - deck - 1, woodD, 10, 1); texRect(s, W - 12, deck, 3, H - deck - 1, woodD, 10, 2);
     texRect(s, 4, deck, 4, H - deck, wood, 10, 3); texRect(s, W - 8, deck, 4, H - deck, wood, 10, 4);
-    for (int k = 0; k < 2; k++) {
-        int y0 = deck + 3 + k * (H - deck) / 2, y1 = y0 + (H - deck) / 2 - 4;
+    for (int k = 0; k < 1; k++) {
+        int y0 = deck + 3, y1 = H - 4; (void)k;   // one heavy X brace
         dline(s, 7, y0, W - 8, y1, woodL); dline(s, W - 8, y0, 7, y1, woodL);
     }
     vline(s, W / 2 - 3, deck, H - 1, woodD); vline(s, W / 2 + 2, deck, H - 1, woodD);
@@ -831,7 +852,7 @@ static void bldTower(Sprite& s, BldFx& fx, int lv, int W, int H) {
     texRect(s, 1, deck - 1, W - 2, 4, woodL, 10, 5); hline(s, 1, W - 2, deck + 2, woodD);
     texRect(s, 4, cabTop + 6, W - 8, cabBot - cabTop - 6, wood, 10, 6);
     for (int x = 6; x < W - 4; x += 4) vline(s, x, cabTop + 6, cabBot - 1, woodD);
-    litWindow(s, fx, 7, cabTop + 9, 10, 8); litWindow(s, fx, W - 17, cabTop + 9, 10, 8);
+    litWindow(s, fx, 5, cabTop + 8, 13, 12); litWindow(s, fx, W - 18, cabTop + 8, 13, 12);
     roofTrap(s, 0, cabTop - 4, W, 10, 5, rgb(92, 66, 44), rgb(60, 42, 28), 2, 9);
     if (lv >= 2) {   // railing + sandbags at the base
         for (int x = 2; x < W - 2; x += 5) vline(s, x, deck - 5, deck - 1, woodL);
@@ -934,7 +955,7 @@ static void buildBuildings() {
         {{48, 48}, {50, 26}, {50, 46}, {60, 46}},   // storage containers
         {{48, 48}, {48, 50}, {54, 52}, {58, 54}},   // greenhouse + cookhouse
         {{48, 48}, {50, 52}, {60, 62}, {62, 66}},   // living quarters house
-        {{48, 48}, {36, 70}, {40, 78}, {42, 86}},   // watchtower
+        {{48, 48}, {42, 64}, {44, 68}, {46, 72}},   // watchtower: plank cabin on stout legs
     };
     for (int b = 0; b < BLD_TYPES; b++) for (int lv = 0; lv < BLD_LEVELS; lv++) {
         BldFx& fx = g_bldFx[b][lv]; fx = BldFx{}; fx.smokeX = fx.flagX = -1;
