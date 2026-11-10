@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased — settlement performance
+## Unreleased — settlement performance, C material menus
 - The settlement renders 56% faster (0.64 -> 0.28 ms/frame on the PC benchmark; the police station 0.27 -> 0.19), aimed at a steady 30 fps on 3DS: no integer divisions in the sprite blitter (the 3DS CPU has no hardware divide), a packed one-multiply 565 blend for lighting and overlays, the settlement colour grade through a lookup table, static lights baked per tile, the player's line of sight cached per tile, and light pools from cached falloff masks. Visual output is unchanged.
 - `zs_tool --bench-base` benchmarks the settlement (day / dusk / night) with a per-stage breakdown.
+- Bottom-screen menus use the v3 "C" material kit everywhere: charcoal woven cloth with a stitched hem and a stitched seam above the prompt footer, leather corner patches with brass rivets, stitched cloth side rails, muted wood action buttons, flat charcoal disabled buttons, olive-gold active choices, and gold corner brackets on the focused button so focus reads by shape as well as colour. Panels are flat dark data fields with a slate title strip. The empty backpack info box shows a small canvas strap in its spare margin. Layout, touch targets and navigation are unchanged; the UI greys sit exactly on RGB565 levels so they stay neutral on 3DS.
+- Marcus and Javier wear the red cap badge in the world as well as in their portraits (character lock v3).
 
 ## v0.2.1 — roomier settlement, bigger loot screen
 - Settlement compound is wider and taller, with at least four tiles of open ground between buildings.

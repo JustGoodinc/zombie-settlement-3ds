@@ -148,7 +148,7 @@ static void railEnd() { if (inv.railFocus) { inv.railFocus = 0; inv.onRail = fal
 enum { RW = 58, RLX = 2, RRX = BOT_W - RW - 2, CX = RLX + RW + 3, CW = RRX - CX - 3, RTOP = 2, RH = 220 };
 static bool railBtn(Canvas& c, int x, int y, int w, int h, int icon, const char* label, int style = 0, uint32_t glyph = 0, bool enabled = true) {
     bool pressedNow = g_ui.pressed == g_ui.count && g_ui.in.touching;
-    bool act = ui_button(c, x, y, w, h, "", style, enabled);
+    bool act = ui_button(c, x, y, w, h, "", style | UB_RAIL, enabled);
     int yo = pressedNow ? 1 : 0, cy = y + h / 2 + yo;
     px tc = enabled ? ((style & UB_SELECTED) ? rgb(255, 240, 200) : pal::cream) : pal::grey;
     bool big = icon >= 0 && h >= 34;
@@ -251,7 +251,8 @@ static void invInfo(Canvas& c, Survivor& s, int x, int y, int w, int h, int idx)
     if (idx < 0 || idx >= s.pack.n) {
         char b[48]; snprintf(b, sizeof b, "%s  HP %d/%d", s.name, (int)s.hp, s.maxHp); gfx_text(c, x + 5, y + 5, b, pal::cream);
         snprintf(b, sizeof b, "Bag %dx%d  %d items", s.pack.w, s.pack.h, s.pack.n); gfx_text(c, x + 5, y + 16, b, pal::dim);
-        gfx_wrap(c, x + 5, y + 30, w - 10, "Tap or drag items. D-Pad / Circle Pad moves the cursor; push past the bag's edge to reach the side buttons.", pal::dim);
+        int ln = gfx_wrap(c, x + 5, y + 30, w - 10, "Tap or drag items. D-Pad / Circle Pad moves the cursor; push past the bag's edge to reach the side buttons.", pal::dim);
+        if (y + h - (y + 30 + ln * 10) >= 18) ui_strap(c, x + 2, y + h - 16, w - 4);   // canvas strap in the spare margin only
         return;
     }
     Item& it = s.pack.it[idx]; const ItemDef& d = idef(it.id);
@@ -1466,6 +1467,7 @@ void ui_render(Canvas& bot) {
     default: ui_open(G.scene == SC_TITLE ? PN_MAIN : PN_HUD); break;
     }
     bot.ox = 0;
+    ui_frame(bot);
     if (confirmBox.active) {
         // modal: only the dialog's own widgets are focusable
         g_ui.count = 0; g_ui.in = in; g_ui.consumed = false;

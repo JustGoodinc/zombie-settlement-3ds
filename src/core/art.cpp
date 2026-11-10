@@ -214,6 +214,11 @@ static void buildCharacters() {
             const CharPal& cp = z ? ZOMB_PAL[v] : SURV_PAL[v];
             int view = VIEW[d], fdx = FD[d], t = TURN[d], zd = z ? 1 : 0;   // zombies hunch: head + torso one row lower
             Sprite head = parseHead(HD[view], view, cp.style);
+            if (!z && (v == 0 || v == 3) && cp.style == 1 && view < 2) {   // red cap badge (character lock v3: S0 Marcus, S3 Javier), matches the portraits
+                int bx = view == 0 ? 7 : 10;
+                spr_set(head, bx, 4, rgb(240, 190, 180)); spr_set(head, bx + 1, 4, rgb(196, 50, 44));
+                spr_set(head, bx, 5, rgb(196, 50, 44)); spr_set(head, bx + 1, 5, rgb(140, 32, 30));
+            }
             int idle = (z && view == 1) ? A_ZOMBIE : A_IDLE;   // zombies reach forward in profile, arms hang when facing the camera
             Sprite raw[P_COUNT]; int drop[P_COUNT];
             struct Def { int p, arm, leg, drop, lean, turn; };
