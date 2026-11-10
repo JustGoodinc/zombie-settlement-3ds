@@ -476,22 +476,22 @@ static void panelContainer(Canvas& c) {
         if (ui_button(c, CX + CW - 62, 51, 28, 13, "<", 0, page > 0)) page--;
         if (ui_button(c, CX + CW - 32, 51, 28, 13, ">", 0, (page + 1) * PER < ct->cap)) page++;
     }
-    // compact backpack (12 px cells)
-    int cell = 12, top = paged ? 72 : 60;
-    char bb[40]; snprintf(bb, sizeof bb, "%s  Bag %dx%d", s.name, s.pack.w, s.pack.h); gfx_text(c, CX + 2, top, bb, pal::dim);
-    int gx = CX + (CW - s.pack.w * cell) / 2, gy = top + 12;
+    // backpack: as big as the space below the loot allows (same 24 px cells as the backpack screen when it fits)
+    int top = paged ? 72 : 60, gy = top + 12, availW = CW - 6, availH = 222 - gy;
+    int cell = 24;
+    if (cell > availW / s.pack.w) cell = availW / s.pack.w;
+    if (cell > availH / s.pack.h) cell = availH / s.pack.h;
+    int gx = CX + (CW - s.pack.w * cell) / 2;
+    gy += (availH - s.pack.h * cell) / 2;
     int prevSel = inv.sel;
     drawGrid(c, s, gx, gy, cell, true);
     gridInteract(c, s, gx, gy, cell);
     if (inv.sel != prevSel && inv.sel >= 0) sel2 = 1;
     bool fromCont = sel2 == 0 && sel < ct->n;
     const Item* shown = fromCont ? &ct->it[sel] : (inv.sel >= 0 && inv.sel < s.pack.n ? &s.pack.it[inv.sel] : nullptr);
-    int iy = gy + s.pack.h * cell + 6;
-    ui_panel(c, CX, iy, CW, 222 - iy);
-    if (shown) {
-        gfx_textB(c, CX + 5, iy + 4, idef(shown->id).name, pal::cream);
-        gfx_wrap(c, CX + 5, iy + 15, CW - 10, idef(shown->id).desc, pal::dim);
-    } else gfx_wrap(c, CX + 5, iy + 5, CW - 10, "Pick loot above, or an item in your bag to leave here.", pal::dim);
+    // one label line: the selected item's name, otherwise whose bag this is
+    if (shown) gfx_textB(c, CX + 2, top, idef(shown->id).name, pal::cream);
+    else { char bb[40]; snprintf(bb, sizeof bb, "%s  Bag %dx%d", s.name, s.pack.w, s.pack.h); gfx_text(c, CX + 2, top, bb, pal::dim); }
     auto takeOne = [&](int i) -> bool {
         Item it = ct->it[i];
         int left = s.pack.add(it);
