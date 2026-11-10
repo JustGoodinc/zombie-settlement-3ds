@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — settlement performance
+- The settlement renders 56% faster (0.64 -> 0.28 ms/frame on the PC benchmark; the police station 0.27 -> 0.19), aimed at a steady 30 fps on 3DS: no integer divisions in the sprite blitter (the 3DS CPU has no hardware divide), a packed one-multiply 565 blend for lighting and overlays, the settlement colour grade through a lookup table, static lights baked per tile, the player's line of sight cached per tile, and light pools from cached falloff masks. Visual output is unchanged.
+- `zs_tool --bench-base` benchmarks the settlement (day / dusk / night) with a per-stage breakdown.
+
 ## v0.2.1 — roomier settlement, bigger loot screen
 - Settlement compound is wider and taller, with at least four tiles of open ground between buildings.
 - Container / stash screen: the "Pick loot above" text box is gone; the backpack grid now uses the full space below the loot slots at the same 24 px cells as the backpack screen. The selected item's name shows on the line above the grid.

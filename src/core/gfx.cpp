@@ -31,14 +31,14 @@ void gfx_fillA(Canvas& c, int x, int y, int w, int h, px col, int a) {
     x += c.ox; y += c.oy;
     int x0 = x < c.cx0 ? c.cx0 : x, y0 = y < c.cy0 ? c.cy0 : y;
     int x1 = x + w > c.cx1 ? c.cx1 : x + w, y1 = y + h > c.cy1 ? c.cy1 : y + h;
-    for (int j = y0; j < y1; j++) { px* r = c.p + j * c.w; for (int i = x0; i < x1; i++) r[i] = gfx_mix(r[i], col, a); }
+    for (int j = y0; j < y1; j++) { px* r = c.p + j * c.w; for (int i = x0; i < x1; i++) r[i] = gfx_mixf(r[i], col, a); }
 }
 void gfx_shade(Canvas& c, int x, int y, int w, int h, int lvl) {
     if (lvl >= 256) return;
     x += c.ox; y += c.oy;
     int x0 = x < c.cx0 ? c.cx0 : x, y0 = y < c.cy0 ? c.cy0 : y;
     int x1 = x + w > c.cx1 ? c.cx1 : x + w, y1 = y + h > c.cy1 ? c.cy1 : y + h;
-    for (int j = y0; j < y1; j++) { px* r = c.p + j * c.w; for (int i = x0; i < x1; i++) r[i] = gfx_scale(r[i], lvl); }
+    for (int j = y0; j < y1; j++) { px* r = c.p + j * c.w; for (int i = x0; i < x1; i++) r[i] = gfx_mixf(r[i], 0, 256 - lvl); }
 }
 void gfx_pset(Canvas& c, int x, int y, px col) {
     x += c.ox; y += c.oy;
@@ -69,14 +69,27 @@ void gfx_blit(Canvas& c, const Sprite& s, int x, int y, int sc, bool flip) {
     if (!s.d) return;
     x += c.ox; y += c.oy;
     if (x >= c.cx1 || y >= c.cy1 || x + s.w * sc <= c.cx0 || y + s.h * sc <= c.cy0) return;
-    for (int j = 0; j < s.h * sc; j++) {
-        int py = y + j; if (py < c.cy0 || py >= c.cy1) continue;
-        const px* row = s.d + (j / sc) * s.w; px* dst = c.p + py * c.w;
-        for (int i = 0; i < s.w * sc; i++) {
-            int pxx = x + i; if (pxx < c.cx0 || pxx >= c.cx1) continue;
-            int sx = i / sc; px v = row[flip ? s.w - 1 - sx : sx];
-            if (v != KEYC) dst[pxx] = v;
+    // clip once up front; no per-pixel bounds checks and no divisions (the 3DS ARM11 has no hardware divide)
+    int x0 = x < c.cx0 ? c.cx0 : x, x1 = x + s.w * sc > c.cx1 ? c.cx1 : x + s.w * sc;
+    int y0 = y < c.cy0 ? c.cy0 : y, y1 = y + s.h * sc > c.cy1 ? c.cy1 : y + s.h * sc;
+    if (sc == 1) {   // the common case: tiles, props, icons
+        for (int py = y0; py < y1; py++) {
+            const px* row = s.d + (py - y) * s.w; px* dst = c.p + py * c.w;
+            if (!flip) { const px* src = row + (x0 - x); for (int px_ = x0; px_ < x1; px_++, src++) { px v = *src; if (v != KEYC) dst[px_] = v; } }
+            else { const px* src = row + (s.w - 1 - (x0 - x)); for (int px_ = x0; px_ < x1; px_++, src--) { px v = *src; if (v != KEYC) dst[px_] = v; } }
         }
+        return;
+    }
+    int sy = (y0 - y) / sc, ry = (y0 - y) % sc;
+    for (int py = y0; py < y1; py++) {
+        const px* row = s.d + sy * s.w; px* dst = c.p + py * c.w;
+        int sx = (x0 - x) / sc, rx = (x0 - x) % sc;
+        for (int px_ = x0; px_ < x1; px_++) {
+            px v = row[flip ? s.w - 1 - sx : sx];
+            if (v != KEYC) dst[px_] = v;
+            if (++rx == sc) { rx = 0; sx++; }
+        }
+        if (++ry == sc) { ry = 0; sy++; }
     }
 }
 void gfx_blitEx(Canvas& c, const Sprite& s, int x, int y, bool flip, int shade, px flash, int fa) {

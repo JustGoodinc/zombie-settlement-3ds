@@ -33,6 +33,13 @@ constexpr px olive = rgb(106, 122, 58), brown = rgb(122, 90, 58), tan = rgb(180,
 }
 
 px gfx_mix(px a, px b, int t);       // t 0..256 (0 = a)
+// fast blend for per-pixel hot loops (lighting, overlays): all three channels in one 32-bit multiply, 32 levels
+inline px gfx_mixf(px a, px b, int t) {
+    unsigned t5 = (unsigned)(t + 4) >> 3; if (t5 > 32) t5 = 32;
+    unsigned xa = (a | ((unsigned)a << 16)) & 0x07E0F81Fu, xb = (b | ((unsigned)b << 16)) & 0x07E0F81Fu;
+    unsigned r = ((xa * (32 - t5) + xb * t5) >> 5) & 0x07E0F81Fu;
+    return (px)(r | (r >> 16));
+}
 px gfx_scale(px c, int lvl);          // lvl 0..256
 void gfx_clear(Canvas&, px c);
 void gfx_fill(Canvas&, int x, int y, int w, int h, px c);

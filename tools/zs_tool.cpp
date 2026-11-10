@@ -215,6 +215,37 @@ static void shots(const char* dir) {
 
 static double ms(std::chrono::steady_clock::time_point a, std::chrono::steady_clock::time_point b) { return std::chrono::duration<double, std::milli>(b - a).count(); }
 
+// settlement benchmark: every facility built, survivors walking about, at day / dusk / night, with a stage breakdown
+extern double (*g_profNow)(); extern double g_prof[8];
+static double nowMs() { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+static void benchBase() {
+    game_newGame(); G.set.tutorialDone = true; G.set.zoom = 200;
+    for (int b = 0; b < BLD_TYPES; b++) G.st.bLevel[b] = 3;
+    G.st.generator = true;
+    level_enter(MAP_SETTLEMENT, -1); ui_open(PN_HUD);
+    g_profNow = nowMs;
+    const struct { const char* n; float clock; } T[3] = {{"day", 11 * 60}, {"dusk", 18 * 60 + 40}, {"night", 23 * 60}};
+    static const char* STAGE[6] = {"light map", "tiles+sprites", "shading", "colour grade", "pools/windows", "zoom scale"};
+    for (auto& t : T) {
+        G.clock = t.clock; step(30);
+        for (double& p : g_prof) p = 0;
+        double simT = 0, renT = 0, worst = 0; int frames = 240;
+        for (int i = 0; i < frames; i++) {
+            Input in; in.ax = (i / 60) % 2 ? 1.0f : -1.0f;
+            auto a = std::chrono::steady_clock::now();
+            game_frame(in, DT);
+            auto b = std::chrono::steady_clock::now();
+            Canvas tc, bo; tc.init(topB, TOP_W, TOP_H); bo.init(botB, BOT_W, BOT_H);
+            game_render(tc, bo, g_renderAlpha);
+            auto c = std::chrono::steady_clock::now();
+            simT += ms(a, b); renT += ms(b, c); if (ms(a, c) > worst) worst = ms(a, c);
+        }
+        printf("settlement %-5s sim %.3f  render %.3f  worst %.3f ms |", t.n, simT / frames, renT / frames, worst);
+        for (int k = 0; k < 6; k++) printf(" %s %.3f", STAGE[k], g_prof[k] / frames);
+        printf("\n");
+    }
+    g_profNow = nullptr;
+}
 static void bench() {
     game_newGame();
     G.squad[0] = 0; G.squad[1] = 1; G.squad[2] = 4;
@@ -298,6 +329,7 @@ int main(int argc, char** argv) {
     if (argc >= 3 && !strcmp(argv[1], "--gallery")) gallery(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--shots")) shots(argv[2]);
     else if (argc >= 2 && !strcmp(argv[1], "--bench")) bench();
+    else if (argc >= 2 && !strcmp(argv[1], "--bench-base")) benchBase();
     else if (argc >= 3 && !strcmp(argv[1], "--icons")) icons(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--handoff")) handoff(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--lineup")) lineup(argv[2]);

@@ -2,6 +2,7 @@
 #include "../core/art.h"
 #include "../ui/ui.h"
 #include <math.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -26,30 +27,57 @@ void render_compute_light() {
     float fdx = flashDX / fl, fdy = flashDY / fl;
     int tx0 = camX / 16 - 1, ty0 = camY / 16 - 1, tx1 = (camX + view_w()) / 16 + 1, ty1 = (camY + view_h()) / 16 + 1;
     float t = G.uiTime;
+    // Static light sources never move: bake their reach per tile (with line of sight) when the map changes and
+    // every 2 s (doors opening). Per frame each tile then costs two lookups instead of a loop over every prop.
+    static uint8_t bakeSteady[Map::MAXW * Map::MAXH], bakeFlick[Map::MAXW * Map::MAXH];
+    static const Map* bakedMap = nullptr; static int bakedSig = -1; static uint32_t bakedTick = 0;
+    int sig = m.id * 7919 + m.nprop * 31 + m.w * 7 + m.h;
+    if (bakedMap != &m || bakedSig != sig || G.tick - bakedTick >= 60) {
+        bakedMap = &m; bakedSig = sig; bakedTick = G.tick;
+        memset(bakeSteady, 0, sizeof bakeSteady); memset(bakeFlick, 0, sizeof bakeFlick);
+        for (int k = 0; k < m.nprop; k++) {
+            const Prop& pr = m.prop[k];
+            if (pr.type != PR_LAMP && pr.type != PR_FIRE && pr.type != PR_TORCH) continue;
+            float r = pr.type == PR_FIRE ? 88.0f : (pr.type == PR_TORCH ? 56.0f : 72.0f);
+            float lx = pr.tx * 16 + 8.0f, ly = pr.ty * 16 + 8.0f; int rt = (int)(r / 16) + 1;
+            uint8_t* dst = pr.type == PR_LAMP ? bakeSteady : bakeFlick;
+            for (int y = pr.ty - rt; y <= pr.ty + rt; y++) for (int x = pr.tx - rt; x <= pr.tx + rt; x++) {
+                if (!m.in(x, y)) continue;
+                float cx = x * 16 + 8.0f, cy = y * 16 + 8.0f, ld = sqrtf((cx - lx) * (cx - lx) + (cy - ly) * (cy - ly));
+                if (ld > r || !map_los(m, lx, ly, cx, cy)) continue;
+                int v = (int)(200 * (1 - ld / r)); int i = m.idx(x, y);
+                if (v > dst[i]) dst[i] = (uint8_t)v;
+            }
+        }
+    }
+    // The player's line of sight only depends on which tile they stand on: cache it per player tile
+    // (refreshed twice a second for doors). Exact: map_los works on tile coordinates.
+    static uint8_t losC[Map::MAXW * Map::MAXH]; static int lpx = -1, lpy = -1, lx0 = 0, ly0 = 0, lx1 = -1, ly1 = -1; static uint32_t losTick = 0; static const Map* losMap = nullptr;
+    int ptx = (int)(p.x / 16), pty = (int)((p.y - 4) / 16);
+    if (ptx != lpx || pty != lpy || losMap != &m || tx0 < lx0 || ty0 < ly0 || tx1 > lx1 || ty1 > ly1 || G.tick - losTick >= 15) {
+        lpx = ptx; lpy = pty; losMap = &m; losTick = G.tick;
+        lx0 = tx0 - 4; ly0 = ty0 - 3; lx1 = tx1 + 4; ly1 = ty1 + 3;
+        for (int y = ly0; y <= ly1; y++) for (int x = lx0; x <= lx1; x++) if (m.in(x, y)) losC[m.idx(x, y)] = map_los(m, p.x, p.y - 4, x * 16 + 8.0f, y * 16 + 8.0f) ? 1 : 0;
+    }
+    float flick = 0.85f + 0.15f * sinf(t * 13) * sinf(t * 7.3f);
     for (int ty = ty0; ty <= ty1; ty++) for (int tx = tx0; tx <= tx1; tx++) {
         if (!m.in(tx, ty)) continue;
         int i = m.idx(tx, ty);
         bool indoor = (m.flags[i] & F_INDOOR) != 0;
         float L = indoor ? 70 + day * 104 : (G.scene == SC_SETTLEMENT ? 70 + day * 176 : 28 + day * 210);   // the settlement keeps a lantern-lit floor
-        float cx = tx * 16 + 8.0f, cy = ty * 16 + 8.0f, dx = cx - p.x, dy = cy - (p.y - 4), d = sqrtf(dx * dx + dy * dy);
-        bool los = d < 12 || map_los(m, p.x, p.y - 4, cx, cy);
-        if (los) {
+        float cx = tx * 16 + 8.0f, cy = ty * 16 + 8.0f, dx = cx - p.x, dy = cy - (p.y - 4), d2 = dx * dx + dy * dy;
+        bool los = d2 < 144 || losC[i];
+        if (los && d2 < 160 * 160) {
+            float d = sqrtf(d2);
             if (d < 36) L = fmaxf(L, 150 - d * 1.5f);                         // personal ambient light
-            if (G.flashAnim > 0.02f && d < 160 && d > 1) {
+            if (G.flashAnim > 0.02f && d > 1) {
                 float dot = (dx * fdx + dy * fdy) / d;
                 if (dot > 0.86f) L = fmaxf(L, (235 - d * 0.7f) * G.flashAnim * fminf(1, (dot - 0.86f) * 25));
             }
         }
-        // light sources: lamps, campfire (flicker), generator lamp
-        for (int k = 0; k < m.nprop; k++) {
-            const Prop& pr = m.prop[k];
-            if (pr.type != PR_LAMP && pr.type != PR_FIRE && pr.type != PR_TORCH) continue;
-            float lx = pr.tx * 16 + 8.0f, ly = pr.ty * 16 + 8.0f, ld = sqrtf((cx - lx) * (cx - lx) + (cy - ly) * (cy - ly));
-            float r = pr.type == PR_FIRE ? 88.0f : (pr.type == PR_TORCH ? 56.0f : 72.0f);
-            if (ld > r) continue;
-            float flick = pr.type != PR_LAMP ? 0.85f + 0.15f * sinf(t * 13 + k) * sinf(t * 7.3f) : ((int)(t * 6 + k * 3) % 23 == 0 ? 0.4f : 1.0f);
-            if (map_los(m, lx, ly, cx, cy)) L = fmaxf(L, 200 * (1 - ld / r) * flick + 30);
-        }
+        // baked light sources: lamps steady, fires and torches flicker
+        if (bakeSteady[i]) L = fmaxf(L, bakeSteady[i] + 30.0f);
+        if (bakeFlick[i]) L = fmaxf(L, bakeFlick[i] * flick + 30.0f);
         if (!los) L = fminf(L * 0.3f, 48);
         G.light[i] = (uint8_t)(L > 255 ? 255 : L);
         if (los && L >= 60) G.explored[i] = 1;
@@ -169,12 +197,17 @@ static void drawChar(Canvas& c, bool zombie, int variant, float x, float y, uint
 struct DrawItem { int16_t y; uint8_t kind; uint8_t idx; };
 enum { DK_PROP, DK_ZOMB, DK_UNIT, DK_NPC, DK_BAG };
 
+// optional stage profiler (zs_tool --bench sets the clock; zero cost otherwise)
+double (*g_profNow)() = nullptr; double g_prof[8];
+static double profT;
+static inline void profMark(int i) { if (!g_profNow) return; double t = g_profNow(); if (i >= 0) g_prof[i] += t - profT; profT = t; }
 void render_world(Canvas& c, float alpha) {
+    profMark(-1);
     Map& m = G.map;
     float sh = G.shake > 0 && G.set.shake ? G.shake : 0;
     camX = (int)G.camX + (sh > 0 ? (int)((hash32(G.tick * 7) % 3) - 1) * (int)ceilf(sh) : 0);
     camY = (int)G.camY + (sh > 0 ? (int)((hash32(G.tick * 13) % 3) - 1) * (int)ceilf(sh) : 0);
-    render_compute_light();
+    render_compute_light(); profMark(0);
     gfx_clear(c, pal::black);
     int tx0 = camX / 16, ty0 = camY / 16, tx1 = (camX + view_w()) / 16 + 1, ty1 = (camY + view_h()) / 16 + 1;
     int palX0 = 1 << 30, palX1 = -1, palY0 = 1 << 30, palY1 = -1;   // the compound's fence bounds (settlement only)
@@ -477,6 +510,7 @@ void render_world(Canvas& c, float alpha) {
         }
     }
 
+    profMark(1);   // tiles, props, characters, particles
     // ---- lighting: 8x8 cells, each blended toward its neighbours to soften tile edges
     float day = daylight();
     // warm dusty grade by day, amber at dusk, deep blue at night
@@ -499,32 +533,54 @@ void render_world(Canvas& c, float alpha) {
             for (int y = y0; y < y0 + 8; y++) {
                 if (y < 0 || y >= c.h) continue;
                 px* row = c.p + y * c.w;
-                for (int x = x0; x < x0 + 8; x++) if (x >= 0 && x < c.w) row[x] = gfx_mix(tint, row[x], v + 1);
+                for (int x = x0; x < x0 + 8; x++) if (x >= 0 && x < c.w) row[x] = gfx_mixf(tint, row[x], v + 1);
             }
         }
     }
-    // golden hour over the settlement (Try 2 evening): warm, saturated, a touch brighter
+    profMark(2);
+    // settlement colour grade (Try 2 evening): +15% saturation through a 64K lookup table built once,
+    // so the per-frame cost is one table read per pixel (it used to be ~20 ALU ops per pixel)
     if (G.scene == SC_SETTLEMENT) {
-        int amt = 0;
-        for (int i = 0; i < c.w * c.h; i++) {   // saturation boost (+30%) then a light warm wash
-            px v = c.p[i]; int r = ((v >> 11) & 31) << 3, g = ((v >> 5) & 63) << 2, b = (v & 31) << 3, l = (r * 3 + g * 6 + b) / 10;
-            r = l + (r - l) * 23 / 20; g = l + (g - l) * 23 / 20; b = l + (b - l) * 23 / 20;
-            r = r < 0 ? 0 : (r > 255 ? 255 : r); g = g < 0 ? 0 : (g > 255 ? 255 : g); b = b < 0 ? 0 : (b > 255 ? 255 : b);
-            c.p[i] = amt > 0 ? gfx_mix(rgb(r, g, b), rgb(255, 172, 92), amt) : rgb(r, g, b);
+        static px* lut = nullptr;
+        if (!lut) {
+            lut = (px*)malloc(sizeof(px) * 65536);
+            for (int v = 0; v < 65536; v++) {
+                int r = ((v >> 11) & 31) << 3, g = ((v >> 5) & 63) << 2, b = (v & 31) << 3, l = (r * 3 + g * 6 + b) / 10;
+                r = l + (r - l) * 23 / 20; g = l + (g - l) * 23 / 20; b = l + (b - l) * 23 / 20;
+                r = r < 0 ? 0 : (r > 255 ? 255 : r); g = g < 0 ? 0 : (g > 255 ? 255 : g); b = b < 0 ? 0 : (b > 255 ? 255 : b);
+                lut[v] = rgb(r, g, b);
+            }
         }
+        px* p = c.p; px* end = c.p + c.w * c.h;
+        while (p < end) { *p = lut[*p]; p++; }
     }
+    profMark(3);
     // ---- post-light overlays (stay readable at night)
     if (day < 0.97f) {
         // warm light pools around fires, lamps and torches (Try 2 dusk): per-pixel radial blend
         float dk = fminf(1.0f, (1.0f - day) / 0.45f);   // lights are at full strength well before full dark
+        // falloff masks ((1-d)^2, 0..255) cached per pool size, so each pixel is one integer multiply + blend
+        struct Mask { int rx, ry; uint8_t* w; };
+        static Mask masks[8]; static int nmask = 0;
+        auto maskFor = [&](int rx, int ry) -> const uint8_t* {
+            for (int k = 0; k < nmask; k++) if (masks[k].rx == rx && masks[k].ry == ry) return masks[k].w;
+            int W = 2 * rx + 1, H = 2 * ry + 1;
+            uint8_t* w = (uint8_t*)malloc(W * H);
+            for (int dy = -ry; dy <= ry; dy++) for (int dx = -rx; dx <= rx; dx++) {
+                float d = (float)(dx * dx) / (rx * rx) + (float)(dy * dy) / (ry * ry);
+                w[(dy + ry) * W + dx + rx] = d >= 1 ? 0 : (uint8_t)(255 * (1 - d) * (1 - d));
+            }
+            if (nmask < 8) masks[nmask++] = Mask{rx, ry, w};
+            return w;
+        };
         auto pool = [&](int cx, int cy, int rx, int ry, px col, int amax) {
-            for (int dy = -ry; dy <= ry; dy++) {
-                int yy = cy + dy; if (yy < 0 || yy >= c.h) continue;
-                for (int dx = -rx; dx <= rx; dx++) {
-                    int xx = cx + dx; if (xx < 0 || xx >= c.w) continue;
-                    float d = (float)(dx * dx) / (rx * rx) + (float)(dy * dy) / (ry * ry); if (d >= 1) continue;
-                    px& p = c.p[yy * c.w + xx]; p = gfx_mix(p, col, (int)(amax * (1 - d) * (1 - d)));
-                }
+            if (amax <= 0) return;
+            const uint8_t* w = maskFor(rx, ry); int W = 2 * rx + 1;
+            int y0 = cy - ry < 0 ? 0 : cy - ry, y1 = cy + ry >= c.h ? c.h - 1 : cy + ry;
+            int x0 = cx - rx < 0 ? 0 : cx - rx, x1 = cx + rx >= c.w ? c.w - 1 : cx + rx;
+            for (int yy = y0; yy <= y1; yy++) {
+                const uint8_t* wr = w + (yy - cy + ry) * W + (x0 - cx + rx); px* row = c.p + yy * c.w;
+                for (int xx = x0; xx <= x1; xx++, wr++) { int a = (*wr * amax) >> 8; if (a > 3) row[xx] = gfx_mixf(row[xx], col, a); }
             }
         };
         float flick = 0.9f + 0.1f * sinf(G.uiTime * 13) * sinf(G.uiTime * 7.3f);
@@ -593,6 +649,7 @@ void render_world(Canvas& c, float alpha) {
         gfx_outline(c, *s, p.tx * 16 - camX + ox, p.ty * 16 - camY + oy, col);
         if (!searched && !searching) gfx_outline(c, *s, p.tx * 16 - camX + ox, p.ty * 16 - camY + oy, (G.tick / 8) & 1 ? pal::lime : rgb(110, 170, 40));
     }
+    profMark(4);   // post-light overlays
 }
 
 // Text and prompts are drawn after the zoom scale-up, at native resolution, so they stay crisp.
@@ -754,6 +811,7 @@ void game_render(Canvas& top, Canvas& bot, float alpha) {
                 for (int x = 0; x < TOP_W; x++) dst[x] = src[xs[x]];
             }
         }
+        profMark(5);   // zoom scale-up
         render_overlay(top, z / 100.0f);
         tut_render(top);
         hud(top);
