@@ -124,9 +124,9 @@ static void gallery(const char* dir) {
     }
     // items at inventory scale (2x)
     {
-        int W = 6 * 92, H = 6 * 52; px* img = (px*)malloc(W * H * sizeof(px)); for (int i = 0; i < W * H; i++) img[i] = rgb(40, 40, 44);
+        int W = 6 * 124, H = 6 * 86; px* img = (px*)malloc(W * H * sizeof(px)); for (int i = 0; i < W * H; i++) img[i] = rgb(44, 48, 74);
         Canvas c; c.init(img, W, H);
-        for (int i = 1; i < IT_COUNT; i++) { int x = ((i - 1) % 6) * 92 + 4, y = ((i - 1) / 6) * 52 + 4; gfx_blit(c, g_item[i], x, y, 2); gfx_text(c, x, y + 40, idef(i).name, pal::cream); }
+        for (int i = 1; i < IT_COUNT; i++) { int x = ((i - 1) % 6) * 124 + 4, y = ((i - 1) / 6) * 86 + 4; gfx_blit(c, g_item[i], x, y, 2); gfx_text(c, x, y + 40 > y + g_item[i].h * 2 + 2 ? y + 40 : y + g_item[i].h * 2 + 2, idef(i).name, pal::cream); }
         char path[512]; snprintf(path, sizeof path, "%s/items.png", dir); gfx_writePNG(path, img, W, H); free(img);
     }
     // portraits + buildings
@@ -338,6 +338,9 @@ int main(int argc, char** argv) {
     else if (argc >= 3 && !strcmp(argv[1], "--base")) base(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--playtest")) playtest(argv[2], argc >= 4 ? atoi(argv[3]) : 30);
     else if (argc >= 3 && !strcmp(argv[1], "--mapshots")) mapShots(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "--settlement")) settlementShots(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "--combat")) combatShots(argv[2]);
+    else if (argc >= 2 && !strcmp(argv[1], "--bench-bake")) bakeBench();
     else { printf("usage: zs_tool --gallery DIR | --shots DIR | --bench | --icons DIR\n"); return 1; }
     return 0;
 }

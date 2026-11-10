@@ -55,9 +55,18 @@ void float_text(float x, float y, const char* s, px col) {
     f->x = x; f->y = y; f->life = 0.9f; f->col = col;
     snprintf(f->txt, sizeof f->txt, "%s", s);
 }
-static void add_decal(float x, float y, int kind) {
-    if (G.ndecal >= 64) { memmove(G.decal, G.decal + 1, sizeof(G.decal[0]) * 63); G.ndecal = 63; }
-    G.decal[G.ndecal++] = {x, y, (uint8_t)kind};
+// blood is stamped into the level layer: it stays for the whole visit and costs nothing to draw afterwards.
+// (cosmetic only: uses its own counter, never the gameplay RNG)
+static uint32_t g_goreSeed = 1;
+static void blood_drop(float x, float y) {
+    uint32_t s = g_goreSeed++ * 2654435761u;
+    bake_blob(x, y, 1.7f + (s >> 28) * 0.12f, rgb(172, 22, 30), 236, s);
+}
+static void blood_pool(float x, float y) {
+    uint32_t s = g_goreSeed++ * 2654435761u;
+    bake_blob(x, y, 8.5f + (s >> 29), rgb(146, 16, 26), 232, s);              // the pool
+    bake_blob(x - 1, y - 1, 5.0f, rgb(190, 26, 34), 220, s + 1);              // wet, brighter middle
+    for (int k = 0; k < 7; k++) { uint32_t h = hash32(s + k * 77); bake_blob(x + (int)(h % 31) - 15, y + (int)((h >> 8) % 19) - 9, 1.4f + ((h >> 16) & 3) * 0.5f, rgb(164, 20, 30), 236, h); }   // spatter
 }
 
 // ---------------------------------------------------------------- weapons / items
@@ -152,6 +161,7 @@ static void zombie_hit(int zi, int result, int dmg, float fromX, float fromY, in
     if (result == HR_HEAD) {
         float_text(z.x, z.y - 14, "HEADSHOT", pal::gold);
         spawn_particles(PK_BLOOD, z.x, z.y - 6, 14, pal::blood);
+        fx_bulletHit(z.x, z.y - 10, dx, dy, true);
         zombie_kill(zi, fromX, fromY, true);
         if (sv >= 0) G.st.surv[sv].kills++;
         return;
@@ -160,6 +170,7 @@ static void zombie_hit(int zi, int result, int dmg, float fromX, float fromY, in
     z.flash = 0.12f;
     z.kx += dx / l * (result == HR_BODY ? 5.0f : 3.0f); z.ky += dy / l * (result == HR_BODY ? 5.0f : 3.0f);
     spawn_particles(PK_BLOOD, z.x + dx / l * 3, z.y - 4, result == HR_BODY ? 6 : 4, pal::blood);
+    fx_bulletHit(z.x, z.y - 6, dx, dy, true);
     audio_playAt(SFX_HIT, z.x, z.y, 0.7f);
     if (result == HR_LEG) { z.slowT = 2.5f; z.anim.play(AnimState::ZStumble, true); float_text(z.x, z.y - 14, "LEG", pal::dim); }
     else { z.anim.play(AnimState::ZHurt); if (result == HR_ARM) float_text(z.x, z.y - 14, "ARM", pal::dim); }
@@ -171,7 +182,7 @@ static void zombie_kill(int zi, float, float, bool head) {
     z.state = ZS_DEAD; z.hp = 0; z.atkPending = false;
     z.anim.play(AnimState::ZDeath, true);
     audio_playAt(SFX_ZDIE, z.x, z.y, head ? 0.6f : 1.0f);
-    add_decal(z.x - 8, z.y - 6, G.rng.range(3));
+    (void)G.rng.range(3); blood_pool(z.x, z.y + 2); fx_kill(z.x, z.y);
     if (z.spawnIdx >= 0 && G.curLoc >= 0) G.loc[G.curLoc].deadMask[z.spawnIdx / 32] |= 1u << (z.spawnIdx % 32);
 }
 
@@ -260,6 +271,7 @@ static void fire(int ui) {
     if (isPlayer && G.set.shake) G.shake = fmaxf(G.shake, ws.shake * 1.2f);
     float mx = u.x + u.fx * 9, my = u.y - 5 + u.fy * 9;
     spawn_particles(PK_MUZZLE, mx, my, 1, pal::gold);
+    fx_shot(mx, my, u.fx, u.fy, ws.shake, isPlayer);
     // ejected casing
     Particle* c = nullptr; for (auto& q : G.part) if (q.life <= 0) { c = &q; break; }
     if (c) { c->x = u.x; c->y = u.y - 4; c->z = 6; c->vx = -u.fy * 40 + G.rng.between(-8, 8); c->vy = u.fx * 40; c->vz = 50; c->life = c->max = 0.6f; c->kind = PK_CASING; c->col = pal::gold; }
@@ -336,7 +348,7 @@ static float g_escortHp[MAX_UNITS];   // trapped survivors have no Survivor reco
 void level_enter(int mapId, int loc) {
     for (int i = 0; i < MAX_UNITS; i++) g_escortHp[i] = 60;
     map_load(G.map, mapId);
-    G.curLoc = loc; G.nz = 0; G.nu = 0; G.ctrl = 0; G.ndecal = 0; G.inLevel = true;
+    G.curLoc = loc; G.nz = 0; G.nu = 0; G.ctrl = 0; G.inLevel = true;
     memset(G.proj, 0, sizeof G.proj); memset(G.part, 0, sizeof G.part); memset(G.ft, 0, sizeof G.ft);
     memset(G.explored, 0, sizeof G.explored);
     G.scene = mapId == MAP_SETTLEMENT ? SC_SETTLEMENT : SC_EXPEDITION;
@@ -408,6 +420,8 @@ void level_enter(int mapId, int loc) {
         }
     }
     G.camX = G.u[0].x - view_w() / 2; G.camY = G.u[0].y - view_h() / 2;
+    bake_level();   // draw the static level layer once (floors, walls, shadows); the renderer copies from it
+    fx_reset();
 
 }
 
@@ -566,7 +580,7 @@ static void unit_die(int ui, const char* cause) {
     u.alive = false;
     u.anim.play(AnimState::Death, true);
     spawn_particles(PK_BLOOD, u.x, u.y - 4, 16, pal::blood);
-    add_decal(u.x - 8, u.y - 4, 2);
+    blood_pool(u.x, u.y + 4);
     audio_play(SFX_DEATH);
     if (u.escort) { game_toast("The rescued survivor was killed."); return; }
     Survivor& s = G.st.surv[u.sv];
@@ -946,6 +960,7 @@ static void update_projectiles(float dt) {
         if (map_opaque(G.map, tx, ty) || (G.map.in(tx, ty) && (G.map.flags[G.map.idx(tx, ty)] & F_BLOCK) && G.map.propAt[G.map.idx(tx, ty)] < 0 && G.map.t[G.map.idx(tx, ty)] != T_BARS && G.map.t[G.map.idx(tx, ty)] != T_FENCE)) {
             spawn_particles(PK_SPARK, ox, oy, 3, pal::cream);
             spawn_particles(PK_DUST, ox, oy, 1, rgb(120, 110, 100));
+            fx_bulletHit(ox, oy, p.vx, p.vy, false);
             p.active = false; continue;
         }
         if (p.untargeted) {
@@ -970,7 +985,7 @@ static void update_particles(float dt) {
         if (p.kind == PK_SMOKE || p.kind == PK_DUST || p.kind == PK_EMBER) { p.z += p.vz * dt; continue; }
         p.vz -= 200 * dt; p.z += p.vz * dt;
         if (p.z < 0) { p.z = 0; p.vz *= -0.3f; p.vx *= 0.5f; p.vy *= 0.5f;
-            if (p.kind == PK_BLOOD && p.life > 0.1f && G.rng.chance(0.08f)) add_decal(p.x - 8, p.y - 8, 0); }
+            if (p.kind == PK_BLOOD && p.life > 0.1f && G.rng.chance(0.08f)) blood_drop(p.x, p.y); }
     }
     for (auto& f : G.ft) if (f.life > 0) { f.life -= dt; f.y -= 18 * dt; }
 }
@@ -1057,6 +1072,7 @@ static void update_level(float dt) {
     separate_zombies();
     update_projectiles(dt);
     update_particles(dt);
+    fx_update(dt);
     for (int i = 0; i < G.map.nbar; i++) {
         Barrier& b = G.map.bar[i];
         float target = (b.state == BS_OPEN || b.state == BS_BROKEN) ? 1.0f : 0.0f;
@@ -1129,6 +1145,9 @@ void game_advanceHours(float hours) {
 
 void game_init() {
     art_init();
+    worldart_init();
+    propart_init();
+    itemart_init();
     audio_init();
     G.scene = SC_TITLE; G.panel = PN_MAIN;
     for (auto& L : G.loc) { memset(&L, 0, sizeof L); L.cooldown = -1; }

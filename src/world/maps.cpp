@@ -58,23 +58,36 @@ R"MAP(""====================EEEE==========================="")MAP",
 R"MAP(""====================EEEE==========================="")MAP",
 };
 
+// The settlement is laid out as a small neighbourhood: two east-west streets with the buildings on their north
+// side facing south onto them, joined by an avenue from the gate through the fire plaza to the quarters at the
+// back. Storage and the workshop face the main street by the gate (a short haul for loot), the watchtower is
+// built into the wall beside the gate, the kitchen sits next to its garden, the infirmary keeps to the far
+// corner, and the overflow tents stand beside the quarters.
 static const char* const SETTLEMENT[] = {
-R"MAP(T"T"T"T"T"T"T"T"T"T"T"T"T"T"T"T"T"T"T")MAP",
-R"MAP("T""""""""""""""""""""""""""""""""""T")MAP",
-R"MAP(""XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"")MAP",
-R"MAP(T"X:1:::::::6:::::::5::::::::3:::::X"T)MAP",
-R"MAP("TX::::::::::::::n:::::::::::::::::XT")MAP",
-R"MAP(T"X"::::::::::::::::::::::T:::::::"X"T)MAP",
-R"MAP("TX::::::rL:::::P::::::::::::::::::XT")MAP",
-R"MAP(T"X"::::::::::::::::::::::::::::::"X"T)MAP",
-R"MAP("TX:4::::::A:::::2:::::::::::A:::::XT")MAP",
-R"MAP(T"X:::::::::::::::::::::*::L:::::::X"T)MAP",
-R"MAP("TX:::::gg:::::::::::::::::::::::::XT")MAP",
-R"MAP(T"X!::::gg:::::::::::S::S:::::::::!X"T)MAP",
-R"MAP(""XXXXXXXXXXXXXXXXXXXXGGXXXXXXXXXXXX"")MAP",
-R"MAP(""""""""""""""""""""""V""""""""""""""")MAP",
-R"MAP(T""""""""""""""""""""::::""""""""""""T)MAP",
-R"MAP("T"T"T"T"T"T"T"T"T"T"::::T"T"T"T"T"T"")MAP",
+R"MAP(T"T"T"T"T"T"T"T"T"T"T"T"T"T"T"T"T")MAP",
+R"MAP("T""""""""""""""""""""""""""""""T")MAP",
+R"MAP(""XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"")MAP",
+R"MAP(T"X""""""""""""""""""""""""""""X"T)MAP",
+R"MAP("TX""""""""""""""""""""""""""""XT")MAP",
+R"MAP(T"X"""4"""ggg""5"""""""""1"""""X"T)MAP",
+R"MAP("TX"""""""ggg""""""""""""""""""XT")MAP",
+R"MAP(T"X"""""""ggg"L""""A""A""""""""X"T)MAP",
+R"MAP("TX::::::::::::::::::::::::::::XT")MAP",
+R"MAP(T"X::::::::::::::::::::::::::::X"T)MAP",
+R"MAP("TX"T"""""""::::::::::""""""T""XT")MAP",
+R"MAP(T"X"""""""""::::*:::r:"""""""""X"T)MAP",
+R"MAP("TX"""2"""n"b::::::::b"""3"""""XT")MAP",
+R"MAP(T"X"""""""y":::P::::::""""""oo"X"T)MAP",
+R"MAP("TX"""""""""L::::::::L"""""""""XT")MAP",
+R"MAP(T"X::::::::::::::::::::::::::::X"T)MAP",
+R"MAP("TX::::::::::::::::::::::::::::XT")MAP",
+R"MAP(T"X"""Y""""""""::::"6""""""""""X"T)MAP",
+R"MAP("TX""""""""""S"::::""""""""""""XT")MAP",
+R"MAP(T"X!"""""""""S"::::"""""""""""!X"T)MAP",
+R"MAP(""XXXXXXXXXXXXXXGGXXXXXXXXXXXXXX"")MAP",
+R"MAP(""""""""""""""""V""""""""""""""""")MAP",
+R"MAP(T""""""""""""""::::""""""""""""""T)MAP",
+R"MAP("T"T"T"T"T"T"T"::::T"T"T"T"T"T"T"")MAP",
 };
 
 static const char* const HOSPITAL[] = {

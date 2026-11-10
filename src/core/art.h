@@ -26,7 +26,8 @@ enum { SURV_VARIANTS = 8, ZOMB_VARIANTS = 4, PORTRAITS = 8, BLD_TYPES = 6, BLD_L
 
 extern Sprite g_tile[TA_COUNT][4];
 extern Sprite g_spr[S_COUNT];
-extern Sprite g_item[40];                 // item icons, 8 px per inventory cell
+enum { ITEM_UNIT = 12 };                  // item icons are drawn at 12 px per inventory cell
+extern Sprite g_item[40];                 // item icons (itemart.cpp)
 extern Sprite g_held[40];                 // weapons as held in the hand (side view, muzzle right)
 extern int8_t g_heldGrip[40][2], g_heldMuzzle[40][2];
 extern Sprite g_portrait[PORTRAITS];      // 24x24, drawn at 2x

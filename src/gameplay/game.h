@@ -183,7 +183,7 @@ struct Game {
     // tutorial (-1 = inactive) and the player-action counters it watches
     int8_t tut = -1; float tutT = 0, tutDist = 0, tutLX = 0, tutLY = 0; bool tutFlag = false;
     uint32_t statShots = 0, statReloads = 0, statDodges = 0; float statSprint = 0;
-    struct Decal { float x, y; uint8_t kind; } decal[64]; int ndecal = 0;
+
 };
 
 struct Settler {           // lightweight settlement NPC (one per survivor)
@@ -199,6 +199,36 @@ extern Game G;
 inline int view_zoom() { int z = G.set.zoom ? G.set.zoom : 100; if (G.scene == SC_SETTLEMENT) z = z >= 200 ? 150 : (z >= 150 ? 125 : 100); return z; }
 inline int view_w() { int z = view_zoom(); return (TOP_W * 100 + z - 1) / z; }   // rounded up so scaling never reads past the edge
 inline int view_h() { int z = view_zoom(); return (TOP_H * 100 + z - 1) / z; }
+
+// ---- worldart.cpp: the static level layer (drawn once per level, copied every frame)
+extern px g_bake[]; extern int g_bakeW, g_bakeH;
+void worldart_init();                                              // door / window / gate overlay sprites
+void bake_level();                                                 // call once the map is loaded and refreshed
+void bake_dot(int x, int y, px col);                               // permanent marks, floor pixels only
+void bake_blob(float x, float y, float r, px col, int alpha, uint32_t seed);
+void bake_sprite(const Sprite& s, int x, int y, bool flipX, int shade);
+
+const Sprite& facade_sprite(int tx, int ty, int kind);              // exterior front strip (16x40): 0 wall, 1 window, 2 door
+void bake_mark(int x, int y, px col);                              // permanent mark anywhere, walls included (bullet holes, spatter)
+
+// ---- fx.cpp: cosmetic combat effects (own RNG, never touches gameplay state)
+struct FxLight { float x, y, r, life, max; px col; };
+extern float g_fxKickX, g_fxKickY;                                 // camera recoil, added by the renderer only
+void fx_reset();
+void fx_update(float dt);
+void fx_shot(float x, float y, float dx, float dy, float power, bool player);
+void fx_bulletHit(float x, float y, float dx, float dy, bool flesh);
+void fx_kill(float x, float y);
+bool fx_corpseBaked(int zi);
+const FxLight* fx_lights(int& n);
+void fx_render(Canvas& c, int camX, int camY);
+void fx_renderGlow(Canvas& c, int camX, int camY);
+
+// ---- propart.cpp: furniture / vehicle sprites in three-quarter view, with per-map and per-position variants
+void propart_init();
+int prop_fx(const Map& m, const Prop& p);                           // 1 = cruiser with a working lightbar, 2 = burning wreck
+void itemart_init();                                               // inventory icons, 12 px per cell
+const Sprite* prop_sprite(const Map& m, const Prop& p, int& ox, int& oy);   // nullptr = drawn by hand (trees, fires, lamps, plots)
 
 // ---- game.cpp
 void game_init();

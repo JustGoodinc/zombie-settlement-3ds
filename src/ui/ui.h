@@ -42,8 +42,6 @@ void ui_icon(Canvas& c, int x, int y, int sprId);
 
 // interactive widgets: return true when activated (tap released inside, or A while focused)
 enum { UB_NORMAL = 0, UB_SELECTED = 1, UB_GOLD = 2, UB_SMALL = 4, UB_LEFT = 8, UB_RAIL = 16 };
-void ui_frame(Canvas& c);    // leather corner patches over the bottom screen's hem (drawn last)
-void ui_strap(Canvas& c, int x, int y, int w);   // olive canvas strap with a leather loop, for genuinely empty margins (14 px tall)
 bool ui_button(Canvas& c, int x, int y, int w, int h, const char* label, int style = 0, bool enabled = true);
 bool ui_tab(Canvas& c, int x, int y, int w, const char* label, bool active);
 bool ui_hit(int x, int y, int w, int h, bool enabled = true);   // invisible focusable area

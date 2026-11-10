@@ -353,3 +353,72 @@ static void mapShots(const char* dir) {
         }
     }
 }
+
+// settlement review (zs_tool --settlement DIR): every facility built, stitched whole-compound overviews by day and dusk
+static void settlementShots(const char* dir) {
+    game_newGame(); G.set.tutorialDone = true;
+    const int LV[BLD_TYPES] = {2, 3, 2, 2, 3, 3};
+    for (int b = 0; b < BLD_TYPES; b++) G.st.bLevel[b] = (uint8_t)LV[b];
+    G.st.generator = true;
+    level_enter(MAP_SETTLEMENT, -1); ui_open(PN_HUD);
+    Map& m = G.map; uint8_t zoom = G.set.zoom; G.set.zoom = 100;
+    const struct { const char* n; float clock; } T[2] = {{"settlement_day", 11 * 60.0f}, {"settlement_dusk", 18 * 60 + 40.0f}};
+    for (auto& t : T) {
+        G.clock = t.clock; step(300);
+        int W = m.w * 16, H = m.h * 16; px* img = (px*)malloc(W * H * sizeof(px)); static px vb[TOP_W * TOP_H];
+        float cx0 = G.camX, cy0 = G.camY;
+        for (int cy = 0; cy < H; cy += TOP_H) for (int cx = 0; cx < W; cx += TOP_W) {
+            int ox = cx + TOP_W > W ? W - TOP_W : cx, oy = cy + TOP_H > H ? H - TOP_H : cy;
+            G.camX = (float)ox; G.camY = (float)oy; Canvas v; v.init(vb, TOP_W, TOP_H); render_world(v, 1);
+            for (int y = 0; y < TOP_H; y++) memcpy(img + (oy + y) * W + ox, vb + y * TOP_W, TOP_W * sizeof(px));
+        }
+        G.camX = cx0; G.camY = cy0;
+        char p[512]; snprintf(p, sizeof p, "%s/%s.png", dir, t.n); gfx_writePNG(p, img, W, H); free(img); printf("  wrote %s\n", p);
+    }
+    G.set.zoom = zoom;
+}
+
+// combat showcase (zs_tool --combat DIR): a short scripted firefight in the police lobby by day and in the car park at
+// night; writes the top screen at the first muzzle flash, mid-fight and after it (to judge flash, blood, casings, light)
+static void combatShots(const char* dir) {
+    const struct { const char* n; int tx, ty; float clock; } SC[2] = {{"combat_day", 22, 29, 11 * 60.0f}, {"combat_night", 24, 36, 22 * 60 + 30.0f}};
+    for (auto& sc : SC) {
+        game_newGame(); G.set.tutorialDone = true;
+        G.squad[0] = 0; G.squad[1] = 1; G.squad[2] = -1; G.st.surv[0].onExpedition = G.st.surv[1].onExpedition = true;
+        level_leave(); level_enter(MAP_POLICE, 0); ui_open(PN_HUD);
+        G.clock = sc.clock; G.flashlight = sc.clock > 20 * 60; G.nz = 0;
+        for (int k = 0; k < G.nu; k++) { G.u[k].x = G.u[k].px = sc.tx * 16 + 8.0f - k * 14; G.u[k].y = G.u[k].py = sc.ty * 16 + 8.0f + k * 6; }
+        Unit& u = G.u[0]; u.fx = 1; u.fy = 0;
+        for (int k = 0; k < 6; k++) {
+            Zombie& z = G.z[G.nz++]; memset(&z, 0, sizeof z);
+            z.x = z.px = u.x + 70 + (k % 3) * 26; z.y = z.py = u.y - 26 + (k / 3) * 44 + (k % 3) * 6; z.hp = 100; z.state = ZS_CHASE; z.spawnIdx = -1; z.speed = 0.5f; z.variant = (uint8_t)(k % ZOMB_VARIANTS); z.hx = -1;
+            z.anim = Animator(); z.anim.play(AnimState::ZWalk, true);
+        }
+        G.camX = u.x - view_w() / 2 + 40; G.camY = u.y - view_h() / 2; step(20);
+        bool gotFlash = false; char p[512];
+        for (int f = 0; f < 330; f++) {
+            Survivor& s = G.st.surv[u.sv]; if (s.equip >= 0) { s.pack.it[s.equip].mag = 12; s.pack.it[s.equip].dur = 300; } s.hp = (float)s.maxHp; s.infection = 0;
+            int zi = -1; float zd = 1e9f;
+            for (int k = 0; k < G.nz; k++) if (G.z[k].state != ZS_DEAD) { float d = len2(G.z[k].x - u.x, G.z[k].y - u.y); if (d < zd) { zd = d; zi = k; } }
+            Input in; in.held = BTN_L;
+            if (zi >= 0) { u.fx = (G.z[zi].x - u.x) / zd; u.fy = (G.z[zi].y - 4 - u.y) / zd; if ((f % 7) == 0) { in.down |= BTN_Y; in.held |= BTN_Y; } }
+            step(1, in);
+            if (!gotFlash && u.muzzleT > 0.03f) { gotFlash = true; snprintf(p, sizeof p, "%s/%s_flash.png", dir, sc.n); gfx_writePNG(p, topB, TOP_W, TOP_H); }
+            if (f == 70) { snprintf(p, sizeof p, "%s/%s_mid.png", dir, sc.n); gfx_writePNG(p, topB, TOP_W, TOP_H); }
+        }
+        snprintf(p, sizeof p, "%s/%s_after.png", dir, sc.n); gfx_writePNG(p, topB, TOP_W, TOP_H); printf("  wrote %s\n", p);
+    }
+}
+
+// zs_tool --bench-bake: how long drawing the static level layer takes per map (it happens once, on entering a level)
+static void bakeBench() {
+    game_newGame(); G.set.tutorialDone = true; G.squad[0] = 0; G.squad[1] = G.squad[2] = -1;
+    for (int l = 0; l <= LOC_COUNT; l++) {
+        int map = l < LOC_COUNT ? LOCATIONS[l].map : MAP_SETTLEMENT;
+        map_load(G.map, map); map_refresh(G.map);
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (int k = 0; k < 20; k++) bake_level();
+        double ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t0).count() / 20;
+        printf("bake %-16s %dx%d tiles  %.2f ms\n", map_name(map), G.map.w, G.map.h, ms);
+    }
+}

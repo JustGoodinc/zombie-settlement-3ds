@@ -75,8 +75,8 @@ static void blitHalf(Canvas& c, const Sprite& s, int x, int y) {
 }
 static void footer(Canvas& c, const char* a, const char* b2, const char* x = nullptr, const char* y = nullptr) {
     // footer strip: glyphs match the active device (3DS buttons / keyboard keys / Xbox pad)
-    gfx_fill(c, 0, 224, BOT_W, 16, rgb(16, 16, 18));
-    gfx_fill(c, 0, 224, BOT_W, 1, rgb(84, 82, 88));
+    gfx_fill(c, 0, 224, BOT_W, 16, rgb(24, 26, 42));
+    gfx_fill(c, 0, 224, BOT_W, 1, rgb(56, 60, 88)); gfx_fill(c, 0, 223, BOT_W, 1, rgb(14, 14, 26));
     int px_ = 5, bw = b2 ? ui_promptW('B', b2) : 0;
     const char* items[3] = {a, y, x}; const char keys[3] = {'A', 'Y', 'X'};
     for (int i = 0; i < 3; i++) {
@@ -149,21 +149,27 @@ enum { RW = 58, RLX = 2, RRX = BOT_W - RW - 2, CX = RLX + RW + 3, CW = RRX - CX 
 static bool railBtn(Canvas& c, int x, int y, int w, int h, int icon, const char* label, int style = 0, uint32_t glyph = 0, bool enabled = true) {
     bool pressedNow = g_ui.pressed == g_ui.count && g_ui.in.touching;
     bool act = ui_button(c, x, y, w, h, "", style | UB_RAIL, enabled);
-    int yo = pressedNow ? 1 : 0, cy = y + h / 2 + yo;
-    px tc = enabled ? ((style & UB_SELECTED) ? rgb(255, 240, 200) : pal::cream) : pal::grey;
+    bool sel = (style & UB_SELECTED) != 0;
+    int depth = !enabled ? 1 : (h >= 22 ? 3 : 2), yo = pressedNow ? depth - 1 : 0, cy = y + (h - depth) / 2 + yo;
+    px tc = enabled ? (sel ? pal::black : pal::cream) : pal::grey;
+    // the selected block is gold: dark lettering, no drop shadow
+    auto text = [&](int ty, const char* s, bool bold) {
+        if (sel) { gfx_text(c, x + (w - gfx_textW(s)) / 2, ty, s, tc, 1, false); if (bold) gfx_text(c, x + (w - gfx_textW(s)) / 2 + 1, ty, s, tc, 1, false); }
+        else if (bold) gfx_textCB(c, x + w / 2, ty, s, tc); else gfx_textC(c, x + w / 2, ty, s, tc);
+    };
     bool big = icon >= 0 && h >= 34;
     if (big) { const Sprite& s = g_spr[icon]; int k = s.w > 12 ? 1 : 2; gfx_blit(c, s, x + (w - s.w * k) / 2, cy - s.h * k - 1, k); }
     // one line if it fits, else split at the first space onto two lines
     int ty = big ? cy + 4 : cy - 4;
     const char* sp = strchr(label, ' ');
-    if (gfx_textWB(label) <= w - 4) gfx_textCB(c, x + w / 2, ty, label, tc);
-    else if (gfx_textW(label) <= w - 2 || !sp) gfx_textC(c, x + w / 2, ty, label, tc);
+    if (gfx_textWB(label) <= w - 4) text(ty, label, true);
+    else if (gfx_textW(label) <= w - 2 || !sp) text(ty, label, false);
     else {
         char a[24]; int n = (int)(sp - label); if (n > 23) n = 23; memcpy(a, label, n); a[n] = 0;
         int y0 = big ? ty : ty - 5;
-        gfx_textC(c, x + w / 2, y0, a, tc); gfx_textC(c, x + w / 2, y0 + 10, sp + 1, tc);
+        text(y0, a, false); text(y0 + 10, sp + 1, false);
     }
-    if (glyph && h >= 30) ui_btn(c, x + w - ui_btnW(glyph) - 3, y + h - 13 + yo, glyph);
+    if (glyph && h >= 30) ui_btn(c, x + w - ui_btnW(glyph) - 3, y + h - 14 - depth + yo, glyph);
     return act;
 }
 // button i of n on a rail (side 0 left, 1 right); heights shrink to fit, capped so few buttons stay thumb-sized
@@ -219,19 +225,19 @@ static bool invPlace(Survivor& s, int idx, int x, int y, int rot) {
 static void drawGrid(Canvas& c, Survivor& s, int gx, int gy, int cell, bool interactive) {
     Grid& g = s.pack;
     for (int y = 0; y < g.h; y++) for (int x = 0; x < g.w; x++) {
-        gfx_fill(c, gx + x * cell, gy + y * cell, cell, cell, rgb(28, 28, 32));
-        gfx_rect(c, gx + x * cell, gy + y * cell, cell + 1, cell + 1, rgb(54, 54, 60));
+        gfx_fill(c, gx + x * cell, gy + y * cell, cell, cell, rgb(24, 26, 42));
+        gfx_rect(c, gx + x * cell, gy + y * cell, cell + 1, cell + 1, rgb(56, 60, 88));
     }
     gfx_rect(c, gx - 2, gy - 2, g.w * cell + 5, g.h * cell + 5, pal::border);
-    int sc = cell / 8, pad = (cell - sc * 8) / 2;
+    int sc = cell / ITEM_UNIT < 1 ? 1 : cell / ITEM_UNIT;   // icons are drawn at 12 px per cell: 2x in the big starter grid, 1x in upgraded bags
     for (int i = 0; i < g.n; i++) {
         if (interactive && i == inv.held && inv.dragging) continue;
         const Item& it = g.it[i];
         int x = gx + it.x * cell, y = gy + it.y * cell, w = itemW(it) * cell, h = itemH(it) * cell;
         bool selected = interactive && i == inv.sel;
         bool heldHere = interactive && i == inv.held;
-        gfx_fill(c, x + 1, y + 1, w - 1, h - 1, selected || heldHere ? pal::goldBg : rgb(52, 50, 48));
-        gfx_blit(c, iconFor(it.id, it.rot), x + pad + (cell >= 16 ? 0 : 0), y + pad, sc);
+        gfx_fill(c, x + 1, y + 1, w - 1, h - 1, selected || heldHere ? pal::goldBg : rgb(44, 48, 74));
+        { const Sprite& ic = iconFor(it.id, it.rot); gfx_blit(c, ic, x + (w - ic.w * sc) / 2 + 1, y + (h - ic.h * sc) / 2 + 1, sc); }
         if (selected || heldHere) { gfx_rect(c, x, y, w + 1, h + 1, pal::gold); gfx_rect(c, x + 1, y + 1, w - 1, h - 1, pal::goldDk); }
         if (it.count > 1) { char b[8]; snprintf(b, sizeof b, "%d", it.count); gfx_text(c, x + w - gfx_textW(b) - 1, y + h - 9, b, pal::cream); }
         const ItemDef& d = idef(it.id);
@@ -252,7 +258,7 @@ static void invInfo(Canvas& c, Survivor& s, int x, int y, int w, int h, int idx)
         char b[48]; snprintf(b, sizeof b, "%s  HP %d/%d", s.name, (int)s.hp, s.maxHp); gfx_text(c, x + 5, y + 5, b, pal::cream);
         snprintf(b, sizeof b, "Bag %dx%d  %d items", s.pack.w, s.pack.h, s.pack.n); gfx_text(c, x + 5, y + 16, b, pal::dim);
         int ln = gfx_wrap(c, x + 5, y + 30, w - 10, "Tap or drag items. D-Pad / Circle Pad moves the cursor; push past the bag's edge to reach the side buttons.", pal::dim);
-        if (y + h - (y + 30 + ln * 10) >= 18) ui_strap(c, x + 2, y + h - 16, w - 4);   // canvas strap in the spare margin only
+        (void)ln;
         return;
     }
     Item& it = s.pack.it[idx]; const ItemDef& d = idef(it.id);
@@ -372,7 +378,7 @@ static void gridInteract(Canvas& c, Survivor& s, int gx, int gy, int cell) {
             int tx = inv.curX - inv.grabDX, ty = inv.curY - inv.grabDY;
             bool ok = g.fits(it.id, inv.heldRot, tx, ty, inv.held);
             gfx_fillA(c, gx + tx * cell, gy + ty * cell, w * cell, h * cell, ok ? pal::green : pal::red, 90);
-            gfx_blit(c, iconFor(it.id, inv.heldRot), gx + tx * cell, gy + ty * cell, cell / 8);
+            { const Sprite& ic = iconFor(it.id, inv.heldRot); int sc = cell / ITEM_UNIT < 1 ? 1 : cell / ITEM_UNIT; gfx_blit(c, ic, gx + tx * cell + (w * cell - ic.w * sc) / 2, gy + ty * cell + (h * cell - ic.h * sc) / 2, sc); }
         }
         gfx_rect(c, gx + inv.curX * cell, gy + inv.curY * cell, cell + 1, cell + 1, ((int)(G.uiTime * 4) & 1) ? pal::gold : pal::cream);
     }
@@ -383,7 +389,7 @@ static void gridInteract(Canvas& c, Survivor& s, int gx, int gy, int cell) {
         int tx = (in.tx - gx) / cell - inv.grabDX, ty = (in.ty - gy) / cell - inv.grabDY;
         bool ok = in.tx >= gx && in.ty >= gy && g.fits(it.id, inv.heldRot, tx, ty, inv.held);
         if (in.tx >= gx && in.ty >= gy) gfx_fillA(c, gx + tx * cell, gy + ty * cell, w * cell, h * cell, ok ? pal::green : pal::red, 80);
-        gfx_blit(c, iconFor(it.id, inv.heldRot), in.tx - inv.grabDX * cell - cell / 2, in.ty - inv.grabDY * cell - cell / 2, cell / 8);
+        { const Sprite& ic = iconFor(it.id, inv.heldRot); int sc = cell / ITEM_UNIT < 1 ? 1 : cell / ITEM_UNIT; gfx_blit(c, ic, in.tx - inv.grabDX * cell - cell / 2 + (w * cell - ic.w * sc) / 2, in.ty - inv.grabDY * cell - cell / 2 + (h * cell - ic.h * sc) / 2, sc); }
     }
 }
 
@@ -462,8 +468,8 @@ static void panelContainer(Canvas& c) {
         bool has = i < ct->n;
         bool selected = sel2 == 0 && sel == i && has;
         if (railGrab(ui_hit(x, y, 36, 30, has), 2)) { sel = i; sel2 = 0; inv.sel = -1; audio_play(SFX_MENU_MOVE); }
-        gfx_fill(c, x, y, 36, 30, selected ? pal::goldBg : rgb(28, 28, 32));
-        gfx_rect(c, x, y, 36, 30, selected ? pal::gold : (g_ui.focus == g_ui.count - 1 && !g_ui.navLock ? pal::goldDk : rgb(64, 64, 70)));
+        gfx_fill(c, x, y, 36, 30, selected ? pal::goldBg : rgb(44, 48, 74));
+        gfx_rect(c, x, y, 36, 30, selected ? pal::gold : (g_ui.focus == g_ui.count - 1 && !g_ui.navLock ? pal::goldDk : rgb(22, 22, 34)));
         if (has) {
             const Item& it = ct->it[i]; const Sprite& ic = g_item[it.id];
             if (ic.w <= 32 && ic.h <= 24) gfx_blit(c, ic, x + 18 - ic.w / 2, y + 15 - ic.h / 2);
@@ -1467,7 +1473,6 @@ void ui_render(Canvas& bot) {
     default: ui_open(G.scene == SC_TITLE ? PN_MAIN : PN_HUD); break;
     }
     bot.ox = 0;
-    ui_frame(bot);
     if (confirmBox.active) {
         // modal: only the dialog's own widgets are focusable
         g_ui.count = 0; g_ui.in = in; g_ui.consumed = false;

@@ -22,13 +22,13 @@ struct Sprite { int16_t w = 0, h = 0; px* d = nullptr; };
 
 // Try 2 palette (see docs/TRY_2_VISUAL_SPECIFICATION.md)
 namespace pal {
-constexpr px black = rgb(20, 20, 24), ink = rgb(14, 14, 16);
-constexpr px panel = rgb(38, 38, 43), panel2 = rgb(48, 48, 54), panelHi = rgb(66, 66, 72);
-constexpr px border = rgb(92, 92, 100), borderLo = rgb(24, 24, 28);
-constexpr px cream = rgb(226, 216, 196), dim = rgb(150, 144, 132), grey = rgb(110, 110, 116);
-constexpr px gold = rgb(232, 192, 64), goldDk = rgb(150, 118, 34), goldBg = rgb(64, 56, 34);
-constexpr px red = rgb(176, 48, 48), redDk = rgb(106, 24, 24), blood = rgb(120, 20, 20);
-constexpr px green = rgb(98, 168, 64), lime = rgb(154, 228, 64), cyan = rgb(80, 170, 200);
+constexpr px black = rgb(22, 22, 34), ink = rgb(16, 16, 26);          // navy-black outlines everywhere (world, props, UI)
+constexpr px panel = rgb(34, 36, 54), panel2 = rgb(44, 46, 66), panelHi = rgb(64, 68, 96);
+constexpr px border = rgb(108, 112, 146), borderLo = rgb(24, 24, 38);
+constexpr px cream = rgb(240, 232, 212), dim = rgb(164, 166, 186), grey = rgb(112, 116, 138);
+constexpr px gold = rgb(236, 196, 72), goldDk = rgb(156, 122, 40), goldBg = rgb(74, 64, 44);
+constexpr px red = rgb(214, 52, 48), redDk = rgb(120, 28, 34), blood = rgb(176, 22, 30);
+constexpr px green = rgb(98, 196, 84), lime = rgb(154, 228, 64), cyan = rgb(84, 176, 214);
 constexpr px olive = rgb(106, 122, 58), brown = rgb(122, 90, 58), tan = rgb(180, 154, 122);
 }
 
@@ -39,6 +39,16 @@ inline px gfx_mixf(px a, px b, int t) {
     unsigned xa = (a | ((unsigned)a << 16)) & 0x07E0F81Fu, xb = (b | ((unsigned)b << 16)) & 0x07E0F81Fu;
     unsigned r = ((xa * (32 - t5) + xb * t5) >> 5) & 0x07E0F81Fu;
     return (px)(r | (r >> 16));
+}
+// saturating add of b * t/256 onto a (glows, muzzle flash): same packed trick, overflow bits clamp each channel
+inline px gfx_addf(px a, px b, int t) {
+    unsigned t5 = (unsigned)(t + 4) >> 3; if (t5 > 32) t5 = 32;
+    const unsigned M = 0x07E0F81Fu;
+    unsigned xa = (a | ((unsigned)a << 16)) & M, xb = (b | ((unsigned)b << 16)) & M;
+    unsigned s = xa + (((xb * t5) >> 5) & M), ov = s & 0x08010020u;
+    s |= ((ov & 0x08000000u) - ((ov & 0x08000000u) >> 6)) | ((ov & 0x00010020u) - ((ov & 0x00010020u) >> 5));
+    s &= M;
+    return (px)(s | (s >> 16));
 }
 px gfx_scale(px c, int lvl);          // lvl 0..256
 void gfx_clear(Canvas&, px c);
