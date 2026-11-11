@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.2 — X takes everything
 - In a container, **X takes everything** (Take All), on the 3DS and with a pad. The footer shows it.
 
 ## v0.4.1 — 30 fps on the Old 3DS
