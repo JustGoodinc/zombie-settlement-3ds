@@ -204,6 +204,7 @@ enum { DK_PROP, DK_ZOMB, DK_UNIT, DK_NPC, DK_BAG };
 
 // optional stage profiler (zs_tool --bench sets the clock; zero cost otherwise)
 double (*g_profNow)() = nullptr; double g_prof[8];
+bool g_lowEnd = false, g_skipBottom = false;
 static double profT;
 bool g_overview;   // review tool only: whole-map captures are stitched from several views, so they skip the screen-edge vignette
 static inline void profMark(int i) { if (!g_profNow) return; double t = g_profNow(); if (i >= 0) g_prof[i] += t - profT; profT = t; }
@@ -586,7 +587,7 @@ void render_world(Canvas& c, float alpha) {
     profMark(2);
     // settlement colour grade (Try 2 evening): +15% saturation through a 64K lookup table built once,
     // so the per-frame cost is one table read per pixel (it used to be ~20 ALU ops per pixel)
-    if (G.scene == SC_SETTLEMENT) {
+    if (G.scene == SC_SETTLEMENT && !gfx_fast()) {   // a 128 KB table read per pixel: dear on the Old 3DS's small cache
         static px* lut = nullptr;
         if (!lut) {
             lut = (px*)malloc(sizeof(px) * 65536);
@@ -932,9 +933,16 @@ void game_render(Canvas& top, Canvas& bot, float alpha) {
             static px vbuf[TOP_W * TOP_H]; Canvas v; v.init(vbuf, view_w(), view_h());
             render_world(v, alpha);
             static int xs[TOP_W]; for (int x = 0; x < TOP_W; x++) xs[x] = x * 100 / z;
+            int last = -1;
             for (int y = 0; y < TOP_H; y++) {
-                const px* src = vbuf + (y * 100 / z) * v.w; px* dst = top.p + y * TOP_W;
-                for (int x = 0; x < TOP_W; x++) dst[x] = src[xs[x]];
+                const int sy = y * 100 / z; px* dst = top.p + y * TOP_W;
+                if (sy == last) { memcpy(dst, dst - TOP_W, TOP_W * sizeof(px)); continue; }   // same source row as the row above
+                last = sy;
+                const px* src = vbuf + sy * v.w;
+                if (z == 200) {   // exactly 2x: each pixel twice, two at a time
+                    uint32_t* d = (uint32_t*)dst;
+                    for (int x = 0; x < TOP_W / 2; x++) d[x] = src[x] * 0x10001u;
+                } else for (int x = 0; x < TOP_W; x++) dst[x] = src[xs[x]];
             }
         }
         profMark(5);   // zoom scale-up
@@ -948,6 +956,11 @@ void game_render(Canvas& top, Canvas& bot, float alpha) {
             }
         }
         tut_render(top);              // last, so a lesson stays readable over a paused menu
+        profMark(6);   // overlay, HUD, pause dim, tutorial
     }
-    ui_render(bot);
+    // the touch screen: skipped on frames the platform says to (Fast graphics); timers in the menus still get the time
+    static float carry = 0;
+    if (g_skipBottom) carry += G.frameMs;
+    else { const float keep = G.frameMs; G.frameMs += carry; carry = 0; ui_render(bot); G.frameMs = keep; }
+    profMark(7);   // bottom screen
 }

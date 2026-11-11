@@ -311,6 +311,9 @@ static void bench() {
         game_render(t, bo, g_renderAlpha);
         auto c = std::chrono::steady_clock::now();
         simT += ms(a, b); renT += ms(b, c); if (ms(a, c) > worst) worst = ms(a, c);
+        static int lastDead = 0; int dead = 0; for (int k = 0; k < G.nu; k++) dead += !G.u[k].alive;
+        if (ms(a, b) > 1.0 || dead != lastDead) printf("  frame %d: sim %.2f ms, squad members down %d\n", i, ms(a, b), dead);   // slow frames and deaths
+        lastDead = dead;
     }
     int alive = 0; for (int i = 0; i < G.nz; i++) alive += G.z[i].state != ZS_DEAD;
     printf("bench: %d zombies (%d alive at end), 3 survivors, night+flashlight, %d frames\n", 60, alive, frames);

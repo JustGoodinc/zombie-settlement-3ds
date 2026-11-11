@@ -524,6 +524,10 @@ static Sprite charFrame(bool z, int v, int d, int pose) {
 static void buildCharacters() {
     for (int v = 0; v < SURV_VARIANTS; v++) for (int d = 0; d < 5; d++) for (int p = 0; p < P_COUNT; p++) survPose[v][d][p] = charFrame(false, v, d, p);
 }
+void art_zombie_warm(int variant) {
+    variant %= ZOMB_VARIANTS;
+    for (int d = 0; d < 5; d++) for (int p = 0; p < P_COUNT; p++) { Sprite& s = zombPose[variant][d][p]; if (!s.d) s = charFrame(true, variant, d, p); }
+}
 void art_zombie_flush() {
     for (auto& look : zombPose) for (auto& dir : look) for (Sprite& s : dir) freeS(s);
 }

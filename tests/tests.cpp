@@ -752,8 +752,30 @@ static void testTutorialZoom() {
     CHECK(G.set.zoom == 150 && G.set.tutorialDone);
     FILE* f = fopen("test_saves/settings.ini", "w"); fputs("8 8 6 30 2 1 0 0 0\n", f); fclose(f);   // old 9-field file
     settings_load();
-    CHECK(G.set.zoom == 200 && !G.set.tutorialDone);
-    G.set.zoom = 125;
+    CHECK(G.set.zoom == 200 && !G.set.tutorialDone && G.set.gfx == 0);
+
+    extern float g_renderAlpha;
+    SECTION("graphics: Fast persists, frees the Old 3DS from the colour grade and the wide settlement view, and the 2x scale-up is exact");
+    G.set.gfx = 2; settings_save(); G.set.gfx = 0; settings_load();
+    CHECK(G.set.gfx == 2);
+    f = fopen("test_saves/settings.ini", "w"); fputs("8 8 6 30 2 1 0 0 0 200 1\n", f); fclose(f);   // an 11-field file from v0.4.0
+    settings_load();
+    CHECK(G.set.gfx == 0 && G.set.tutorialDone);
+    g_lowEnd = true; CHECK(gfx_fast()); G.set.gfx = 1; CHECK(!gfx_fast()); g_lowEnd = false; G.set.gfx = 2; CHECK(gfx_fast());
+    game_newGame(); G.set.zoom = 200;
+    G.set.gfx = 1; frames(1); CHECK(view_zoom() == 150);   // Full: the settlement one step further out, as before
+    G.set.gfx = 2; frames(1); CHECK(view_zoom() == 200);   // Fast: the settlement at raid zoom (half the pixels)
+    {   // at 200% every screen pixel is the view pixel at half its coordinates
+        static px top[TOP_W * TOP_H], bot[BOT_W * BOT_H]; Canvas t, b; t.init(top, TOP_W, TOP_H); b.init(bot, BOT_W, BOT_H);
+        static px view[TOP_W * TOP_H]; Canvas v; v.init(view, view_w(), view_h());
+        frames(2); render_world(v, g_renderAlpha);          // the world view alone, as game_render draws it first
+        G.set.showFps = false; g_skipBottom = false;
+        game_render(t, b, g_renderAlpha);
+        int bad = 0;   // compare only rows the HUD leaves alone (the middle band of the screen, away from the vignette-free overlays)
+        for (int y = 100; y < 140; y++) for (int x = 0; x < TOP_W; x++) bad += top[y * TOP_W + x] != view[(y / 2) * v.w + x / 2];
+        CHECK(bad < TOP_W * 40 / 10);   // overlays (prompts, toasts) may cover a little of it; a wrong scale-up would differ almost everywhere
+    }
+    G.set.gfx = 0; G.set.zoom = 125;
 }
 static void testMenuNav() {
     SECTION("menus: D-pad and Circle Pad navigate every paused menu, holding repeats");

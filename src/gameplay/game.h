@@ -126,6 +126,7 @@ struct Settings {
     bool fullscreen = false;
     uint8_t zoom = 200;                       // camera zoom percent: 100 / 125 / 150 / 200 (200 = Try 2 framing)
     bool tutorialDone = false;
+    uint8_t gfx = 0;                          // graphics: 0 auto (Fast on an Old 3DS), 1 full, 2 fast
 };
 
 enum Scene : uint8_t { SC_TITLE, SC_SETTLEMENT, SC_EXPEDITION };
@@ -196,7 +197,13 @@ extern Game G;
 // world viewport in world pixels (the top screen shows this area scaled by the zoom setting)
 // camera zoom percent in effect
 // the settlement is framed fence-to-fence like the Try 2 overview: one zoom step wider than expeditions
-inline int view_zoom() { int z = G.set.zoom ? G.set.zoom : 100; if (G.scene == SC_SETTLEMENT) z = z >= 200 ? 150 : (z >= 150 ? 125 : 100); return z; }
+// Fast graphics (the Old 3DS): no settlement colour grade, and the touch screen is redrawn at 15 fps when nothing
+// touches it. Set by the platform: true on hardware that cannot hold 30 fps with everything on.
+extern bool g_lowEnd;
+inline bool gfx_fast() { return G.set.gfx == 2 || (G.set.gfx == 0 && g_lowEnd); }
+extern bool g_skipBottom;   // platform: this frame, leave the touch screen as it is
+// the settlement is shown one step further out than a raid, except with Fast graphics (it would cost twice the pixels)
+inline int view_zoom() { int z = G.set.zoom ? G.set.zoom : 100; if (G.scene == SC_SETTLEMENT && !gfx_fast()) z = z >= 200 ? 150 : (z >= 150 ? 125 : 100); return z; }
 inline int view_w() { int z = view_zoom(); return (TOP_W * 100 + z - 1) / z; }   // rounded up so scaling never reads past the edge
 inline int view_h() { int z = view_zoom(); return (TOP_H * 100 + z - 1) / z; }
 

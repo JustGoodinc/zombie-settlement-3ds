@@ -424,6 +424,7 @@ void level_enter(int mapId, int loc) {
     }
     G.camX = G.u[0].x - view_w() / 2; G.camY = G.u[0].y - view_h() / 2;
     art_zombie_flush();   // zombie frames are drawn on demand: start each level with an empty set
+    for (int i = 0; i < G.nz; i++) art_zombie_warm(G.z[i].variant);   // every zombie here, drawn now rather than as it comes into view
     bake_level();   // draw the static level layer once (floors, walls, shadows); the renderer copies from it
     fx_reset();
 

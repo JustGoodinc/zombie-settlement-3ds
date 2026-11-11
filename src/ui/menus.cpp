@@ -1331,6 +1331,10 @@ static void panelSettings(Canvas& c) {
     if (row(b)) { s.zoom = s.zoom >= 200 ? 100 : (s.zoom >= 150 ? 200 : (s.zoom >= 125 ? 150 : 125)); settings_save(); }
     if (row(s.shake ? "Screen shake: On" : "Screen shake: Off")) s.shake = !s.shake;
     if (row(s.showFps ? "Show FPS: On" : "Show FPS: Off")) s.showFps = !s.showFps;
+    if (!g_canQuit) {   // the console: Fast keeps the Old 3DS at 30 fps
+        snprintf(b, sizeof b, "Graphics: %s", s.gfx == 1 ? "Full" : (s.gfx == 2 ? "Fast" : (g_lowEnd ? "Auto (Fast)" : "Auto (Full)")));
+        if (row(b)) s.gfx = (uint8_t)((s.gfx + 1) % 3);
+    }
     if (g_canQuit) {
         snprintf(b, sizeof b, "Window scale: %dx", s.winScale);
         if (row(b)) s.winScale = s.winScale >= 3 ? 1 : s.winScale + 1;

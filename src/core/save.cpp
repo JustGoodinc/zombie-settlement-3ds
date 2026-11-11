@@ -212,8 +212,8 @@ bool save_info(int slot, char* out, int len) {
 void settings_load() {
     char p[256]; snprintf(p, sizeof p, "%ssettings.ini", g_dir);
     FILE* f = fopen(p, "r"); if (!f) return;
-    int a, b, c, d, e, s, fps, fs, slot, zoom = 200, tut = 0;
-    int n = fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d", &a, &b, &c, &d, &e, &s, &fps, &fs, &slot, &zoom, &tut);
+    int a, b, c, d, e, s, fps, fs, slot, zoom = 200, tut = 0, gfx = 0;
+    int n = fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d %d", &a, &b, &c, &d, &e, &s, &fps, &fs, &slot, &zoom, &tut, &gfx);
     if (n >= 9) {   // older files have 9 fields; zoom + tutorial flag were added later
         Settings& st = G.set;
         auto cl = [](int v, int lo, int hi) { return (uint8_t)(v < lo ? lo : (v > hi ? hi : v)); };
@@ -222,6 +222,7 @@ void settings_load() {
         st.shake = s != 0; st.showFps = fps != 0; st.fullscreen = fs != 0; G.saveSlot = slot >= 0 && slot < 3 ? slot : 0;
         st.zoom = (zoom == 100 || zoom == 125 || zoom == 150 || zoom == 200) ? (uint8_t)zoom : 200;
         st.tutorialDone = n >= 11 && tut != 0;
+        st.gfx = n >= 12 ? cl(gfx, 0, 2) : 0;   // added with v0.4.1
     }
     fclose(f);
 }
@@ -229,6 +230,6 @@ void settings_save() {
     char p[256]; snprintf(p, sizeof p, "%ssettings.ini", g_dir);
     FILE* f = fopen(p, "w"); if (!f) return;
     const Settings& s = G.set;
-    fprintf(f, "%d %d %d %d %d %d %d %d %d %d %d\n", s.master, s.sfx, s.music, s.dayMinutes, s.winScale, s.shake, s.showFps, s.fullscreen, G.saveSlot, s.zoom, s.tutorialDone);
+    fprintf(f, "%d %d %d %d %d %d %d %d %d %d %d %d\n", s.master, s.sfx, s.music, s.dayMinutes, s.winScale, s.shake, s.showFps, s.fullscreen, G.saveSlot, s.zoom, s.tutorialDone, s.gfx);
     fclose(f);
 }

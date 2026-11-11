@@ -50,3 +50,4 @@ void art_init();
 // Zombie frames are drawn on first use, so the reference is good until the next art_zombie_flush().
 const Sprite& art_char(bool zombie, int variant, int dir, Pose p, bool& flip);
 void art_zombie_flush();   // drop the zombie frames drawn so far (called when a level loads, to bound memory)
+void art_zombie_warm(int variant);   // draw every frame of one zombie look now (level load), so none is drawn mid-fight
