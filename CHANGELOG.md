@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- In a container, **X takes everything** (Take All), on the 3DS and with a pad. The footer shows it.
+
 ## v0.4.1 — 30 fps on the Old 3DS
 - **Graphics setting** (Settings, on the 3DS): Auto (Fast on an Old 3DS, Full on a New 3DS), Full or Fast. Fast shows the settlement at raid zoom instead of one step further out, skips the settlement colour grade, and while you play redraws the touch screen at 15 fps (at once for the stylus, START, SELECT, A and B). Prompted by the owner's test on an Old 3DS XL: v0.4.0 ran at about 20 fps.
 - Faster for everyone, with no visible change: the 2x scale-up of the world view writes two pixels at a time and copies repeated rows; the copy to the rotated 3DS screens moves eight rows at a time (checked pixel-exact against the old copy); the zombie sprites of a level are drawn while it loads, not the first time each zombie comes into view.

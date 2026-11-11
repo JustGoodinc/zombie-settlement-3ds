@@ -367,7 +367,7 @@ static void gridInteract(Canvas& c, Survivor& s, int gx, int gy, int cell) {
                 else if (g.move(i, g.it[i].x, g.it[i].y, g.it[i].rot ^ 1)) audio_play(SFX_INV); else say("No room to rotate here.");
             }
         }
-        if ((d & BTN_X) && inv.sel >= 0 && inv.sel < g.n) {
+        if ((d & BTN_X) && G.panel != PN_CONTAINER && inv.sel >= 0 && inv.sel < g.n) {   // in a container X is Take All
             int sv = (int)(&s - G.st.surv), ui_ = -1; for (int k = 0; k < G.nu; k++) if (G.u[k].sv == sv) ui_ = k;
             survivor_useItem(sv, inv.sel, ui_); if (inv.sel >= g.n) inv.sel = -1;
         }
@@ -508,7 +508,7 @@ static void panelContainer(Canvas& c) {
         return true;
     };
     // left rail: taking and storing
-    if (rail(c, 0, 0, 3, "Take All", UB_GOLD | hl(TH_TAKEALL), ct->n > 0)) {
+    if (rail(c, 0, 0, 3, "Take All", UB_GOLD | hl(TH_TAKEALL), ct->n > 0, -1, BTN_X) || (ct->n > 0 && (g_ui.in.down & BTN_X))) {   // X: take everything
         int moved = 0, start = ct->n;
         for (int i = ct->n - 1; i >= 0; i--) if (takeOne(i)) moved++;
         audio_play(moved ? SFX_PICKUP : SFX_EMPTY);
@@ -548,7 +548,7 @@ static void panelContainer(Canvas& c) {
         ui_back();
     }
     railEnd();
-    footer(c, inv.onRail ? "Confirm" : (inv.held >= 0 ? "Place" : "Move"), "Back", nullptr, "Rotate");
+    footer(c, inv.onRail ? "Confirm" : (inv.held >= 0 ? "Place" : "Move"), "Back", "Take All", "Rotate");
 }
 
 // ---------------------------------------------------------------- HUD (gameplay bottom screen)

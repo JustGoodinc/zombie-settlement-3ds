@@ -653,8 +653,9 @@ static void testTutorialZoom() {
     CHECK(G.panel == PN_CONTAINER && G.tut == TS_LOOT && tut_highlight() == TH_TAKEALL);
     const Container& ct = G.loc[G.curLoc].cont[mp.container];
     CHECK(ct.n == 4 && ct.it[0].id == IT_TOOLS && ct.it[1].id == IT_SCRAP);   // the fixed first haul
-    tap(30, 36);                                                   // Take All
-    CHECK(ct.n == 0 && s.pack.countOf(IT_TOOLS) == 1 && s.pack.countOf(IT_SCRAP) == 3);
+    const int used = s.pack.n;
+    press(BTN_X);                                                  // X in a container: Take All (and it must not use an item)
+    CHECK(ct.n == 0 && s.pack.countOf(IT_TOOLS) == 1 && s.pack.countOf(IT_SCRAP) == 3 && s.pack.n == used + 3);   // the 9 mm joins the ammo already carried
     press(BTN_B); frames(2);
     CHECK(G.panel == PN_HUD && G.tut == TS_PACK);
     press(BTN_SELECT); CHECK(G.panel == PN_INVENTORY && G.tut == TS_PACK);
