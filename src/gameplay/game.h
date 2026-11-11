@@ -180,8 +180,8 @@ struct Game {
     bool inLevel = false;
     int8_t squad[3] = {-1, -1, -1};   // survivors chosen for the next expedition (0 = controlled)
     int8_t expLoc = -1;              // location of an in-progress expedition (persisted)
-    // tutorial (-1 = inactive) and the player-action counters it watches
-    int8_t tut = -1; float tutT = 0, tutDist = 0, tutLX = 0, tutLY = 0; bool tutFlag = false;
+    // tutorial step (TutStep, -1 = inactive) and the player-action counters it watches
+    int8_t tut = -1;
     uint32_t statShots = 0, statReloads = 0, statDodges = 0; float statSprint = 0;
 
 };
@@ -254,6 +254,7 @@ float daylight();   // 0 (night) .. 1 (day)
 void dbg_zombieHit(int zi, int result, int dmg);
 void dbg_fire(int ui);
 void expedition_finish(bool failed);
+void expedition_begin(int loc);        // send G.squad out to a location (the prep screen and the tutorial both use it)
 void spawn_turned(int sv);
 
 // ---- settlement.cpp
@@ -297,14 +298,26 @@ bool save_deserialize(const uint8_t* buf, int len, char* err, int errLen);
 void ui_update(const Input& in);
 void ui_dropInput();
 
-// ---- tutorial.cpp (skippable guided first run)
+// ---- tutorial.cpp (skippable guided first run: opening scene, raid lessons, buildings tour, an upgrade)
+enum TutStep : int8_t { TS_INTRO, TS_MOVE, TS_SEARCH, TS_LOOT, TS_PACK, TS_FIGHT, TS_RELOAD, TS_DODGE, TS_EXTRACT, TS_HOME, TS_TOUR,
+                        TS_BUILDING, TS_UPGRADE, TS_PLAN, TS_COUNT };   // values of G.tut; TS_INTRO and TS_TOUR are scenes
+enum { SPAWN_LESSON = -2 };             // Zombie::spawnIdx of the two fight-lesson zombies (weak bites that cannot infect)
 void tut_start();
 void tut_skip();
 void tut_update();
 void tut_render(Canvas& top);
 bool tut_active();
+bool tut_scene();                       // a scene is playing: it owns the pad and the HUD is hidden
+void tut_input(Input& pad);             // during a scene: A is next, START skips, and the scene walks the leader
+bool tut_camera(float& x, float& y);    // top-left the camera should ease towards during a scene
+void tut_sceneNext();                   // (the touch-screen buttons)
+void tut_sceneSkip();
+const char* tut_sceneTitle();
+int  tut_sceneBeat(int& total);
+const char* tut_objective();            // the lesson's goal for the HUD objective line, or nullptr
+void tut_loot(int prop, Container& c);  // the marked container's fixed first haul
 int  tut_highlight();   // which on-screen button the current step wants pressed (TH_*)
-enum { TH_NONE, TH_EXPEDITION, TH_DEPLOY, TH_TAKEALL };
+enum { TH_NONE, TH_RAID, TH_TAKEALL, TH_BASE, TH_UPGRADE };
 void ui_render(Canvas& bot);
 void ui_open(Panel p);
 void ui_push(Panel p);

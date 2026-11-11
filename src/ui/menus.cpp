@@ -27,7 +27,7 @@ static void say(const char* s) { snprintf(msg, sizeof msg, "%s", s); msgT = 3; }
 enum { CA_NEWGAME = 1, CA_LOAD, CA_SAVE, CA_DELETE, CA_MAINMENU, CA_REJECT, CA_QUIT, CA_TUTORIAL };
 // tutorial nudges: pulse the button the current step wants (gold on/off)
 static int hl(int which) { return (tut_highlight() == which && (((int)(G.uiTime * 3)) & 1)) ? UB_SELECTED : 0; }
-static void offerTutorial() { if (!G.set.tutorialDone) ask(CA_TUTORIAL, 0, "Play the tutorial? Recommended if you are new. You can skip it at any time."); }
+static void offerTutorial() { if (!G.set.tutorialDone) ask(CA_TUTORIAL, 0, "Play the tutorial? A short first raid, then a tour of the settlement. Skip it any time."); }
 
 void ui_update(const Input& in) { g_input = in; }
 // The simulation changed panels this frame (e.g. extraction): the button press that caused it
@@ -111,7 +111,7 @@ static void costLine(Canvas& c, int x, int y, const uint8_t* cost) {
 static const char* survStatus(const Survivor& s, px& col) {
     col = pal::green;
     if (!s.alive) { col = pal::grey; return "Deceased"; }
-    if (s.onExpedition) { col = pal::cyan; return "On expedition"; }
+    if (s.onExpedition) { col = pal::cyan; return "On a raid"; }
     if (s.quarantined) { col = pal::gold; return "Quarantined"; }
     if (s.infection && s.infKnown) { col = pal::red; return INF_NAMES[s.infection]; }
     if (s.hp < 50) { col = pal::gold; return "Injured"; }
@@ -584,17 +584,34 @@ static void minimap(Canvas& c, int x, int y, int w, int h) {
 }
 
 static const char* objective() {
+    if (const char* lesson = tut_objective()) return lesson;   // the tutorial's current goal comes first
     if (G.scene == SC_SETTLEMENT) {
         if (G.st.visitorPresent) return "A stranger waits at the gate.";
         int sec = settle_security();
         if (sec < 25) return "Security is low! Assign guards.";
-        return "Use the radio table to plan an expedition.";
+        return "Use the radio table to plan a raid.";
     }
     for (int i = 0; i < G.nu; i++) if (G.u[i].escort && G.u[i].alive) return G.u[i].order == ORD_HOLD ? (G.map.id == MAP_POLICE ? "Someone is trapped in the holding cells." : "Someone is trapped inside. Find them.") : "Escort the survivor to the south road.";
     return "Search for supplies. Extract at the south road.";
 }
 
+// A tutorial scene is playing on the top screen: the touch screen only offers Next and the two ways out.
+static void panelScene(Canvas& c) {
+    ui_panel(c, CX, 2, CW, 220, tut_sceneTitle());
+    int total, at = tut_sceneBeat(total);
+    for (int k = 0; k < total; k++) {   // where we are in the scene
+        int x = CX + CW / 2 - total * 6 + k * 12, on = k <= at;
+        gfx_fill(c, x, 28, 9, 5, pal::ink); gfx_fill(c, x + 1, 29, 7, 3, on ? pal::gold : pal::panelHi);
+    }
+    gfx_wrap(c, CX + 14, 60, CW - 28, "The scene plays on the top screen.", pal::cream);
+    gfx_wrap(c, CX + 14, 90, CW - 28, "Next moves it along. Skip Scene goes straight to the part you play.", pal::dim);
+    if (rail(c, 0, 0, 1, "Next", UB_GOLD, true, -1, BTN_A)) tut_sceneNext();
+    if (rail(c, 1, 0, 2, "Skip Scene", 0, true, -1, BTN_START)) { tut_sceneSkip(); return; }
+    if (rail(c, 1, 1, 2, "Skip Tutorial")) tut_skip();
+}
+
 static void panelHud(Canvas& c) {
+    if (tut_scene()) { panelScene(c); return; }
     // thumb rails down both edges (reachable without letting go of the Circle Pad / ABXY);
     // information stays in the middle column
     const int RW = 60, LX = 2, RX = BOT_W - RW - 2, CX = LX + RW + 4, CW = RX - CX - 4, TOP = 2, H = 220;
@@ -625,9 +642,9 @@ static void panelHud(Canvas& c) {
     if (tut_active() && ui_button(c, CX + 24, 202, CW - 48, 18, "Skip Tutorial")) tut_skip();
     if (G.scene == SC_SETTLEMENT) {
         const int bh = (H - 2 * 4) / 3;
-        if (railBtn(c, LX, TOP, RW, bh, S_ICON_HOUSE, "Base")) ui_open(PN_BASE);
+        if (railBtn(c, LX, TOP, RW, bh, S_ICON_HOUSE, "Base", hl(TH_BASE))) ui_open(PN_BASE);
         if (railBtn(c, LX, TOP + bh + 4, RW, bh, S_ICON_PEOPLE, "Survivors")) ui_open(PN_SURVIVORS);
-        if (railBtn(c, LX, TOP + 2 * (bh + 4), RW, bh, S_ICON_TRAIN, "Expedition", hl(TH_EXPEDITION))) ui_open(PN_WORLDMAP);
+        if (railBtn(c, LX, TOP + 2 * (bh + 4), RW, bh, S_ICON_TRAIN, "Raid", hl(TH_RAID))) ui_open(PN_WORLDMAP);
         char jb[24]; snprintf(jb, sizeof jb, G.st.unread ? "Journal %d" : "Journal", G.st.unread);
         if (railBtn(c, RX, TOP, RW, bh, S_RADIO, jb, G.st.unread ? UB_GOLD : 0)) ui_open(PN_JOURNAL);
         if (railBtn(c, RX, TOP + bh + 4, RW, bh, S_ICON_MAT, "Backpack", 0, BTN_SELECT)) { g_invSurvivor = -1; ui_open(PN_INVENTORY); }
@@ -660,7 +677,7 @@ static void panelSquad(Canvas& c) {
         for (int o = 0; o < 3; o++) if (ui_button(c, CX + 5 + o * 62, y + 21, 59, 20, ON[o], u.order == o ? UB_SELECTED : 0, u.alive)) u.order = (uint8_t)o;
         y += 50;
     }
-    if (!n) gfx_wrap(c, CX + 6, 22, CW - 12, "You are alone on this expedition. Bring companions from Expedition Preparation.", pal::dim);
+    if (!n) gfx_wrap(c, CX + 6, 22, CW - 12, "You are alone on this raid. Bring companions from Raid Prep.", pal::dim);
     gfx_wrap(c, CX + 6, 128, CW - 12, "Follow: stay close and fight. Hold: guard this spot. Retreat: fall back to the extraction point. D-Pad Down cycles orders in the field.", pal::dim);
     for (int o = 0; o < 3; o++) {
         char b[16]; snprintf(b, sizeof b, "All %s", ON[o]);
@@ -695,7 +712,7 @@ static void panelPause(Canvas& c) {
     if (rail(c, 1, 0, nr, "Save Game", 0, canSave)) { saveMode = 1; ui_push(PN_SAVELOAD); }
     if (rail(c, 1, 1, nr, "Controls")) ui_push(PN_CONTROLS);
     if (tut && rail(c, 1, 2, nr, "Skip Tutorial")) { tut_skip(); ui_open(PN_HUD); return; }
-    if (rail(c, 1, nr - 1, nr, "Main Menu")) ask(CA_MAINMENU, 0, G.scene == SC_EXPEDITION ? "Quit to menu? Expedition progress since the last save is lost." : "Return to the main menu? Unsaved progress is lost.");
+    if (rail(c, 1, nr - 1, nr, "Main Menu")) ask(CA_MAINMENU, 0, G.scene == SC_EXPEDITION ? "Quit to menu? Raid progress since the last save is lost." : "Return to the main menu? Unsaved progress is lost.");
     if (ui_pressedB()) ui_open(PN_HUD);
 }
 
@@ -735,7 +752,7 @@ static void doLoad(int slot) {
     // an expedition interrupted by quitting: the squad straggles home empty-handed
     if (G.expLoc >= 0) {
         for (int i = 0; i < G.st.nsurv; i++) if (G.st.surv[i].onExpedition) { G.st.surv[i].onExpedition = false; G.st.surv[i].hp = fmaxf(10, G.st.surv[i].hp - 15); }
-        journal(JK_WARN, "The expedition to the %s was abandoned. The squad straggled home.", LOCATIONS[G.expLoc].name);
+        journal(JK_WARN, "The raid on the %s was abandoned. The squad straggled home.", LOCATIONS[G.expLoc].name);
         G.expLoc = -1;
     }
     level_enter(MAP_SETTLEMENT, -1);
@@ -806,7 +823,7 @@ static void panelBase(Canvas& c) {
         gfx_textB(c, CX + 34, 158, BUILDINGS[b].name, pal::cream);
         gfx_wrap(c, CX + 34, 170, CW - 40, BUILDINGS[b].desc, pal::dim);
         if (G.st.bDamage[b]) gfx_text(c, CX + 5, 186, "Damaged", pal::red);
-        if (rail(c, 1, 0, 2, "Manage", UB_GOLD)) { g_buildingSel = b; ui_push(PN_BUILDING); }
+        if (rail(c, 1, 0, 2, "Manage", UB_GOLD | hl(TH_BASE))) { g_buildingSel = b; ui_push(PN_BUILDING); }
         footer(c, "Select", "Back");
     } else if (active == 2) {
         ui_panel(c, CX, 2, CW, 220, "Jobs");
@@ -858,7 +875,7 @@ static void panelBase(Canvas& c) {
 // ---------------------------------------------------------------- building menu
 static void panelBuilding(Canvas& c) {
     static const char* T[] = {"Build", "Upgrade", "Repair"};
-    for (int t = 0; t < 3; t++) if (rail(c, 0, t, 3, T[t], tab == t ? UB_SELECTED : 0)) tab = t;
+    for (int t = 0; t < 3; t++) if (rail(c, 0, t, 3, T[t], tab == t ? UB_SELECTED : (t == 1 ? hl(TH_UPGRADE) : 0))) tab = t;   // (the tutorial pulses Upgrade)
     if (ui_shoulderR()) tab = (tab + 1) % 3; if (ui_shoulderL()) tab = (tab + 2) % 3;
     if (tab > 2) tab = 0;
     int b = g_buildingSel;
@@ -905,7 +922,7 @@ static void panelBuilding(Canvas& c) {
         if (b == B_QUARTERS) { fa[0] = "Sleep"; fa[1] = "Rest 2h"; }
     }
     int nr = 2 + (fa[0] ? 1 : 0) + (fa[1] ? 1 : 0);
-    if (rail(c, 1, 0, nr, T[tab], UB_GOLD, can && afford)) {
+    if (rail(c, 1, 0, nr, T[tab], UB_GOLD | (tab == 1 ? hl(TH_UPGRADE) : 0), can && afford)) {
         pay(cost);
         if (tab == 2) { G.st.bDamage[b]--; journal(JK_INFO, "The %s was repaired.", d.name); }
         else {
@@ -1205,7 +1222,7 @@ static void panelWorldMap(Canvas& c) {
     else if (S.cooldown >= 0) snprintf(b, sizeof b, "Restock in %d:%02d", (int)S.cooldown / 60, (int)S.cooldown % 60);
     else snprintf(b, sizeof b, S.visited ? "Cooldown: Ready" : "Unexplored");
     gfx_text(c, CX + 6, y, b, S.cooldown >= 0 ? pal::gold : pal::green);
-    if (rail(c, 1, 0, 2, "Deploy", UB_GOLD | (L.map >= 0 ? hl(TH_DEPLOY) : 0), L.map >= 0 && G.scene == SC_SETTLEMENT, S_ICON_TRAIN)) {
+    if (rail(c, 1, 0, 2, "Deploy", UB_GOLD, L.map >= 0 && G.scene == SC_SETTLEMENT, S_ICON_TRAIN)) {
         G.squad[0] = (int8_t)G.st.leader; G.squad[1] = G.squad[2] = -1; g_mapSel = sel;
         ui_push(PN_PREP);
     }
@@ -1215,7 +1232,7 @@ static void panelWorldMap(Canvas& c) {
 static bool eligible(int i) { const Survivor& s = G.st.surv[i]; return s.alive && !s.quarantined && s.hp >= 30; }
 
 static void panelPrep(Canvas& c) {
-    ui_panel(c, CX, 2, CW, 220, "Expedition Prep");
+    ui_panel(c, CX, 2, CW, 220, "Raid Prep");
     if (G.squad[0] < 0 || !eligible(G.squad[0])) { for (int i = 0; i < G.st.nsurv; i++) if (eligible(i)) { G.squad[0] = (int8_t)i; break; } }
     if (G.squad[0] < 0) {
         gfx_text(c, CX + 8, 22, "Nobody is fit to travel.", pal::red);
@@ -1254,25 +1271,14 @@ static void panelPrep(Canvas& c) {
     snprintf(b, sizeof b, "Security while away: %d", sec);
     gfx_text(c, CX + 6, 196, b, sec < 25 ? pal::red : pal::cream);
     gfx_text(c, CX + 6, 207, sec < 25 ? "Settlement left exposed!" : security_rating(sec), sec < 25 ? pal::red : pal::dim);
-    if (rail(c, 1, 0, 3, "Deploy", UB_GOLD | hl(TH_DEPLOY), true, S_ICON_TRAIN)) {
-        int dest = g_mapSel;
-        for (int k = 0; k < 3; k++) if (G.squad[k] >= 0) G.st.surv[G.squad[k]].onExpedition = true;
-        G.expLoc = (int8_t)dest;
-        save_write(G.saveSlot);
-        level_leave();
-        level_enter(LOCATIONS[dest].map, dest);
-        G.clock += 45; // travel time
-        ui_open(PN_HUD);
-        game_toast("Arrived at the %s. Find supplies and extract south.", LOCATIONS[dest].name);
-        return;
-    }
+    if (rail(c, 1, 0, 3, "Deploy", UB_GOLD, true, S_ICON_TRAIN)) { expedition_begin(g_mapSel); return; }
     if (rail(c, 1, 1, 3, "Review Pack", 0, true, S_ICON_MAT)) { g_invSurvivor = G.squad[0]; ui_push(PN_INVENTORY); }
     if (rail(c, 1, 2, 3, "Back", 0, true, -1, BTN_B) || ui_pressedB()) ui_back();
 }
 
 static void panelSummary(Canvas& c) {
     Summary& s = G.sum;
-    ui_panel(c, CX, 2, CW, 220, s.failed ? "Expedition Failed" : "Extraction");
+    ui_panel(c, CX, 2, CW, 220, s.failed ? "Raid Failed" : "Extraction");
     int y = 20;
     for (int i = 0; i < s.nlines; i++) y += 10 * gfx_wrap(c, CX + 6, y, CW - 12, s.lines[i], i == 0 ? pal::gold : (strstr(s.lines[i], "died") ? pal::red : pal::cream)) + 2;
     resRow(c, CX + 6, 190, true);
@@ -1360,7 +1366,7 @@ static void panelControls(Canvas& c) {
 }
 static void panelCredits(Canvas& c) {
     ui_panel(c, CX, 2, CW, 220, "Credits");
-    gfx_wrap(c, CX + 6, 22, CW - 12, "STAYING ALIVE\n\nDesign, code, pixel art and audio created for this project. All art and sound are original and generated in code.\n\nBuilt with devkitPro / libctru (3DS) and Win32 (PC).\n\nThanks for playing.", pal::cream);
+    gfx_wrap(c, CX + 6, 22, CW - 12, "STAYING ALIVE\n\nDesign, code, pixel art and audio created for this project. All art and sound are original and generated in code.\n\nSoundtrack: seven original pieces for a small synthesiser, one for the menus and one for each place.\n\nBuilt with devkitPro / libctru (3DS) and Win32 (PC).\n\nThanks for playing.", pal::cream);
     if (rail(c, 1, 0, 1, "Back", 0, true, -1, BTN_B) || ui_pressedB()) ui_back();
 }
 static void panelDeath(Canvas& c) {

@@ -178,7 +178,7 @@ static void shots(const char* dir) {
     step(20); shot(dir, "01_title");
     game_newGame(); step(40);
     shot(dir, "02_settlement_day");
-    tut_start(); step(12); shot(dir, "02b_tutorial_banner"); tut_skip(); G.toastT = 0;
+    tut_start(); step(40); press(BTN_A); press(BTN_A); step(60); shot(dir, "02b_tutorial_scene"); tut_skip(); G.toastT = 0;   // the opening scene, at the radio line
     ui_open(PN_CONTROLS); step(8); shot(dir, "02c_controls_3ds");
     { extern int g_inputStyle; extern const char* g_keyName[12]; static const char* PC[12] = {"E", "Shift", "R", "Space", "Q", "F", "Esc", "Tab", "^", "v", "<", ">"}; for (int i = 0; i < 12; i++) g_keyName[i] = PC[i]; g_inputStyle = 1; step(2); shot(dir, "02d_controls_keyboard"); ui_open(PN_HUD); step(4); shot(dir, "02e_hud_keyboard_prompts"); g_inputStyle = 0; }
     ui_open(PN_BASE); step(10); shot(dir, "03_settlement_base");
@@ -186,7 +186,7 @@ static void shots(const char* dir) {
     ui_open(PN_SURVIVORS); step(10); shot(dir, "05_survivors");
     ui_open(PN_WORLDMAP); step(10); shot(dir, "06_world_map");
     tap(289, 36);   // Deploy (right rail, top) -> prep
-    step(5); shot(dir, "07_expedition_prep");
+    step(5); shot(dir, "07_raid_prep");
     G.squad[1] = 4; step(2);
     tap(289, 36);   // Deploy
     step(40); shot(dir, "08_police_arrival");
@@ -245,6 +245,11 @@ static void shots(const char* dir) {
     ui_open(PN_SETTINGS); step(8); shot(dir, "27_settings");
     ui_open(PN_ANIMTEST); step(20); shot(dir, "28_anim_test_room");
     ui_open(PN_SAVELOAD); step(8); shot(dir, "29_save_load");
+    // the tutorial: a lesson out on the raid, the tour of the buildings, the upgrade lesson
+    game_newGame(); tut_start(); press(BTN_START); step(30); shot(dir, "31_tutorial_raid_lesson");
+    expedition_finish(false); ui_open(PN_HUD); step(4); press(BTN_A); press(BTN_A); step(80); shot(dir, "32_tutorial_tour");
+    press(BTN_START); step(4); g_buildingSel = B_STORAGE; ui_open(PN_BUILDING); step(8); shot(dir, "33_tutorial_upgrade");
+    tut_skip(); G.toastT = 0;
     G.scene = SC_TITLE; G.inLevel = false; ui_open(PN_MAIN); step(8); shot(dir, "30_main_menu");
 }
 
@@ -357,6 +362,7 @@ static void icons(const char* dir) {
 
 #include "handoff.inc"
 #include "playtest.inc"
+#include "music.inc"
 
 int main(int argc, char** argv) {
     game_init();
@@ -369,6 +375,8 @@ int main(int argc, char** argv) {
     else if (argc >= 3 && !strcmp(argv[1], "--handoff")) handoff(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--lineup")) lineup(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--zombies")) zombies(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "--tutorial")) tutorialShots(argv[2]);
+    else if (argc >= 3 && !strcmp(argv[1], "--music")) musicTool(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--duel")) duel(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--base")) base(argv[2]);
     else if (argc >= 3 && !strcmp(argv[1], "--playtest")) playtest(argv[2], argc >= 4 ? atoi(argv[3]) : 30);

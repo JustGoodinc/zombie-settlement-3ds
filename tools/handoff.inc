@@ -69,10 +69,15 @@ static void captureScreens() {
     tapC(289, 36); step(6);   // Start (right rail)
     cap("03_tutorial_offer", "Front end", "Tutorial offer (modal)", "Confirm dialog shown on New Game while the tutorial has never been finished or skipped.");
     tapC(98, 151); step(30);   // Yes
-    cap("04_tutorial_step1", "Tutorial", "Tutorial banner: step 1/10", "Top-screen banner: step counter, title, glyph of the control to use, wrapped hint, skip hint. Bottom HUD gains Skip Tutorial.");
-    G.tut = 2; G.tutT = 1; step(4);
-    cap("05_tutorial_highlight", "Tutorial", "Tutorial: pulsing target button", "Step 3 pulses the Expedition button gold until the world map is opened.");
-    tut_skip(); G.toastT = 0;
+    step(20); press(BTN_A); press(BTN_A); step(60);   // on to the radio line
+    cap("04_tutorial_scene", "Tutorial", "Tutorial: opening scene", "Letterboxed scene at the settlement before the first raid: speaker well, name, a line that types itself out, A to continue. HUD hidden; the touch screen offers Next, Skip Scene, Skip Tutorial.");
+    press(BTN_START); step(30);                       // skip to the raid
+    cap("05_tutorial_lesson", "Tutorial", "Tutorial: lesson on the raid", "Lesson banner (counter, title, hint with the control's glyph inline) and a gold marker on what it points at. The objective line shows the lesson's goal.");
+    expedition_finish(false); ui_open(PN_HUD); step(4); press(BTN_A); press(BTN_A); step(80);
+    cap("05b_tutorial_tour", "Tutorial", "Tutorial: tour of the buildings", "Back home the camera visits each of the six buildings: gold brackets on the building, its picture and name beside the line.");
+    press(BTN_START); step(4); g_buildingSel = B_STORAGE; ui_open(PN_BUILDING); step(8);
+    cap("05c_tutorial_upgrade", "Tutorial", "Tutorial: upgrade lesson", "The Upgrade tab pulses gold, then the Upgrade button; the lesson ends when a building goes up a level.");
+    tut_skip(); game_newGame(); G.toastT = 0;
     ui_open(PN_SETTINGS); step(8);
     cap("06_settings", "Front end", "Settings", "Volumes (segmented bars), day length, screen shake, FPS, camera zoom, window/fullscreen (PC), Controls, Replay Tutorial, Animation Test Room.");
     ui_open(PN_CONTROLS); step(6);
@@ -86,7 +91,7 @@ static void captureScreens() {
     cap("10_credits", "Front end", "Credits", "");
     // ---- settlement
     ui_open(PN_HUD); G.clock = 10 * 60; step(30);
-    cap("11_settlement_day", "Settlement", "Settlement HUD - day", "Top: player at the campfire, cabins, tents, watchtower, settlers at work. Bottom: resources, population/security, minimap with buildings, objective, Base/Survivors/Expedition/Journal/Inventory/Pause.");
+    cap("11_settlement_day", "Settlement", "Settlement HUD - day", "Top: player at the campfire, cabins, tents, watchtower, settlers at work. Bottom: resources, population/security, minimap with buildings, objective, Base/Survivors/Raid/Journal/Inventory/Pause.");
     G.clock = 19 * 60; step(10);
     cap("12_settlement_dusk", "Settlement", "Settlement - dusk", "Amber grade as daylight fades.");
     G.clock = 23 * 60; step(20);
@@ -144,26 +149,26 @@ static void captureScreens() {
     ui_open(PN_SAVELOAD); step(6);
     cap("36_save_load", "Front end", "Save / Load", "");
     ui_open(PN_WORLDMAP); step(6);
-    cap("37_world_map", "Expedition", "World map - Police Station", "Location list with icons, map preview, loot, threat, restock timer, Deploy.");
+    cap("37_world_map", "Raid", "World map - Police Station", "Location list with icons, map preview, loot, threat, restock timer, Deploy.");
     tapC(31, 48); step(4);
-    cap("38_world_map_unscouted", "Expedition", "World map - unscouted location", "Unscouted locations are visibly disabled; Deploy greys out.");
+    cap("38_world_map_unscouted", "Raid", "World map - unscouted location", "Unscouted locations are visibly disabled; Deploy greys out.");
     tapC(31, 16); step(2); tapC(289, 36); step(6);
     G.squad[1] = 4; step(2);
-    cap("39_expedition_prep", "Expedition", "Expedition preparation", "Leader picker, equipment summary, companions (max 2), security-while-away warning, Deploy.");
+    cap("39_raid_prep", "Raid", "Raid preparation", "Leader picker, equipment summary, companions (max 2), security-while-away warning, Deploy.");
     tapC(289, 36); step(40);
     // ---- expedition
-    cap("40_police_arrival", "Expedition", "Police Station - arrival", "Parking lot, POLICE sign with strobes, cars, cones, extraction chevrons. Bottom HUD: explored-only minimap, objective, glyph hints.");
+    cap("40_police_arrival", "Raid", "Police Station - arrival", "Parking lot, POLICE sign with strobes, cars, cones, extraction chevrons. Bottom HUD: explored-only minimap, objective, glyph hints.");
     Unit& u = G.u[G.ctrl];
     u.x = u.px = 26 * 16 + 8.0f; u.y = u.py = 29 * 16 + 8.0f; u.fy = -1; u.fx = 0; u.dir = 6;
     for (int i = 0; i < G.nu; i++) if (i != G.ctrl && !G.u[i].escort) { G.u[i].x = G.u[i].px = u.x - 14; G.u[i].y = G.u[i].py = u.y + 10; }
     G.nz = 0; step(20);
-    cap("41_police_lobby", "Expedition", "Police Station - lobby interior", "Interior lighting, wall ambient occlusion, desks, benches, litter decals.");
+    cap("41_police_lobby", "Raid", "Police Station - lobby interior", "Interior lighting, wall ambient occlusion, desks, benches, litter decals.");
     int best = -1; float bd = 1e9f;
     for (int i = 0; i < G.map.nprop; i++) { const Prop& p = G.map.prop[i]; if (p.container < 0) continue; float dx = p.tx * 16 + 8 - u.x, dy = p.ty * 16 + 8 - u.y; if (dx * dx + dy * dy < bd) { bd = dx * dx + dy * dy; best = i; } }
     const Prop& cp = G.map.prop[best]; u.x = u.px = cp.tx * 16 + 8.0f; u.y = u.py = cp.ty * 16 + 30.0f; u.fx = 0; u.fy = -1; u.dir = 6; step(8);
-    cap("42_container_highlight", "Expedition", "Container in reach", "Lime pulsing outline + A prompt plate (drawn after zoom, stays sharp).");
+    cap("42_container_highlight", "Raid", "Container in reach", "Lime pulsing outline + A prompt plate (drawn after zoom, stays sharp).");
     press(BTN_A); step(16);
-    cap("43_searching", "Expedition", "Searching", "Gold outline + progress bar; the survivor crouches; moving cancels.");
+    cap("43_searching", "Raid", "Searching", "Gold outline + progress bar; the survivor crouches; moving cancels.");
     step(40);
     cap("44_container_menu", "Inventory", "Container (loot) menu", "Slots row, Take All (pulses during tutorial), Take, Store, Inspect, compact backpack. World paused.");
     ui_open(PN_HUD); step(4);
@@ -197,20 +202,20 @@ static void captureScreens() {
         map_refresh(G.map);
     }
     step(20);
-    cap("51_rescue", "Expedition", "Trapped survivor (rescue)", "HELP! bubble behind the opened cell door; A to rescue, then escort to extraction.");
+    cap("51_rescue", "Raid", "Trapped survivor (rescue)", "HELP! bubble behind the opened cell door; A to rescue, then escort to extraction.");
     const uint8_t Z[3] = {100, 150, 200};
     static const char* ZN[3] = {"52_zoom_100", "53_zoom_150", "54_zoom_200"};
     for (int i = 0; i < 3; i++) { G.set.zoom = Z[i]; step(4); char t[32]; snprintf(t, sizeof t, "Camera zoom %d%%", Z[i]); cap(ZN[i], "Atmosphere", t, "Settings > Camera zoom. Default is 125%; HUD and text stay native resolution."); }
     G.set.zoom = 125;
     ui_open(PN_SQUAD); step(6);
-    cap("55_squad_orders", "Expedition", "Squad orders", "Follow / Hold / Retreat per companion.");
+    cap("55_squad_orders", "Raid", "Squad orders", "Follow / Hold / Retreat per companion.");
     ui_open(PN_PAUSE); step(6);
-    cap("56_pause_expedition", "Front end", "Pause - expedition", "PAUSED banner on the dimmed top screen; Save disabled away from the settlement.");
+    cap("56_pause_raid", "Front end", "Pause - raid", "PAUSED banner on the dimmed top screen; Save disabled away from the settlement.");
     ui_open(PN_HUD);
     u.x = u.px = G.map.exitX * 16 + 8.0f; u.y = u.py = G.map.exitY * 16 + 8.0f; step(4);
-    cap("57_extraction_prompt", "Expedition", "Extraction zone", "Yellow chevrons blink green; A to extract.");
+    cap("57_extraction_prompt", "Raid", "Extraction zone", "Yellow chevrons blink green; A to extract.");
     press(BTN_A); step(10);
-    cap("58_extraction_summary", "Expedition", "Extraction summary", "Results, deaths, delivered resources, rescued survivor offer, Return.");
+    cap("58_extraction_summary", "Raid", "Extraction summary", "Results, deaths, delivered resources, rescued survivor offer, Return.");
     ui_open(PN_DEATH); step(6);
     cap("59_survivor_lost", "Front end", "Survivor lost", "Shown when the controlled survivor dies at the settlement.");
     G.debugAnim = 0; ui_open(PN_ANIMTEST); step(20);
@@ -355,7 +360,7 @@ static void writeDocs(int assetCount) {
     fprintf(m, "## 8. Asset package (%d files)\n\n| Folder | Contents |\n|---|---|\n", assetCount);
     fprintf(m, "| `assets/props_icons/` | props, decals, UI icons (transparent PNG, 1x and @4x) |\n| `assets/tiles/` | door / window / gate overlays (`_h` in a horizontal wall, `_v` in a vertical wall) and crack overlays |\n| `assets/levels/` | every map as its baked level layer: floors, walls, fences, shadows, ground detail (1x PNG) |\n| `assets/furniture/` | furniture and vehicles, every variant |\n| `assets/items/` | inventory item art (12 px per grid cell) |\n");
     fprintf(m, "| `assets/characters/` | every survivor palette and zombie look x 8 directions x 15 poses |\n| `assets/portraits/` | 24x24 portraits |\n| `assets/buildings/` | 6 buildings x plot + 3 levels |\n");
-    fprintf(m, "| `assets/ui/` | components sheet, bottom-screen background, font sheet, palette strip |\n| `assets/audio/` | 29 effects + 4 ambience/music beds (WAV 22.05 kHz mono) |\n| `assets/sheets/` | review sheets (characters, tiles, props, items, buildings) |\n| `assets/app_icons/` | 3DS icon/banner, Windows .ico |\n\n");
+    fprintf(m, "| `assets/ui/` | components sheet, bottom-screen background, font sheet, palette strip |\n| `assets/audio/` | 29 effects, 3 ambience beds and the 7 pieces of the soundtrack, one loop each (WAV 22.05 kHz mono) |\n| `assets/sheets/` | review sheets (characters, tiles, props, items, buildings) |\n| `assets/app_icons/` | 3DS icon/banner, Windows .ico |\n\n");
     fprintf(m, "## 9. Review and mockup comparisons\n\n`review/` holds the staged Try 2 scenes and side-by-side comparisons (mockup left, game right): `compare_settlement.png`, `compare_combat.png`, `compare_characters.png`, `compare_portrait_cap.png`, `compare_portrait_longhair.png`, plus `character_lineup.png` (4x), `combat_police_station.png`, `settlement_day.png`, `settlement_dusk.png`, `settlement_overview_100.png`. Regenerate the scenes with `zs_tool --lineup`, `--duel` and `--base`.\n\n");
     fprintf(m, "## 10. Open design work\n\n- Five launch maps are built and playtested (Police Station, Hospital, Supermarket, Train Yard, Neighborhood); more can be added as ASCII layouts in `src/world/maps.cpp` (check them with `zs_tool --playtest`).\n- 45-degree character directions reuse front/back art with a turned head.\n- Bushes and street trees around the Police Station (the mockup has them).\n- All art is procedural/original: characters and settlement buildings in `src/core/art.cpp`, floors/walls/ground detail in `src/gameplay/worldart.cpp`, furniture and vehicles in `propart.cpp`, item icons in `itemart.cpp`, combat effects in `fx.cpp`.\n- Review tools: `zs_tool --mapshots`, `--combat`, `--settlement`, `--rain`, `--gallery`, `--bench`, `--bench-bake`, `--playtest`.\n");
     fclose(m);

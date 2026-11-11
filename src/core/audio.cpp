@@ -39,6 +39,7 @@ static void tone(Buf& b, int start, float sec, float f0, float f1, float amp, fl
 static int S(float sec) { return (int)(sec * AUDIO_RATE); }
 
 void audio_init() {
+    music_init();
     // firearms: crack (noise) + body thump (sine) + tail
     sfx[SFX_PISTOL] = mk(0.35f); noise(sfx[SFX_PISTOL], 0, 0.3f, 0.9f, 22, 0.6f, 1); tone(sfx[SFX_PISTOL], 0, 0.12f, 140, 60, 0.6f, 30, 0); sfx[SFX_PISTOL].prio = 3;
     sfx[SFX_REVOLVER] = mk(0.45f); noise(sfx[SFX_REVOLVER], 0, 0.4f, 1.0f, 14, 0.5f, 2); tone(sfx[SFX_REVOLVER], 0, 0.16f, 120, 50, 0.7f, 22, 0); sfx[SFX_REVOLVER].prio = 3;
@@ -111,40 +112,45 @@ void audio_playAt(Sfx s, float x, float y, float vol, float pitch) {
 
 int audio_activeVoices() { int n = 0; for (auto& v : voices) n += v.s >= 0; return n; }
 
-// procedural ambience + music drone, generated per sample (cheap oscillators)
-static float windY, windMod, cricketPh, droneP[3], musicT;
+// Mixed a block at a time: sound effects, ambience (wind, crickets at night outdoors) and the soundtrack (music.cpp).
+static float windY, cricketPh, ambT;
 void audio_mix(int16_t* out, int frames) {
-    static const float CH[4][3] = {{110.0f, 130.8f, 164.8f}, {98.0f, 116.5f, 146.8f}, {87.3f, 110.0f, 130.8f}, {98.0f, 123.5f, 146.8f}};
-    for (int i = 0; i < frames; i++) {
-        float mix = 0;
+    enum { BLOCK = 256 };
+    static float fx[BLOCK], mus[BLOCK];
+    while (frames > 0) {
+        const int n = frames < BLOCK ? frames : BLOCK;
+        memset(fx, 0, n * sizeof(float)); memset(mus, 0, n * sizeof(float));
         for (auto& v : voices) {
             if (v.s < 0) continue;
-            const Buf& b = sfx[v.s]; int p = (int)v.pos;
-            if (p >= b.n) { v.s = -1; continue; }
-            mix += b.d[p] / 32767.0f * v.vol * sfxV;
-            v.pos += v.step;
+            const Buf& b = sfx[v.s];
+            for (int i = 0; i < n; i++) {
+                const int p = (int)v.pos;
+                if (p >= b.n) { v.s = -1; break; }
+                fx[i] += b.d[p] * (1.0f / 32767.0f) * v.vol;
+                v.pos += v.step;
+            }
         }
-        // ambience: wind (filtered noise, slowly modulated), crickets at night outdoors
-        musicT += 1.0f / AUDIO_RATE;
-        windMod = 0.5f + 0.5f * sinf(musicT * 0.21f) * sinf(musicT * 0.07f + 1.3f);
-        windY += 0.02f * ((arng.f() * 2 - 1) - windY);
-        float amb = windY * (ambIndoor ? 0.10f : 0.22f) * (0.4f + windMod);
-        if (ambNight && !ambIndoor) {
-            cricketPh += 4200.0f / AUDIO_RATE; cricketPh -= floorf(cricketPh);
-            float gate = fmodf(musicT * 3.1f, 1.0f) < 0.12f && fmodf(musicT * 0.37f, 1.0f) < 0.6f ? 1.0f : 0.0f;
-            amb += sinf(cricketPh * PI2) * 0.025f * gate;
+        // the wind rises and falls slowly, so its level is worked out once a block
+        ambT += (float)n / AUDIO_RATE;
+        const float wind = (ambIndoor ? 0.10f : 0.22f) * (0.9f + 0.5f * sinf(ambT * 0.21f) * sinf(ambT * 0.07f + 1.3f));
+        const bool crickets = ambNight && !ambIndoor && fmodf(ambT * 0.37f, 1.0f) < 0.6f;
+        for (int i = 0; i < n; i++) {
+            windY += 0.02f * ((arng.f() * 2 - 1) - windY);
+            float amb = windY * wind;
+            if (crickets) {
+                cricketPh += 4200.0f / AUDIO_RATE; if (cricketPh >= 1) cricketPh -= 1;
+                if (fmodf(ambT * 3.1f + i * (3.1f / AUDIO_RATE), 1.0f) < 0.12f) amb += (cricketPh < 0.5f ? 4 * cricketPh - 1 : 3 - 4 * cricketPh) * 0.022f;   // a thin triangle chirp
+            }
+            fx[i] += amb;
         }
-        // music: slow detuned drone chords (atmospheric, never intense)
-        int chord = ((int)(musicT / 8.0f)) & 3; float fade = fmodf(musicT, 8.0f); float env = fade < 2 ? fade / 2 : (fade > 6 ? (8 - fade) / 2 : 1);
-        float mus = 0;
-        for (int k = 0; k < 3; k++) {
-            droneP[k] += CH[chord][k] * (ambTitle ? 1.0f : 0.5f) / AUDIO_RATE; droneP[k] -= floorf(droneP[k]);
-            mus += sinf(droneP[k] * PI2) * 0.05f;
+        music_render(mus, n);
+        const float mg = musicV * (paused ? 0.6f : 1.0f);
+        for (int i = 0; i < n; i++) {
+            float total = (fx[i] * sfxV + mus[i] * mg) * masterV;
+            total = total > 1 ? 1 : (total < -1 ? -1 : total);
+            out[i] = (int16_t)(total * 32000);
         }
-        mus *= env * (ambSettle || ambTitle ? 1.0f : 0.55f);
-        float total = (mix + amb * sfxV + mus * musicV * (paused ? 0.6f : 1.0f)) * masterV;
-        if (total > 1) total = 1; if (total < -1) total = -1;
-        out[i] = (int16_t)(total * 32000);
+        out += n; frames -= n;
     }
 }
 
@@ -163,16 +169,33 @@ const char* audio_sfxName(int s) { return SFX_NAMES[s]; }
 int audio_exportWavs(const char* dir) {
     char p[512]; int n = 0;
     for (int s = 0; s < SFX_COUNT; s++) if (sfx[s].d) { snprintf(p, sizeof p, "%s/sfx_%02d_%s.wav", dir, s, SFX_NAMES[s]); writeWav(p, sfx[s].d, sfx[s].n); n++; }
-    // ambience + music beds, rendered through the real mixer
-    struct Bed { const char* name; bool night, indoor, settle, title; } beds[4] = {
-        {"bed_title_music", false, false, false, true}, {"bed_settlement_day", false, false, true, false},
-        {"bed_expedition_night_outdoor", true, false, false, false}, {"bed_expedition_indoor", false, true, false, false}};
+    // ambience beds (no music), then every piece of the soundtrack for one full loop, all through the real mixer
+    struct Bed { const char* name; bool night, indoor; } beds[3] = {{"bed_day_outdoor", false, false}, {"bed_night_outdoor", true, false}, {"bed_indoor", false, true}};
     static int16_t buf[AUDIO_RATE * 16];
     for (auto& b : beds) {
         for (auto& v : voices) v.s = -1;
-        audio_ambience(b.night, b.indoor, b.settle, b.title); audio_volumes(10, 8, 8); audio_pause(false);
+        music_reset(MUS_NONE);
+        audio_ambience(b.night, b.indoor, false, false); audio_volumes(10, 8, 8); audio_pause(false);
         audio_mix(buf, AUDIO_RATE * 16);
         snprintf(p, sizeof p, "%s/%s.wav", dir, b.name); writeWav(p, buf, AUDIO_RATE * 16); n++;
     }
+    for (int t = 0; t < MUS_COUNT; t++) { snprintf(p, sizeof p, "%s/music_%d_%s.wav", dir, t, music_name(t)); for (char* c = p + strlen(dir); *c; c++) if (*c == ' ') *c = '_'; n += audio_exportMusic(t, p) > 0; }
+    music_reset(MUS_NONE);
     return n;
+}
+// One full loop of a piece as a WAV (music only, at the level it has with the Music and Master sliders at full).
+// Returns the number of samples written.
+int audio_exportMusic(int track, const char* path) {
+    const int total = (int)(music_loopSeconds(track) * AUDIO_RATE);
+    int16_t* pcm = (int16_t*)malloc(total * sizeof(int16_t)); if (!pcm) return 0;
+    music_reset(track);
+    static float blk[1024];
+    for (int at = 0; at < total;) {
+        const int m = total - at < 1024 ? total - at : 1024;
+        memset(blk, 0, m * sizeof(float)); music_render(blk, m);
+        for (int i = 0; i < m; i++) { float v = blk[i]; pcm[at + i] = (int16_t)((v > 1 ? 1 : (v < -1 ? -1 : v)) * 32000); }
+        at += m;
+    }
+    writeWav(path, pcm, total); free(pcm);
+    return total;
 }

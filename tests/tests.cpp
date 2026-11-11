@@ -277,6 +277,65 @@ static void testZombieLooks() {
     CHECK(inmates >= 1);
 }
 
+// the soundtrack: every piece is well formed and plays a full loop cleanly, the same way every time; the game asks
+// for the piece that belongs to the place; a change of piece fades instead of cutting; the music slider is obeyed
+static void testMusic() {
+    SECTION("music: seven pieces, clean, repeatable, and they follow the place");
+    CHECK(music_check() == nullptr);
+    static float a[4096], b[4096];
+    for (int t = 0; t < MUS_COUNT; t++) {
+        const float secs = music_loopSeconds(t); const int total = (int)(secs * AUDIO_RATE);
+        CHECK(secs > 45 && secs < 130 && music_name(t)[0]);
+        music_reset(t);
+        float peak = 0; double sum = 0; int bad = 0;
+        for (int at = 0; at < total; at += 4096) {
+            const int m = total - at < 4096 ? total - at : 4096;
+            memset(a, 0, sizeof a); music_render(a, m);
+            for (int i = 0; i < m; i++) { const float v = a[i]; if (!(v == v) || fabsf(v) > 4) bad++; if (fabsf(v) > peak) peak = fabsf(v); sum += v * v; }
+        }
+        const float rms = (float)sqrt(sum / total);
+        if (bad || peak >= 1.0f || peak < 0.3f || rms < 0.04f || rms > 0.25f) printf("  %s: peak %.2f rms %.3f bad %d\n", music_name(t), peak, rms, bad);
+        CHECK(bad == 0);
+        CHECK(peak < 1.0f && peak > 0.3f);       // never clips, even with the sliders at full
+        CHECK(rms > 0.04f && rms < 0.25f);       // and is neither a whisper nor a wall
+        music_reset(t); memset(a, 0, sizeof a); music_render(a, 4096);
+        music_reset(t); memset(b, 0, sizeof b); music_render(b, 4096);
+        CHECK(!memcmp(a, b, sizeof a));          // the same notes every time
+    }
+    // a change of piece fades the old one out and the new one in: no jump in the signal anywhere across the change
+    music_reset(MUS_SETTLEMENT);
+    for (int k = 0; k < 20; k++) { memset(a, 0, sizeof a); music_render(a, 4096); }
+    audio_music(MUS_HOSPITAL);
+    float last = a[4095], jump = 0, tail = 0;
+    for (int k = 0; k < 16; k++) {
+        memset(a, 0, sizeof a); music_render(a, 4096);
+        for (int i = 0; i < 4096; i++) { const float d = fabsf(a[i] - last); if (d > jump) jump = d; last = a[i]; if (k == 15 && fabsf(a[i]) > tail) tail = fabsf(a[i]); }
+    }
+    CHECK(jump < 0.12f);
+    CHECK(tail > 0.02f && audio_musicTrack() == MUS_HOSPITAL);   // and the new piece is playing
+    // the music slider: silence at zero (effects off too), sound above it
+    static int16_t out[2048];
+    music_reset(MUS_MENU); audio_volumes(10, 0, 0); audio_pause(false);
+    int loud = 0;
+    for (int k = 0; k < 8; k++) { audio_mix(out, 2048); for (int i = 0; i < 2048; i++) loud += out[i] != 0; }
+    CHECK(loud == 0);
+    audio_volumes(10, 0, 6);
+    for (int k = 0; k < 8; k++) { audio_mix(out, 2048); for (int i = 0; i < 2048; i++) loud += out[i] != 0; }
+    CHECK(loud > 1000);
+    // the game asks for the piece that belongs to where you are
+    game_newGame(); frames(2);
+    CHECK(audio_musicTrack() == MUS_SETTLEMENT);
+    static const int WANT[LOC_COUNT] = {MUS_POLICE, MUS_HOSPITAL, MUS_MARKET, MUS_YARD, MUS_HOMES};
+    for (int l = 0; l < LOC_COUNT; l++) {
+        game_newGame(); G.squad[0] = 0; G.squad[1] = G.squad[2] = -1; G.st.surv[0].onExpedition = true;
+        level_leave(); level_enter(LOCATIONS[l].map, l); ui_open(PN_HUD); frames(2);
+        CHECK(audio_musicTrack() == WANT[l]);
+    }
+    G.scene = SC_TITLE; G.inLevel = false; ui_open(PN_MAIN); frames(2);
+    CHECK(audio_musicTrack() == MUS_MENU);
+    music_reset(MUS_NONE);
+}
+
 // every launch location: within engine limits, every container has a reachable open side, no sealed floor
 static void testLaunchMaps() {
     SECTION("maps: all five launch locations are well formed");
@@ -424,7 +483,7 @@ static void testSettlement() {
     for (int i = 0; i < 200; i++) skill_xp(G.st.surv[0], SK_SHOOT, 1);
     CHECK(G.st.surv[0].skill[SK_SHOOT] > lvl);
 
-    SECTION("expeditions: extraction delivers resources, loot refresh");
+    SECTION("raids: extraction delivers resources, loot refresh");
     startExpedition();
     int food = G.st.res[RES_FOOD];
     G.st.surv[0].pack.add(makeItem(IT_CANNED, 2));
@@ -539,47 +598,142 @@ static void testMenus() {
 }
 
 
+static void press(uint32_t b) { Input i; i.down = b; i.held = b; frames(1, i); frames(1); }
+static void tap(int x, int y) {   // stylus tap on the bottom screen
+    Input a; a.touching = true; a.touchDown = true; a.tx = x; a.ty = y; frames(1, a);
+    Input b; b.touchUp = true; b.tx = x; b.ty = y; frames(1, b);
+    frames(1);
+}
 static void testTutorialZoom() {
-    SECTION("tutorial: every step completes from real player actions");
+    SECTION("tutorial: the opening scene plays itself and hands over at the raid");
     save_setDir("test_saves/");
     game_newGame();
     G.set.tutorialDone = false;
     tut_start();
-    CHECK(tut_active() && G.tut == 0);
-    Input mv; mv.ax = 1; mv.held = 0;
-    frames(40, mv);                                   // walk
-    CHECK(G.tut == 1);
-    ui_open(PN_INVENTORY); frames(2); ui_open(PN_HUD); frames(2);   // backpack open + close
-    CHECK(G.tut == 2);
-    CHECK(tut_highlight() == TH_EXPEDITION);
-    ui_open(PN_WORLDMAP); frames(2);
-    CHECK(G.tut == 3 && tut_highlight() == TH_DEPLOY);
-    G.squad[0] = 0; G.squad[1] = -1; G.squad[2] = -1; G.st.surv[0].onExpedition = true;
-    level_leave(); level_enter(MAP_POLICE, 0); ui_open(PN_HUD); frames(2);
-    CHECK(G.tut == 4);
-    int prop = -1; for (int i = 0; i < G.map.nprop; i++) if (G.map.prop[i].container >= 0) { prop = i; break; }
-    ui_container(prop, -1); frames(2);
-    CHECK(G.tut == 5 && tut_highlight() == TH_TAKEALL);
-    ui_open(PN_HUD); frames(2);
-    CHECK(G.tut == 6);
-    Survivor& s = G.st.surv[0]; s.pack.it[s.equip].mag = 5; s.pack.it[s.equip].dur = 100;
-    G.u[0].cd = 0; dbg_fire(0); frames(2);
-    CHECK(G.tut == 7);
-    Input rl; rl.down = BTN_X; rl.held = BTN_X; frames(1, rl); frames(2);
-    CHECK(G.tut == 8);
-    Input b1; b1.held = BTN_B; b1.down = BTN_B; frames(1, b1); Input b2; b2.up = BTN_B; frames(1, b2); frames(10);
-    CHECK(G.tut == 9);
-    expedition_finish(false); frames(2);
-    CHECK(G.tut == 10);
-    G.frameMs = 1000.0f / 30; frames(200);
-    CHECK(!tut_active() && G.set.tutorialDone);
+    CHECK(tut_active() && G.tut == TS_INTRO && tut_scene());
+    int total = 0;
+    CHECK(tut_sceneBeat(total) == 0 && total == 5);                // fire, radio, leader, the walk, the title card
+    float x0 = G.u[G.ctrl].x, y0 = G.u[G.ctrl].y;
+    Input mv; mv.ax = 1; frames(20, mv);
+    CHECK(G.u[G.ctrl].x == x0 && G.u[G.ctrl].y == y0);              // the pad is the scene's: the leader stays put
+    press(BTN_SELECT);
+    CHECK(G.panel == PN_HUD);                                      // ...and no menu opens over it
+    press(BTN_A); CHECK(tut_sceneBeat(total) == 0);                // the first A finishes the line being typed
+    press(BTN_A); CHECK(tut_sceneBeat(total) == 1);                // the second moves on
+    for (int k = 0; k < 4; k++) press(BTN_A);
+    CHECK(tut_sceneBeat(total) == 3);                              // the walk to the gate, which nobody has to steer
+    frames(30);
+    CHECK(G.u[G.ctrl].y > y0 + 10);
+    for (int i = 0; i < 400 && G.tut == TS_INTRO; i++) frames(1);
+    CHECK(G.tut == TS_MOVE && !tut_scene() && G.scene == SC_EXPEDITION && G.map.id == MAP_POLICE);
+    Unit& u = G.u[G.ctrl];
+    int squad = 0, near = 0;
+    for (int i = 0; i < G.nu; i++) squad += !G.u[i].escort;
+    for (int i = 0; i < G.nz; i++) near += hypotf(G.z[i].x - u.x, G.z[i].y - u.y) < 200;
+    CHECK(squad == 1 && near == 0);                                // a solo raid, and a quiet street to learn in
+    CHECK(G.st.surv[u.sv].onExpedition && G.expLoc == G.curLoc);
 
-    SECTION("tutorial: skip, and dying/extracting early never strands it");
+    SECTION("tutorial: raid lessons finish when the player does the thing");
+    Survivor& s = G.st.surv[u.sv];
+    mv.ax = -1; frames(40, mv);
+    CHECK(G.tut == TS_SEARCH);
+    int prop = -1; float bd = 1e9f;                                // the marked container is the one nearest the arrival point
+    for (int i = 0; i < G.map.nprop; i++) {
+        const Prop& p = G.map.prop[i]; if (p.container < 0) continue;
+        float d = hypotf(p.tx * 16 + p.tw * 8.0f - (G.map.spawnX * 16 + 8.0f), p.ty * 16 + p.th * 8.0f - (G.map.spawnY * 16 + 8.0f));
+        if (d < bd) { bd = d; prop = i; }
+    }
+    const Prop& mp = G.map.prop[prop];
+    u.x = u.px = mp.tx * 16 + mp.tw * 8.0f; u.y = u.py = (mp.ty + mp.th) * 16 + 9.0f; u.fx = 0; u.fy = -1;
+    frames(2); press(BTN_A); frames(50);                           // search it
+    CHECK(G.panel == PN_CONTAINER && G.tut == TS_LOOT && tut_highlight() == TH_TAKEALL);
+    const Container& ct = G.loc[G.curLoc].cont[mp.container];
+    CHECK(ct.n == 4 && ct.it[0].id == IT_TOOLS && ct.it[1].id == IT_SCRAP);   // the fixed first haul
+    tap(30, 36);                                                   // Take All
+    CHECK(ct.n == 0 && s.pack.countOf(IT_TOOLS) == 1 && s.pack.countOf(IT_SCRAP) == 3);
+    press(BTN_B); frames(2);
+    CHECK(G.panel == PN_HUD && G.tut == TS_PACK);
+    press(BTN_SELECT); CHECK(G.panel == PN_INVENTORY && G.tut == TS_PACK);
+    press(BTN_B); frames(2);
+    CHECK(G.panel == PN_HUD && G.tut == TS_FIGHT);
+    int lesson = 0, side = 0;
+    for (int i = 0; i < G.nz; i++) if (G.z[i].spawnIdx == SPAWN_LESSON) { lesson++; side += G.z[i].x > u.x ? 1 : -1; CHECK(fabsf(G.z[i].x - u.x) > 100); }
+    CHECK(lesson == 2 && (side == 2 || side == -2));               // two of them, out of view, from one side
+    float minHp = s.hp;
+    for (int i = 0; i < 900; i++) { frames(1); if (s.hp < minHp) minHp = s.hp; }
+    CHECK(minHp < 100);                                            // they reach you and they bite...
+    CHECK(minHp >= 25 && s.infection == INF_NONE && u.alive);      // ...but a lesson cannot end the run
+    CHECK(G.tut == TS_FIGHT);                                      // and standing there does not pass it
+    s.pack.it[s.equip].mag = 3;
+    for (int i = 0; i < G.nz; i++) if (G.z[i].spawnIdx == SPAWN_LESSON) dbg_zombieHit(i, HR_HEAD, 1);
+    frames(2);
+    CHECK(G.tut == TS_RELOAD);
+    press(BTN_X); frames(2);
+    CHECK(G.tut == TS_DODGE);
+    Input b1; b1.held = BTN_B; b1.down = BTN_B; frames(1, b1); Input b2; b2.up = BTN_B; frames(1, b2); frames(10);
+    CHECK(G.tut == TS_EXTRACT);
+    int mat = G.st.res[RES_MAT];
+    u.x = u.px = G.map.exitX * 16 + 8.0f; u.y = u.py = G.map.exitY * 16 + 8.0f;
+    frames(2); press(BTN_A); frames(2);
+    CHECK(G.scene == SC_SETTLEMENT && G.panel == PN_SUMMARY && G.tut == TS_HOME);
+    CHECK(G.st.res[RES_MAT] == mat + 15);                          // toolbox 6 + three scrap at 3: the haul reached the stores
+
+    SECTION("tutorial: home, the tour of the buildings, an upgrade, the next raid");
+    tap(289, 36);                                                  // Return Home
+    if (G.panel == PN_JOURNAL) press(BTN_B);
+    frames(3);
+    CHECK(G.panel == PN_HUD && G.tut == TS_TOUR && tut_scene());
+    CHECK(tut_sceneBeat(total) == 0 && total == 8);                // a greeting, six buildings, a closing line
+    press(BTN_A); press(BTN_A);
+    frames(90);                                                    // the camera travels to the first building
+    float sx = 0, sy = 0;
+    for (int i = 0; i < G.map.nprop; i++) if (G.map.prop[i].type == PR_PLOT && G.map.prop[i].special == B_STORAGE) { sx = G.map.prop[i].tx * 16 + 24.0f; sy = G.map.prop[i].ty * 16 + 24.0f; }
+    float want = sx - view_w() / 2, most = (float)(G.map.w * 16 - view_w());   // as far as the edge of the map allows
+    CHECK(fabsf(G.camX - (want < 0 ? 0 : (want > most ? most : want))) < 6);
+    for (int k = 0; k < 14; k++) press(BTN_A);
+    CHECK(G.tut == TS_BUILDING && !tut_scene() && tut_highlight() == TH_BASE);
+    Unit& h = G.u[G.ctrl];
+    h.x = h.px = sx; h.y = h.py = sy + 34; h.fx = 0; h.fy = -1;      // at the storage door
+    frames(2); press(BTN_A); frames(2);
+    CHECK(G.panel == PN_BUILDING && g_buildingSel == B_STORAGE && G.tut == TS_UPGRADE && tut_highlight() == TH_UPGRADE);
+    int lv = G.st.bLevel[B_STORAGE]; mat = G.st.res[RES_MAT];
+    tap(30, 108);                                                  // the Upgrade tab
+    tap(289, 36);                                                  // Upgrade
+    frames(2);
+    CHECK(G.st.bLevel[B_STORAGE] == lv + 1 && G.st.res[RES_MAT] == mat - 25);
+    CHECK(G.tut == TS_PLAN && tut_highlight() == TH_RAID);
+    press(BTN_B); frames(2);
+    CHECK(G.panel == PN_HUD && tut_active());
+    tap(30, 185);                                                  // Raid: the world map
+    frames(2);
+    CHECK(G.panel == PN_WORLDMAP && !tut_active() && G.set.tutorialDone);
+
+    SECTION("tutorial: skipping, leaving early and empty stores never strand it");
     game_newGame(); G.set.tutorialDone = false; tut_start();
     tut_skip();
-    CHECK(!tut_active() && G.set.tutorialDone);
-    game_newGame(); tut_start(); G.tut = 4; ui_open(PN_SUMMARY); frames(2);
-    CHECK(G.tut == 10);
+    CHECK(!tut_active() && G.set.tutorialDone && G.scene == SC_SETTLEMENT);
+    game_newGame(); tut_start();
+    press(BTN_START); frames(2);                                   // START skips the scene, not the tutorial
+    CHECK(G.tut == TS_MOVE && G.scene == SC_EXPEDITION && G.panel == PN_HUD);   // (and the same press does not open the pause menu)
+    expedition_finish(false); frames(2);                           // out again before a single lesson is done
+    CHECK(G.tut == TS_HOME);
+    ui_open(PN_HUD); frames(2);
+    CHECK(G.tut == TS_TOUR);
+    press(BTN_START); frames(2);
+    CHECK(G.tut == TS_BUILDING);
+    for (int r = 0; r < RES_COUNT; r++) G.st.res[r] = 0;           // nothing in the stores: the upgrade is shown, not forced
+    ui_open(PN_BUILDING); frames(2);
+    CHECK(G.tut == TS_UPGRADE);
+    ui_open(PN_HUD); frames(30);
+    CHECK(G.tut == TS_PLAN);
+    G.scene = SC_TITLE; G.inLevel = false; ui_open(PN_MAIN); frames(2);   // off to the main menu: dropped quietly
+    CHECK(!tut_active());
+    game_newGame(); tut_start(); press(BTN_START); frames(2);
+    expedition_finish(true); frames(2);                            // the raid failed: the settlement half still runs
+    CHECK(G.tut == TS_HOME);
+    ui_open(PN_HUD); frames(2);
+    CHECK(G.tut == TS_TOUR && tut_scene());
+    tut_skip();
 
     SECTION("zoom: every level renders, view covers the screen, settings persist");
     startExpedition();
@@ -597,7 +751,6 @@ static void testTutorialZoom() {
     CHECK(G.set.zoom == 200 && !G.set.tutorialDone);
     G.set.zoom = 125;
 }
-static void press(uint32_t b) { Input i; i.down = b; i.held = b; frames(1, i); frames(1); }
 static void testMenuNav() {
     SECTION("menus: D-pad and Circle Pad navigate every paused menu, holding repeats");
     save_setDir("test_saves/");
@@ -640,6 +793,7 @@ int main() {
     testLaunchMaps();
     testVisualLayers();
     testZombieLooks();
+    testMusic();
     testSettlement();
     testSave();
     testAnimation();

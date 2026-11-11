@@ -2,7 +2,7 @@
 
 A top-down pixel-art zombie survival and settlement-management game for **Windows PC** and **Nintendo 3DS**, built from one shared C++17 codebase.
 
-Run expeditions to handcrafted locations, scavenge containers, organise a grid backpack, fight or avoid zombies, extract, and grow your settlement of survivors. Survivors die permanently.
+Raid handcrafted locations, scavenge containers, organise a grid backpack, fight or avoid zombies, extract, and grow your settlement of survivors. Survivors die permanently.
 
 ![Police station, hospital, supermarket, train yard, neighbourhood and the settlement](docs/showcase.png)
 
@@ -10,14 +10,16 @@ The dead are whoever they used to be: officers, inmates and riot police in the s
 
 ![Zombie looks: sixteen people, four versions of each](docs/zombie_looks.png)
 
-These screenshots are from the current development build. The v0.3.0 download below predates this art pass ([docs/ART_DIRECTION.md](docs/ART_DIRECTION.md)).
+A new game opens with a short scene at the camp fire and goes straight out on a first raid that teaches looting and fighting; back home, a tour of the six buildings ends with your first upgrade. The soundtrack is seven original pieces for a small synthesiser, in the manner of late-70s and early-80s horror film scores: one for the menus and one for each place.
+
+These screenshots are from the current development build. The v0.3.0 download below predates this art pass, the new tutorial and the soundtrack ([docs/ART_DIRECTION.md](docs/ART_DIRECTION.md)).
 
 ## Status
 
 Early playable build. See [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md) for exact per-feature status and [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for limitations.
 
-**Playable now:** settlement (5 survivors, 6 buildings, jobs, resources, recruitment, infirmary, workshop, stash), five expeditions (Police Station, Hospital, Supermarket, Train Yard, Neighborhood) with zombies, containers, keys and locked doors, survivor rescue and extraction, the grid inventory with stylus drag, rotation and stacking, day/night with a flashlight, infection and permanent death, incidents, and save/load.
-**Not yet:** real-hardware verification of the 3DS build (frame rate and load times are unmeasured on a console), and an FBI QR install test.
+**Playable now:** settlement (5 survivors, 6 buildings, jobs, resources, recruitment, infirmary, workshop, stash), five places to raid (Police Station, Hospital, Supermarket, Train Yard, Neighborhood) with zombies, containers, keys and locked doors, survivor rescue and extraction, the grid inventory with stylus drag, rotation and stacking, day/night with a flashlight, infection and permanent death, incidents, a guided first raid, a soundtrack, and save/load.
+**Not yet:** real-hardware verification of the 3DS build (frame rate and load times are unmeasured on a console), an FBI QR install test, and a listening test of the audio (the soundtrack has been checked by measurement only).
 
 ## Install
 

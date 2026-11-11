@@ -453,6 +453,60 @@ static void bakeBench() {
     (void)n;
 }
 
+// zs_tool --tutorial DIR: plays the whole tutorial through the real input (A to move the scenes on, the pad, the touch
+// screen) and saves both screens at every stage, to review how it reads from the first line to the last lesson
+static void tutorialShots(const char* dir) {
+    game_newGame(); G.set.tutorialDone = false; G.set.zoom = 200;
+    int total = 0; char nm[48];
+    auto line = [&]() { press(BTN_A); press(BTN_A); };            // finish the line being typed, then move on
+    tut_start(); step(50); shot(dir, "t01_scene_fire");
+    line(); step(70); shot(dir, "t02_scene_radio");
+    line(); step(70); shot(dir, "t03_scene_leader");
+    line(); step(45); shot(dir, "t04_scene_gate");
+    for (int i = 0; i < 300 && tut_sceneBeat(total) < 4 && tut_scene(); i++) step(1);
+    step(36); shot(dir, "t05_title_card");
+    for (int i = 0; i < 300 && G.tut == TS_INTRO; i++) step(1);
+    step(20); shot(dir, "t06_lesson_move");
+    Unit* u = &G.u[G.ctrl];
+    Input up; up.ay = -1; step(34, up); step(6); shot(dir, "t07_lesson_search");
+    int prop = -1; float bd = 1e9f;
+    for (int i = 0; i < G.map.nprop; i++) { const Prop& p = G.map.prop[i]; if (p.container < 0) continue; float d = len2(p.tx * 16 + p.tw * 8.0f - u->x, p.ty * 16 + p.th * 8.0f - u->y); if (d < bd) { bd = d; prop = i; } }
+    const Prop& mp = G.map.prop[prop];
+    u->x = u->px = mp.tx * 16 + mp.tw * 8.0f; u->y = u->py = (mp.ty + mp.th) * 16 + 9.0f; u->fx = 0; u->fy = -1;
+    step(3); press(BTN_A); step(50); shot(dir, "t08_lesson_loot");
+    tap(30, 36); step(4); press(BTN_B); step(12); shot(dir, "t09_lesson_backpack");
+    press(BTN_SELECT); step(10); shot(dir, "t10_backpack_open");
+    press(BTN_B); step(4);
+    for (int f = 0; f < 600 && G.tut == TS_FIGHT; f++) {          // face the nearest of the two and fire
+        int zi = -1; float zd = 1e9f;
+        for (int k = 0; k < G.nz; k++) if (G.z[k].spawnIdx == SPAWN_LESSON && G.z[k].state != ZS_DEAD) { float d = len2(G.z[k].x - u->x, G.z[k].y - u->y); if (d < zd) { zd = d; zi = k; } }
+        Input in; in.held = BTN_L;
+        if (zi >= 0) { u->fx = (G.z[zi].x - u->x) / zd; u->fy = (G.z[zi].y - 4 - u->y) / zd; if (zd < 96 && f % 9 == 0) { in.down |= BTN_Y; in.held |= BTN_Y; } }
+        step(1, in);
+        if (f == 70) shot(dir, "t11_lesson_fight");
+    }
+    step(12); shot(dir, "t12_lesson_reload");
+    press(BTN_X); step(50); shot(dir, "t13_lesson_dodge");
+    { Input b1; b1.held = BTN_B; b1.down = BTN_B; step(1, b1); Input b2; b2.up = BTN_B; step(1, b2); }
+    step(30); shot(dir, "t14_lesson_extract");
+    u->x = u->px = G.map.exitX * 16 + 8.0f; u->y = u->py = G.map.exitY * 16 + 8.0f; step(20); shot(dir, "t15_at_the_chevrons");
+    press(BTN_A); step(12); shot(dir, "t16_home_summary");
+    tap(289, 36); if (G.panel == PN_JOURNAL) press(BTN_B);
+    step(50); shot(dir, "t17_tour_greeting");
+    for (int k = 0; k < B_COUNT; k++) { line(); step(85); snprintf(nm, sizeof nm, "t%02d_tour_building_%d", 18 + k, k + 1); shot(dir, nm); }
+    line(); step(60); shot(dir, "t24_tour_closing");
+    line(); step(25); shot(dir, "t25_lesson_buildings");
+    u = &G.u[G.ctrl];
+    for (int i = 0; i < G.map.nprop; i++) if (G.map.prop[i].type == PR_PLOT && G.map.prop[i].special == B_STORAGE) { u->x = u->px = G.map.prop[i].tx * 16 + 24.0f; u->y = u->py = G.map.prop[i].ty * 16 + 58.0f; u->fx = 0; u->fy = -1; }
+    step(20); shot(dir, "t26_at_the_storage");
+    press(BTN_A); step(10); shot(dir, "t27_lesson_upgrade");
+    tap(30, 108); step(8); shot(dir, "t28_upgrade_tab");
+    tap(289, 36); step(20); shot(dir, "t29_upgraded");
+    press(BTN_B); step(14); shot(dir, "t30_lesson_next_raid");
+    tap(30, 185); step(12); shot(dir, "t31_tutorial_complete");
+    printf("tutorial walkthrough: %s (active %d, done %d)\n", dir, (int)tut_active(), (int)G.set.tutorialDone);
+}
+
 // zs_tool --rain DIR: the police car park on the first rainy day, at dusk and at night
 static void rainShots(const char* dir) {
     game_newGame(); G.set.tutorialDone = true;

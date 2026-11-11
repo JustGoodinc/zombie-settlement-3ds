@@ -560,6 +560,7 @@ static void finish_search(Unit& u) {
     LocState& L = G.loc[G.curLoc];
     if (!L.generated[p.container]) {
         loot_generate(G.curLoc, p.container, p.type, p.special, L.cont[p.container]);
+        tut_loot(pi, L.cont[p.container]);   // the tutorial's marked container holds a fixed first haul
         L.generated[p.container] = true;
     }
     u.anim.play(AnimState::Idle, true);
@@ -594,10 +595,22 @@ static void unit_die(int ui, const char* cause) {
     save_write(G.saveSlot);   // permanent death is saved immediately
 }
 
+// The squad in G.squad leaves for a location: marked as away, the game saved, 45 minutes on the road.
+void expedition_begin(int loc) {
+    for (int k = 0; k < 3; k++) if (G.squad[k] >= 0) G.st.surv[G.squad[k]].onExpedition = true;
+    G.expLoc = (int8_t)loc;
+    save_write(G.saveSlot);
+    level_leave();
+    level_enter(LOCATIONS[loc].map, loc);
+    G.clock += 45;
+    ui_open(PN_HUD);
+    game_toast("Arrived at the %s. Find supplies and extract south.", LOCATIONS[loc].name);
+}
+
 void expedition_finish(bool failed) {
     Summary& sm = G.sum; memset(&sm, 0, sizeof sm); sm.failed = failed; sm.rescued = -1;
     auto line = [&](const char* fmt, ...) { if (sm.nlines >= 10) return; va_list a; va_start(a, fmt); vsnprintf(sm.lines[sm.nlines++], 48, fmt, a); va_end(a); };
-    line(failed ? "EXPEDITION FAILED - %s" : "Extracted from %s", LOCATIONS[G.curLoc].name);
+    line(failed ? "RAID FAILED - %s" : "Extracted from %s", LOCATIONS[G.curLoc].name);
     for (int k = 0; k < G.nu; k++) {
         Unit& u = G.u[k];
         if (u.escort) {
@@ -803,6 +816,8 @@ static void zombie_attack_land(Zombie& z) {
     if (!u.alive || len2(u.x - z.x, u.y - z.y) > 18) { return; }
     if (u.dodgeT > 0) { float_text(u.x, u.y - 18, "DODGED", pal::cream); return; }
     int dmg = 8 + G.rng.range(7);
+    const bool lesson = z.spawnIdx == SPAWN_LESSON;   // the tutorial's two zombies: weak bites, no infection, never fatal
+    if (lesson) dmg = 4;
     u.hurtT = 0.3f; u.anim.play(AnimState::Hurt);
     u.searchT = 0; u.searchProp = -1;
     spawn_particles(PK_BLOOD, u.x, u.y - 6, 6, pal::blood);
@@ -813,7 +828,8 @@ static void zombie_attack_land(Zombie& z) {
     if (u.escort) { g_escortHp[z.target] -= dmg; if (g_escortHp[z.target] <= 0) unit_die(z.target, "zombie"); return; }
     Survivor& s = G.st.surv[u.sv];
     s.hp -= dmg;
-    if (s.infection == INF_NONE && G.rng.chance(0.12f)) {
+    if (lesson && s.hp < 25) s.hp = 25;
+    if (!lesson && s.infection == INF_NONE && G.rng.chance(0.12f)) {
         s.infection = INF_EARLY; s.infHours = 0; s.infKnown = true;
         float_text(u.x, u.y - 22, "BITTEN!", pal::red);
         game_toast("%s was bitten and is infected!", s.name);
@@ -1102,8 +1118,9 @@ static void update_level(float dt) {
         }
     }
     // camera: follow with a small look-ahead in the facing direction
-    float tx = p.x + p.fx * 24 - view_w() / 2, ty = p.y + p.fy * 18 - view_h() / 2;
-    G.camX += (tx - G.camX) * fminf(1, dt * 6); G.camY += (ty - G.camY) * fminf(1, dt * 6);
+    float tx = p.x + p.fx * 24 - view_w() / 2, ty = p.y + p.fy * 18 - view_h() / 2, ease = 6;
+    if (tut_camera(tx, ty)) ease = 2.6f;   // a tutorial scene points the camera itself, and pans gently
+    G.camX += (tx - G.camX) * fminf(1, dt * ease); G.camY += (ty - G.camY) * fminf(1, dt * ease);
     G.camX = clampf(G.camX, 0, (float)(G.map.w * 16 - view_w())); G.camY = clampf(G.camY, 0, (float)(G.map.h * 16 - view_h()));
     if (G.map.w * 16 < view_w()) G.camX = (G.map.w * 16 - view_w()) / 2.0f;
     if (G.scene == SC_SETTLEMENT) {   // frame the compound fence to fence (Try 2 overview), towers poking over the top fence
@@ -1111,6 +1128,7 @@ static void update_level(float dt) {
         for (int i = 0; i < G.map.w * G.map.h; i++) if (G.map.t[i] == T_PALISADE) { int y = i / G.map.w; if (y < y0) y0 = y; if (y > y1) y1 = y; }
         if (y1 >= 0) {
             float top = y0 * 16.0f - 20, bot = (y1 + 1) * 16.0f + 4;
+            if (tut_scene()) bot += 40;   // a scene has a caption bar across the bottom: let the camera lift the gate side clear of it
             if (bot - top <= view_h()) G.camY = (top + bot - view_h()) / 2.0f;
             else G.camY = clampf(G.camY, top, bot - view_h());
         }
@@ -1176,9 +1194,14 @@ void game_frame(const Input& in, float realDt) {
     G.uiTime += realDt; G.panelT += realDt; G.tabT += realDt;
     audio_volumes(G.set.master, G.set.sfx, G.set.music);
     audio_pause(game_paused());
-    ui_update(in);
-    g_in = in;
-    g_down |= in.down; g_up |= in.up;
+    // A tutorial scene takes the pad away from the player (and walks the leader itself). The menus must not see the
+    // buttons it used either, or the START that skips a scene would open the pause menu in the same frame.
+    Input pad = in, menu = in;
+    if (tut_scene()) { menu.down = menu.held = menu.up = 0; menu.ax = menu.ay = 0; }
+    tut_input(pad);
+    ui_update(menu);
+    g_in = pad;
+    g_down |= pad.down; g_up |= pad.up;
     Panel before = G.panel;
     acc += realDt;
     while (acc >= DT) {
@@ -1194,6 +1217,9 @@ void game_frame(const Input& in, float realDt) {
     bool indoor = false;
     if (G.inLevel) { int tx = (int)(G.u[G.ctrl].x / 16), ty = (int)(G.u[G.ctrl].y / 16); indoor = G.map.in(tx, ty) && (G.map.flags[G.map.idx(tx, ty)] & F_INDOOR); }
     audio_ambience(is_night(), indoor, G.scene == SC_SETTLEMENT, G.scene == SC_TITLE);
+    // the soundtrack: one piece for the menus, one for home, one for each place you raid
+    static const int8_t PIECE[MAP_COUNT] = {MUS_POLICE, MUS_SETTLEMENT, MUS_HOSPITAL, MUS_MARKET, MUS_HOMES, MUS_YARD};   // by map id
+    audio_music(G.scene != SC_TITLE && G.inLevel && G.map.id >= 0 && G.map.id < MAP_COUNT ? PIECE[G.map.id] : MUS_MENU);
 }
 
 

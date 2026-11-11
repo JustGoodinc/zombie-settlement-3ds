@@ -11,4 +11,4 @@ All art is original and generated at startup by `src/core/art.cpp`, from hand-dr
 | `buildings_portraits.png` | 6 buildings × (plot + 3 levels), 8 portraits |
 | `assets/icons/` | 3DS icon 48×48, HOME banner 256×128 + banner sound, Windows .ico |
 
-Audio is original too: 29 synthesised effects plus procedural ambience and music (`src/core/audio.cpp`).
+Audio is original too: 29 synthesised effects, procedural ambience (`src/core/audio.cpp`) and a seven-piece soundtrack played by a small synthesiser (`src/core/music.cpp`).

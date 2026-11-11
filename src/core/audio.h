@@ -17,9 +17,20 @@ void audio_play(Sfx s, float vol = 1.0f, float pitch = 1.0f);
 void audio_playAt(Sfx s, float x, float y, float vol = 1.0f, float pitch = 1.0f);  // world-positioned
 void audio_listener(float x, float y);
 void audio_ambience(bool night, bool indoors, bool settlement, bool title);
+// The soundtrack (music.cpp): one piece for the menus and one for each place, played by a small synth as the game runs.
+enum MusicTrack { MUS_NONE = -1, MUS_MENU, MUS_SETTLEMENT, MUS_POLICE, MUS_HOSPITAL, MUS_MARKET, MUS_YARD, MUS_HOMES, MUS_COUNT };
+void audio_music(int track);                   // the piece that should be playing; a change fades the old one out and the new one in
+int  audio_musicTrack();                       // the piece last asked for
+void music_init();
+void music_reset(int track);                   // start a piece from the top at once, no fade (tools and tests)
+void music_render(float* out, int frames);     // adds the music to out (about -1..1)
+float music_loopSeconds(int track);
+const char* music_name(int track);
+const char* music_check();                     // nullptr when every pattern is well formed, else the name of the piece that is not
 void audio_volumes(int master, int sfx, int music);  // 0..10
 void audio_pause(bool paused);                       // dims ambience while menus pause the game
 void audio_mix(int16_t* out, int frames);            // mono
 int  audio_activeVoices();
-int  audio_exportWavs(const char* dir);   // design handoff: writes every effect + ambience beds
+int  audio_exportWavs(const char* dir);   // design handoff: writes every effect, the ambience beds and the soundtrack
+int  audio_exportMusic(int track, const char* path);   // one full loop of a piece as a WAV; returns samples written
 const char* audio_sfxName(int s);

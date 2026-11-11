@@ -85,4 +85,4 @@ mixed looks render in the same time as sixty in four. None of this has been meas
 
 `zs_tool --mapshots DIR` (every map: overview, arrival, middle, far end, night), `--combat DIR` (a staged firefight in
 every location), `--zombies DIR` (every look, and the four versions of each), `--settlement DIR`, `--rain DIR`,
-`--gallery DIR` (sprite sheets), `--handoff DIR` (all 60 screens + asset export).
+`--gallery DIR` (sprite sheets), `--handoff DIR` (every screen + asset export), `--tutorial DIR` (plays the whole tutorial and saves every stage), `--music DIR` (the soundtrack as WAVs with spectrograms and measurements).

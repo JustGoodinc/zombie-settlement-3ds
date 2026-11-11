@@ -726,7 +726,7 @@ static void render_overlay(Canvas& c, float z) {
     if (pl.searchT > 0) ui_bar(c, SX(pl.x) - 14, SY(pl.y - 34), 28, 5, 1 - pl.searchT / 1.4f, pal::gold);
     if (pl.reloadT > 0) gfx_textC(c, SX(pl.x), SY(pl.y - 38), "RELOADING", pal::cream);
     for (auto& f : G.ft) if (f.life > 0) gfx_textC(c, SX(f.x), SY(f.y), f.txt, f.col);
-    if (g_prompt && !game_paused()) {
+    if (g_prompt && !game_paused() && !tut_scene()) {
         int w = ui_promptW('A', g_prompt) + 8;
         int x = SX(g_promptX), y = SY(g_promptY + 12);
         if (x - w / 2 < 2) x = w / 2 + 2; if (x + w / 2 > TOP_W - 2) x = TOP_W - 2 - w / 2;
@@ -814,7 +814,7 @@ static void hud(Canvas& c) {
     if (G.toastT > 0) {
         int tw = gfx_textW(G.toast) + 12; if (tw > 396) tw = 396;
         int a = G.toastT < 0.4f ? (int)(G.toastT / 0.4f * 200) : 200;
-        int ty = tut_active() ? 174 : 216;   // keep clear of the tutorial banner
+        int ty = tut_active() ? 148 : 216;   // keep clear of the tutorial banner (up to three lines tall, top or bottom)
         gfx_fillA(c, 200 - tw / 2, ty, tw, 14, rgb(24, 26, 42), a); gfx_rect(c, 200 - tw / 2, ty, tw, 14, pal::gold);
         gfx_textC(c, 200, ty + 3, G.toast, pal::cream);
     }
@@ -939,8 +939,7 @@ void game_render(Canvas& top, Canvas& bot, float alpha) {
         }
         profMark(5);   // zoom scale-up
         render_overlay(top, z / 100.0f);
-        tut_render(top);
-        hud(top);
+        if (!tut_scene()) hud(top);   // a tutorial scene has the whole screen
         if (game_paused()) {
             gfx_fillA(top, 0, 0, TOP_W, TOP_H, pal::ink, 110);
             if (G.panel == PN_INVENTORY || G.panel == PN_CONTAINER || G.panel == PN_PAUSE) {
@@ -948,6 +947,7 @@ void game_render(Canvas& top, Canvas& bot, float alpha) {
                 gfx_textC(top, 200, 108, "PAUSED", pal::cream, 2);
             }
         }
+        tut_render(top);              // last, so a lesson stays readable over a paused menu
     }
     ui_render(bot);
 }

@@ -30,9 +30,12 @@ Legend: **NS** not started · **IP** in progress · **I** implemented · **AT** 
 | World map + prep + summary | I, MT |
 | Save/load, corruption recovery | I, AT |
 | Animation system + test room | I, AT, MT |
-| Audio (29 sfx, ambience, music) | I (not listened to by a human yet) |
+| Audio (29 sfx, ambience, seven-piece soundtrack) | I (not listened to by a human yet) |
 | GitHub repo + CI + release v0.1.0 | I (CI green: Windows tests + smoke launch, 3DS build, CIA package) |
-| Hospital, Grocery, Train Yard, Scrapyard, Woods, Residential maps | NS |
+| Hospital, Supermarket, Train Yard, Neighborhood maps (five launch locations with the Police Station) | I, AT, MT (bot playtest, 30 runs per map) |
+| Visual overhaul (baked level layer, lighting, furniture, menus, icons, title) | I, AT (partial), MT |
+| Zombie looks (16 by place x 4 versions, turned survivors) | I, AT, MT |
+| Tutorial (opening scene, raid lessons, buildings tour, first upgrade) | I, AT, MT (scripted walkthrough) |
 | Expanded weapon catalog beyond 9 | NS |
 | Original 3DS performance measurement | NS (needs hardware) |
 | FBI QR install | I (QR points at verified public CIA URL), not HW-tested |
@@ -41,5 +44,5 @@ Legend: **NS** not started · **IP** in progress · **I** implemented · **AT** 
 1. ~~CI green + v0.1.0 release~~ done.
 2. Have a 3DS owner test the CIA via the FBI QR.
 3. Inspect the 3DS build visually in the emulator and measure it on hardware.
-4. Build the remaining six locations (Phase 8), starting with the Grocery Store (low threat, food).
-5. Polish: smoother night lighting, more character detail, more weapons.
+4. Listen to the soundtrack and the effects, and tune them by ear.
+5. More weapons.

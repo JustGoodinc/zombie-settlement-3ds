@@ -35,7 +35,7 @@ Azahar emulator: `C:\Users\admin\Tools\Azahar\azahar-windows-msvc-2126.2\azahar.
 ## Key design decisions
 - A shared software renderer instead of SDL2 or citro2d: pixel-identical output, no downloads, headless tests and screenshots.
 - 3/4 top-down presentation following Try 2 (walls with front faces). 16 px tiles and characters, 8 visual directions (3 mirrored).
-- Saving only at the settlement, with autosave on deploy, death, extraction and each morning. Quitting mid-expedition sends the squad home empty-handed.
+- Saving only at the settlement, with autosave on deploy, death, extraction and each morning. Quitting mid-raid sends the squad home empty-handed.
 - The loot refresh timer starts on departure (see WORLD_MAP_SPECIFICATION).
 
 ## Immediate next actions

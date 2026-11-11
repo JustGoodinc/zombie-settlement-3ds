@@ -5,8 +5,8 @@ All screens live in `src/ui/menus.cpp`. Every screen works with touch and with D
 | Panel | Reached from | Contents |
 |---|---|---|
 | Main | boot | New Game, Continue, Load, Settings, Controls, Credits, Quit (PC) |
-| HUD (settlement) | default | resources, population/security, minimap, objective, Base / Survivors / Expedition / Journal / Inventory / Pause |
-| HUD (expedition) | default | explored minimap, objective, bag info, Inventory / Squad / Pause |
+| HUD (settlement) | default | resources, population/security, minimap, objective, Base / Survivors / Raid / Journal / Inventory / Pause |
+| HUD (raid) | default | explored minimap, objective, bag info, Inventory / Squad / Pause |
 | Pause | START | Resume, Inventory, Survivor Status, Options, Save (settlement only), Controls, Main Menu |
 | Inventory | SELECT, HUD, Pause, Survivors→Backpack, Prep→Review | Grid / Equip / Items / Key tabs, Sort, Use/Equip, Rotate, Drop or To Stash |
 | Container | search, dropped bag, Storage→Open Stash | slots, Take All, Take, Store, Inspect (or Donate at the stash), Back |
@@ -24,7 +24,7 @@ All screens live in `src/ui/menus.cpp`. Every screen works with touch and with D
 | Settings | Main, Pause | volumes, day length, shake, FPS, camera zoom, window scale/fullscreen (PC), Controls, Replay Tutorial, Animation Test Room |
 | Save/Load | Main, Pause | 3 slots, confirmations, damage reporting |
 | Controls | Settings, Pause, Main | glyph + action table for the active device (3DS buttons, keyboard keys, Xbox pad) |
-| Tutorial banner | New Game prompt, Settings → Replay | top-screen step banner; Skip Tutorial on the HUD and in Pause |
+| Tutorial | New Game prompt, Settings → Replay | opening scene and buildings tour (letterboxed, A to continue, START skips the scene; touch screen: Next, Skip Scene, Skip Tutorial); lesson banner with a marker on what it points at; Skip Tutorial on the HUD and in Pause |
 | Credits, Death, Animation Test | as named | |
 
 Unscouted locations are listed but visibly disabled ("UNSCOUTED – Route not yet found") and Deploy is greyed out for them.
@@ -38,14 +38,14 @@ flowchart TD
   Building --> Workshop
   Building --> Stash
   SettlementHUD --> Survivors --> Inventory
-  SettlementHUD --> WorldMap --> Prep --> ExpeditionHUD
+  SettlementHUD --> WorldMap --> Prep --> RaidHUD
   SettlementHUD -->|gate| Recruit
-  ExpeditionHUD -->|A on container| Container
-  ExpeditionHUD --> Squad
-  ExpeditionHUD -->|extract or wipe| Summary --> Journal --> SettlementHUD
+  RaidHUD -->|A on container| Container
+  RaidHUD --> Squad
+  RaidHUD -->|extract or wipe| Summary --> Journal --> SettlementHUD
   Summary -->|rescued| Recruit
   SettlementHUD --> Pause
-  ExpeditionHUD --> Pause
+  RaidHUD --> Pause
   Pause -->|settlement only| SaveSlots
   Pause --> Main
 ```
