@@ -23,9 +23,70 @@ static void fft(float* re, float* im, int n) {   // in place, n a power of two
     }
 }
 
+// The score as the sequencer plays it, one line a bar: every note each voice starts, by name. This is how the
+// writing is checked against what was meant (the patterns in music.cpp are letters, not note names).
+static FILE* scoreOut; static int scoreSect, scoreBar, scoreVoice;
+static void scoreNote(int sect, int bar, int step, int voice, int note) {
+    static const char* NAMES[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    static const char* VOICE[7] = {"bass", "bell", "lead", "strings", "thump", "slam", "tick"};
+    if (sect != scoreSect || bar != scoreBar) { fprintf(scoreOut, "\n  %d.%-2d", sect + 1, bar + 1); scoreSect = sect; scoreBar = bar; scoreVoice = -1; }
+    if (voice != scoreVoice) { fprintf(scoreOut, "  %s", VOICE[voice]); scoreVoice = voice; }
+    if (voice == 3) fprintf(scoreOut, " %s%d", NAMES[note % 12], note / 12 - 1);
+    else if (voice < 3) fprintf(scoreOut, " %d:%s%d", step, NAMES[note % 12], note / 12 - 1);
+    else fprintf(scoreOut, " %d%s", step, note ? "" : "(soft)");
+}
+static void musicScore(const char* dir) {
+    char path[512]; snprintf(path, sizeof path, "%s/score.txt", dir);
+    scoreOut = fopen(path, "w"); if (!scoreOut) return;
+    static float sink[1024];
+    for (int t = 0; t < MUS_COUNT; t++) {
+        fprintf(scoreOut, "%s%s (%.1f s)   section.bar, then each voice's notes as step:note", t ? "\n\n" : "", music_name(t), music_loopSeconds(t));
+        scoreSect = scoreBar = -1;
+        music_trace = scoreNote; music_reset(t);
+        const int total = (int)(music_loopSeconds(t) * AUDIO_RATE) - 64;   // stop just short of the loop point
+        for (int at = 0; at < total; at += 1024) music_render(sink, total - at < 1024 ? total - at : 1024);
+        music_trace = nullptr;
+    }
+    fprintf(scoreOut, "\n"); fclose(scoreOut);
+}
+// Each voice on its own: how loud it is over the whole loop and at its loudest moment (dB, sliders at full), how
+// many notes or hits a second the piece starts, and the highest peak over three times round (the second and third
+// loops are not sample-for-sample the first: the slow wobbles and the echo carry on).
+static int rateNotes;
+static void rateNote(int, int, int, int voice, int) { if (voice != 3) rateNotes++; }
+static void musicVoices() {
+    static float blk[1024];
+    static const int BIT[7] = {1, 2, 8, 4, 16, 32, 64};   // bass, bell, lead, strings, thump, slam, tick
+    printf("\n%-14s  %-11s %-11s %-11s %-11s %-11s %-11s %-11s  %7s %7s\n", "each voice", "bass", "bell", "lead", "strings", "thump", "slam", "tick", "notes/s", "peak x3");
+    for (int t = 0; t < MUS_COUNT; t++) {
+        const int total = (int)(music_loopSeconds(t) * AUDIO_RATE);
+        printf("%-14s ", music_name(t));
+        for (int v = 0; v < 7; v++) {
+            music_voices = BIT[v] | 128; music_reset(t);
+            double sum = 0; float peak = 0;
+            for (int at = 0; at < total; at += 1024) {
+                const int m = total - at < 1024 ? total - at : 1024;
+                memset(blk, 0, sizeof blk); music_render(blk, m);
+                for (int i = 0; i < m; i++) { sum += blk[i] * blk[i]; if (fabsf(blk[i]) > peak) peak = fabsf(blk[i]); }
+            }
+            if (peak < 1e-4f) printf(" %-11s", "-"); else printf(" %5.1f/%-5.1f", 10 * log10(sum / total + 1e-12), 20 * log10f(peak));
+        }
+        music_voices = 255; music_reset(t); rateNotes = 0; music_trace = rateNote;
+        float peak = 0;
+        for (int at = 0; at < total * 3; at += 1024) {
+            if (at >= total) music_trace = nullptr;
+            memset(blk, 0, sizeof blk); music_render(blk, 1024);
+            for (int i = 0; i < 1024; i++) if (fabsf(blk[i]) > peak) peak = fabsf(blk[i]);
+        }
+        music_trace = nullptr;
+        printf("  %7.2f %7.2f\n", rateNotes / music_loopSeconds(t), peak);
+    }
+}
+
 static void musicTool(const char* dir) {
     enum { N = 2048, W = 1000, H = 256 };
     static float win[N], re[N], im[N];
+    musicScore(dir);
     for (int i = 0; i < N; i++) win[i] = 0.5f - 0.5f * cosf(6.2831853f * i / N);
     printf("%-14s %6s %6s %7s %6s  %5s %5s %5s  %s\n", "piece", "loop s", "peak", "rms dB", "crest", "low%", "mid%", "high%", "loudness by eighths of the loop (dB)");
     for (int t = 0; t < MUS_COUNT; t++) {
@@ -90,13 +151,20 @@ static void musicTool(const char* dir) {
     // sine calls a sample that the old drone and crickets made (the part of the old mixer that is gone)
     static int16_t out[1024]; static float blk[1024];
     const int SECS = 120;
-    music_reset(MUS_POLICE);
-    for (int i = 0; i < AUDIO_RATE * 30 / 1024; i++) { memset(blk, 0, sizeof blk); music_render(blk, 1024); }   // get into the full section first
-    auto t0 = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < AUDIO_RATE * SECS / 1024; i++) { memset(blk, 0, sizeof blk); music_render(blk, 1024); }
-    double mus = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t0).count() / SECS;
+    double mus = 0; int worst = 0;   // the dearest piece, over one whole loop of each
+    for (int t = 0; t < MUS_COUNT; t++) {
+        const int blocks = (int)(music_loopSeconds(t) * AUDIO_RATE) / 1024;
+        music_reset(t);
+        auto a = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < blocks; i++) { memset(blk, 0, sizeof blk); music_render(blk, 1024); }
+        double ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - a).count() / (blocks * 1024.0 / AUDIO_RATE);
+        if (ms > mus) { mus = ms; worst = t; }
+    }
+    musicVoices();
+    printf("dearest piece to play: %s\n", music_name(worst));
+    music_reset(worst);
     audio_volumes(8, 8, 6); audio_ambience(true, false, false, false);
-    t0 = std::chrono::high_resolution_clock::now();
+    auto t0 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < AUDIO_RATE * SECS / 1024; i++) audio_mix(out, 1024);
     double mix = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t0).count() / SECS;
     volatile float sink = 0; float ph = 0;

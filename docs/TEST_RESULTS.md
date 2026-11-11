@@ -1,6 +1,6 @@
 # Test Results
 
-Run: `build\zs_tests.exe` (MSVC Release, 2026-11-09). **214 passed, 0 failed.**
+Run: `build\zs_tests.exe` (MSVC Release, 2026-11-10). **418 passed, 0 failed.**
 
 | Area | What is checked |
 |---|---|
@@ -18,7 +18,7 @@ Run: `build\zs_tests.exe` (MSVC Release, 2026-11-09). **214 passed, 0 failed.**
 | UI | every panel opens and B backs out; the recruit Accept flow |
 | Tutorial | the opening scene takes the pad (the leader stays put, no menu opens), A finishes a line and then moves on, the scene walks the leader to the gate and hands over at the police station on a solo raid with a quiet street; every raid lesson finishes only from the real action (walk, search the marked car, Take All, open and close the backpack, kill a lesson zombie, reload, dodge, extract); the marked car holds its fixed haul and the haul reaches the stores; lesson zombies bite but cannot kill or infect; back home the tour visits six buildings with the camera on each; a building is opened at its door and upgraded through the touch screen; opening the world map ends it; skipping the scene with START does not open the pause menu; skipping, leaving early, a failed raid and empty stores never strand it |
 | Zombie looks | every look and version draws at 16x24; no two looks or versions are near-copies; every location fields at least five looks indoors and out; whoever spawns by the cells is an inmate; picking a look leaves the game random numbers alone |
-| Music | all seven pieces are well formed, play a full loop without clipping (even at full volume) or silence, and give the same samples every time; a change of piece fades with no jump in the signal; the music slider is obeyed; the game asks for the piece that belongs to the menu, the settlement and each location |
+| Music | all seven pieces are well formed, are slow (fewer than three notes or hits a second over the whole piece, every voice counted), play a full loop without clipping (even at full volume) or silence, and give the same samples every time; a change of piece fades with no jump in the signal; the music slider is obeyed; the game asks for the piece that belongs to the menu, the settlement and each location |
 | Launch maps and visuals | all five locations within engine limits with every container reachable; baked level layer sized to the map, blood cannot paint walls, cosmetic effects leave the game random numbers alone; every item icon fills its footprint |
 | Zoom | every zoom level renders and the view always covers the screen; zoom and tutorial flag survive settings save/load; old 9-field settings files still load |
 

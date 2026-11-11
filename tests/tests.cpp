@@ -279,22 +279,26 @@ static void testZombieLooks() {
 
 // the soundtrack: every piece is well formed and plays a full loop cleanly, the same way every time; the game asks
 // for the piece that belongs to the place; a change of piece fades instead of cutting; the music slider is obeyed
+static int musicNotes;
+static void countNote(int, int, int, int voice, int) { if (voice != 3) musicNotes++; }   // the strings re-voice every bar: not counted
 static void testMusic() {
-    SECTION("music: seven pieces, clean, repeatable, and they follow the place");
+    SECTION("music: seven pieces, slow, clean, repeatable, and they follow the place");
     CHECK(music_check() == nullptr);
     static float a[4096], b[4096];
     for (int t = 0; t < MUS_COUNT; t++) {
         const float secs = music_loopSeconds(t); const int total = (int)(secs * AUDIO_RATE);
-        CHECK(secs > 45 && secs < 130 && music_name(t)[0]);
-        music_reset(t);
+        CHECK(secs > 80 && secs < 180 && music_name(t)[0]);
+        music_reset(t); musicNotes = 0; music_trace = countNote;
         float peak = 0; double sum = 0; int bad = 0;
         for (int at = 0; at < total; at += 4096) {
             const int m = total - at < 4096 ? total - at : 4096;
             memset(a, 0, sizeof a); music_render(a, m);
             for (int i = 0; i < m; i++) { const float v = a[i]; if (!(v == v) || fabsf(v) > 4) bad++; if (fabsf(v) > peak) peak = fabsf(v); sum += v * v; }
         }
-        const float rms = (float)sqrt(sum / total);
-        if (bad || peak >= 1.0f || peak < 0.3f || rms < 0.04f || rms > 0.25f) printf("  %s: peak %.2f rms %.3f bad %d\n", music_name(t), peak, rms, bad);
+        music_trace = nullptr;
+        const float rms = (float)sqrt(sum / total), rate = musicNotes / secs;
+        if (bad || peak >= 1.0f || peak < 0.3f || rms < 0.04f || rms > 0.25f || rate >= 3.0f) printf("  %s: peak %.2f rms %.3f bad %d, %.2f notes a second\n", music_name(t), peak, rms, bad, rate);
+        CHECK(rate > 0.2f && rate < 3.0f);       // slow: fewer than three notes or hits a second, every voice counted, over the whole piece
         CHECK(bad == 0);
         CHECK(peak < 1.0f && peak > 0.3f);       // never clips, even with the sliders at full
         CHECK(rms > 0.04f && rms < 0.25f);       // and is neither a whisper nor a wall

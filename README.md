@@ -10,7 +10,7 @@ The dead are whoever they used to be: officers, inmates and riot police in the s
 
 ![Zombie looks: sixteen people, four versions of each](docs/zombie_looks.png)
 
-A new game opens with a short scene at the camp fire and goes straight out on a first raid that teaches looting and fighting; back home, a tour of the six buildings ends with your first upgrade. The soundtrack is seven original pieces for a small synthesiser, in the manner of late-70s and early-80s horror film scores: one for the menus and one for each place.
+A new game opens with a short scene at the camp fire and goes straight out on a first raid that teaches looting and fighting; back home, a tour of the six buildings ends with your first upgrade. The soundtrack is seven original pieces for a small synthesiser, one for the menus and one for each place, slow and written as horror score rather than as songs: a low drone, strings that slide into place a semitone wrong, and a sound that belongs to where you are (a heartbeat, a cell door, a heart monitor, a shop chime, a tolling bell, a music box running down).
 
 These screenshots are from the current development build. The v0.3.0 download below predates this art pass, the new tutorial and the soundtrack ([docs/ART_DIRECTION.md](docs/ART_DIRECTION.md)).
 
@@ -19,7 +19,7 @@ These screenshots are from the current development build. The v0.3.0 download be
 Early playable build. See [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md) for exact per-feature status and [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for limitations.
 
 **Playable now:** settlement (5 survivors, 6 buildings, jobs, resources, recruitment, infirmary, workshop, stash), five places to raid (Police Station, Hospital, Supermarket, Train Yard, Neighborhood) with zombies, containers, keys and locked doors, survivor rescue and extraction, the grid inventory with stylus drag, rotation and stacking, day/night with a flashlight, infection and permanent death, incidents, a guided first raid, a soundtrack, and save/load.
-**Not yet:** real-hardware verification of the 3DS build (frame rate and load times are unmeasured on a console), an FBI QR install test, and a listening test of the effects and the in-game mix (the soundtrack itself has been listened to and approved).
+**Not yet:** real-hardware verification of the 3DS build (frame rate and load times are unmeasured on a console), an FBI QR install test, and a listening test of the audio. The soundtrack was rewritten (slow, horror) after the owner found the first version too upbeat, and the new pieces have been measured but not yet heard; the effects and the in-game mix have never been reviewed by ear.
 
 ## Install
 

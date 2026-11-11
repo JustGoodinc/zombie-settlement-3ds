@@ -27,6 +27,10 @@ void music_render(float* out, int frames);     // adds the music to out (about -
 float music_loopSeconds(int track);
 const char* music_name(int track);
 const char* music_check();                     // nullptr when every pattern is well formed, else the name of the piece that is not
+// tools: when set, called for every note the sequencer starts. voice: 0 bass, 1 bell, 2 lead, 3 strings (note is a
+// MIDI number); 4 thump, 5 slam, 6 tick (note is 1 for a full hit, 0 for a soft one)
+extern void (*music_trace)(int sect, int bar, int step, int voice, int note);
+extern int music_voices;                       // tools: which voices may play, one bit each in the order above (all of them unless a tool says otherwise)
 void audio_volumes(int master, int sfx, int music);  // 0..10
 void audio_pause(bool paused);                       // dims ambience while menus pause the game
 void audio_mix(int16_t* out, int frames);            // mono
