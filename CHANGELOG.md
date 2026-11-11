@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — a new first hour (tutorial, soundtrack, raids) and the visual overhaul
+## v0.4.0 — a new first hour (tutorial, soundtrack, raids) and the visual overhaul
 - **New tutorial.** A new game opens with a short scene at the settlement (the fire, the radio, the leader's decision, the walk to the gate, a title card) and goes straight out on a first raid of the police station, alone. Lessons finish when you do the thing, with the button to press drawn in the text and a gold marker on what the lesson points at: move, search the marked car, Take All, open the backpack, fight, reload, dodge, extract. The marked car always holds the same useful first haul. The two zombies of the fight lesson bite weakly and cannot infect, so a first fight cannot end the run; everything else on that raid plays by the normal rules. Back home a second scene takes the camera round the six buildings, then you upgrade one with what you brought back, and the last lesson points at the next raid. A/Next moves a scene on, START skips the scene, Skip Tutorial skips everything. Replay it from Settings.
 - **Expeditions are now raids** everywhere in the game (the Raid button, Raid Prep, Raid Failed, the objective and journal lines).
 - **A soundtrack: slow, and written as horror.** Seven original pieces for a small synthesiser, one for the menus and one for each place. None of them keeps a beat. Each is a low drone that throbs, string chords that slide into place and sit a semitone wrong, one sparse figure, a held note, and a sound that belongs to the place:

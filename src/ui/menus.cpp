@@ -728,7 +728,7 @@ static void panelMain(Canvas& c) {
         char t[16]; snprintf(t, sizeof t, "Slot %d", s + 1); gfx_text(c, CX + 12, y + 5, t, pal::gold);
         gfx_text(c, CX + 12, y + 18, ok ? info : "Empty", ok ? pal::cream : pal::dim);
     }
-    gfx_textC(c, CX + CW / 2, 182, "v0.3.0  PC + 3DS", pal::grey);
+    gfx_textC(c, CX + CW / 2, 182, "v0.4.0  PC + 3DS", pal::grey);
     if (rail(c, 0, 0, 3, "Continue", UB_GOLD, save_exists(G.saveSlot) || any)) {
         int slot = G.saveSlot; if (!save_exists(slot)) for (int s = 0; s < 3; s++) if (save_exists(s)) { slot = s; break; }
         ask(CA_LOAD, slot, "Continue from slot %d?", slot + 1);

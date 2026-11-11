@@ -12,7 +12,7 @@ The dead are whoever they used to be: officers, inmates and riot police in the s
 
 A new game opens with a short scene at the camp fire and goes straight out on a first raid that teaches looting and fighting; back home, a tour of the six buildings ends with your first upgrade. The soundtrack is seven original pieces for a small synthesiser, one for the menus and one for each place, slow and written as horror score rather than as songs: a low drone, strings that slide into place a semitone wrong, and a sound that belongs to where you are (a heartbeat, a cell door, a heart monitor, a shop chime, a tolling bell, a music box running down).
 
-These screenshots are from the current development build. The v0.3.0 download below predates this art pass, the new tutorial and the soundtrack ([docs/ART_DIRECTION.md](docs/ART_DIRECTION.md)).
+These screenshots are from v0.4.0. The rules behind the look are in [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md).
 
 ## Status
 
