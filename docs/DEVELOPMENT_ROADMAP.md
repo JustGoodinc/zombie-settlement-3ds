@@ -30,7 +30,7 @@ Legend: **NS** not started · **IP** in progress · **I** implemented · **AT** 
 | World map + prep + summary | I, MT |
 | Save/load, corruption recovery | I, AT |
 | Animation system + test room | I, AT, MT |
-| Audio (29 sfx, ambience, seven-piece soundtrack) | I, AT; soundtrack rewritten slow and dark on the owner's direction (2026-11-10: the first version was too upbeat), the new version not yet listened to; effects and in-game balance not yet reviewed by ear |
+| Audio (29 sfx, ambience, seven-piece soundtrack) | I, AT; soundtrack rewritten slow and dark on the owner's direction (2026-11-10: the first version was too upbeat), the new version listened to and approved by the owner the same day; effects and in-game balance not yet reviewed by ear |
 | GitHub repo + CI + release v0.1.0 | I (CI green: Windows tests + smoke launch, 3DS build, CIA package) |
 | Hospital, Supermarket, Train Yard, Neighborhood maps (five launch locations with the Police Station) | I, AT, MT (bot playtest, 30 runs per map) |
 | Visual overhaul (baked level layer, lighting, furniture, menus, icons, title) | I, AT (partial), MT |
@@ -44,5 +44,5 @@ Legend: **NS** not started · **IP** in progress · **I** implemented · **AT** 
 1. ~~CI green + v0.1.0 release~~ done.
 2. Have a 3DS owner test the CIA via the FBI QR.
 3. Inspect the 3DS build visually in the emulator and measure it on hardware.
-4. Listen to the new soundtrack, the effects and the in-game mix, and tune them by ear.
+4. Listen to the effects and the in-game mix, and tune them by ear.
 5. More weapons.
