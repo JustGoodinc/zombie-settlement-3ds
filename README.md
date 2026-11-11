@@ -19,7 +19,7 @@ These screenshots are from the current development build. The v0.3.0 download be
 Early playable build. See [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md) for exact per-feature status and [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for limitations.
 
 **Playable now:** settlement (5 survivors, 6 buildings, jobs, resources, recruitment, infirmary, workshop, stash), five places to raid (Police Station, Hospital, Supermarket, Train Yard, Neighborhood) with zombies, containers, keys and locked doors, survivor rescue and extraction, the grid inventory with stylus drag, rotation and stacking, day/night with a flashlight, infection and permanent death, incidents, a guided first raid, a soundtrack, and save/load.
-**Not yet:** real-hardware verification of the 3DS build (frame rate and load times are unmeasured on a console), an FBI QR install test, and a listening test of the audio (the soundtrack has been checked by measurement only).
+**Not yet:** real-hardware verification of the 3DS build (frame rate and load times are unmeasured on a console), an FBI QR install test, and a listening test of the effects and the in-game mix (the soundtrack itself has been listened to and approved).
 
 ## Install
 
